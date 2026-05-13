@@ -24,7 +24,6 @@ export default function PaginaPedidos() {
 
   const audioRef = useRef(null);
 
-  // Comprobar sesión y cargar pedidos al entrar
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -34,7 +33,6 @@ export default function PaginaPedidos() {
       }
       setUsuario(session.user);
 
-      // Comprobar si es superadmin
       const { data: admin } = await supabase.rpc('soy_superadmin');
       setEsAdmin(admin === true);
 
@@ -44,7 +42,6 @@ export default function PaginaPedidos() {
     init();
   }, []);
 
-  // Realtime: escuchar pedidos nuevos
   useEffect(() => {
     const canal = supabase
       .channel('pedidos-realtime')
@@ -120,17 +117,13 @@ export default function PaginaPedidos() {
     <div className="min-h-screen">
       <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" />
 
-      {/* Cabecera */}
       <header className="bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-900">📋 Panel de Pedidos</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{usuario?.email}</span>
-           {esAdmin && (
-              
-                href="/admin"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
+            {esAdmin && (
+              <a href="/admin" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                 🛡️ Admin
               </a>
             )}
@@ -144,10 +137,8 @@ export default function PaginaPedidos() {
         </div>
       </header>
 
-      {/* Contenido */}
       <main className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-1 md:grid-cols-3 gap-6">
 
-        {/* Columna izquierda: lista de pedidos */}
         <div className="md:col-span-1">
           <h2 className="text-lg font-semibold mb-3">Pedidos recientes ({pedidos.length})</h2>
           {pedidos.length === 0 ? (
@@ -184,7 +175,6 @@ export default function PaginaPedidos() {
           )}
         </div>
 
-        {/* Columna derecha: detalle del pedido */}
         <div className="md:col-span-2">
           {!seleccionado ? (
             <div className="bg-white p-8 rounded-lg text-center text-gray-500">
