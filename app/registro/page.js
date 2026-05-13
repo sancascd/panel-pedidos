@@ -9,14 +9,12 @@ export default function PaginaRegistro() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
 
-  // Datos del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nombreRest, setNombreRest] = useState('');
   const [telefono, setTelefono] = useState('');
   const [direccion, setDireccion] = useState('');
 
-  // Estado de la página
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState(false);
@@ -42,26 +40,44 @@ export default function PaginaRegistro() {
       setCargando(false);
       if (authError.message.includes('already')) {
         setError('Ya existe una cuenta con ese email. Inicia sesión en su lugar.');
+      } else if (authError.message.includes('rate limit')) {
+        setError('Has hecho muchos intentos seguidos. Espera unos minutos y vuelve a probarlo.');
       } else {
         setError('No se pudo crear la cuenta: ' + authError.message);
       }
       return;
     }
 
-    // 2. Iniciar sesión (por si no se inicia automáticamente)
-    if (!authData.session) {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-      if (loginError) {
-        setCargando(false);
-        setError('Cuenta creada, pero no se pudo iniciar sesión: ' + loginError.message);
-        return;
-      }
+    if (!authData?.user?.id) {
+      setCargando(false);
+      setError('No se pudo crear el usuario. Inténtalo de nuevo.');
+      return;
     }
 
-    // 3. Llamar a la función de Supabase que crea el restaurante y lo vincula
+    // 2. Confirmar el email automáticamente (porque Supabase Free no nos deja desactivarlo)
+    const { error: confirmError } = await supabase.rpc('confirmar_email_usuario', {
+      usuario_id_in: authData.user.id,
+    });
+
+    if (confirmError) {
+      setCargando(false);
+      setError('No se pudo confirmar la cuenta: ' + confirmError.message);
+      return;
+    }
+
+    // 3. Iniciar sesión (ya con el email confirmado)
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (loginError) {
+      setCargando(false);
+      setError('Cuenta creada pero no se pudo iniciar sesión: ' + loginError.message);
+      return;
+    }
+
+    // 4. Registrar el restaurante y vincularlo al usuario
     const { error: rpcError } = await supabase.rpc('registrar_restaurante', {
       nombre_in: nombreRest,
       telefono_in: telefono,
@@ -76,11 +92,12 @@ export default function PaginaRegistro() {
       return;
     }
 
-    // 4. Éxito
+    // 5. Cerrar sesión: el usuario no debe entrar al panel hasta ser aprobado
+    await supabase.auth.signOut();
+
     setExito(true);
   }
 
-  // Pantalla de éxito (cuando ya se ha registrado)
   if (exito) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
@@ -104,7 +121,6 @@ export default function PaginaRegistro() {
     );
   }
 
-  // Formulario de registro
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
