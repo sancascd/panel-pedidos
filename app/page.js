@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { crearClienteSupabase } from '@/lib/supabase';
 
 export default function PaginaLogin() {
@@ -13,7 +14,6 @@ export default function PaginaLogin() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
-  // Si ya hay sesión activa, redirigimos directamente a /pedidos
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.push('/pedidos');
@@ -93,6 +93,19 @@ export default function PaginaLogin() {
             {cargando ? 'Iniciando sesión...' : 'Entrar'}
           </button>
         </form>
+
+        {/* Enlace al registro */}
+        <div className="mt-6 pt-6 border-t text-center">
+          <p className="text-sm text-gray-600 mb-2">
+            ¿Aún no tienes cuenta?
+          </p>
+          <Link
+            href="/registro"
+            className="inline-block text-blue-600 hover:text-blue-700 font-medium text-sm"
+          >
+            Registra tu restaurante →
+          </Link>
+        </div>
       </div>
     </div>
   );
