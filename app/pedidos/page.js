@@ -4,12 +4,30 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 
-const ESTADOS = {
-  nuevo: { label: 'Nuevo', color: 'bg-red-100 text-red-700', siguiente: 'en_preparacion', siguienteLabel: 'Empezar a preparar' },
-  en_preparacion: { label: 'En preparación', color: 'bg-yellow-100 text-yellow-700', siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
-  listo: { label: 'Listo', color: 'bg-blue-100 text-blue-700', siguiente: 'entregado', siguienteLabel: 'Marcar como entregado' },
-  entregado: { label: 'Entregado', color: 'bg-green-100 text-green-700', siguiente: null, siguienteLabel: null },
+// Estados segun el tipo de entrega.
+// Cada estado dice cual es el siguiente y la etiqueta del boton.
+const FLUJO_DOMICILIO = {
+  recibido:    { label: 'Pedido recibido', color: 'bg-red-100 text-red-700',     siguiente: 'listo',      siguienteLabel: 'Marcar como listo' },
+  listo:       { label: 'Listo',           color: 'bg-yellow-100 text-yellow-700', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
+  en_reparto:  { label: 'En reparto',      color: 'bg-blue-100 text-blue-700',     siguiente: 'entregado',  siguienteLabel: 'Marcar como entregado' },
+  entregado:   { label: 'Entregado',       color: 'bg-green-100 text-green-700',   siguiente: null,         siguienteLabel: null },
 };
+
+const FLUJO_RECOGIDA = {
+  recibido:    { label: 'Pedido recibido', color: 'bg-red-100 text-red-700',       siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
+  listo:       { label: 'Listo para recoger', color: 'bg-green-100 text-green-700', siguiente: null,    siguienteLabel: null },
+};
+
+// Devuelve el flujo correcto segun el tipo de entrega del pedido
+function flujoDe(pedido) {
+  return pedido.tipo_entrega === 'recogida' ? FLUJO_RECOGIDA : FLUJO_DOMICILIO;
+}
+
+// Devuelve la info de un estado, con proteccion por si el estado no existe en ese flujo
+function infoEstado(pedido) {
+  const flujo = flujoDe(pedido);
+  return flujo[pedido.estado] || { label: pedido.estado, color: 'bg-gray-100 text-gray-700', siguiente: null, siguienteLabel: null };
+}
 
 export default function PaginaPedidos() {
   const router = useRouter();
@@ -105,6 +123,14 @@ export default function PaginaPedidos() {
     });
   }
 
+  // Etiqueta del tipo de entrega
+  function etiquetaEntrega(pedido) {
+    if (pedido.tipo_entrega === 'recogida') {
+      return { texto: '🏪 Recogida', clase: 'bg-purple-100 text-purple-700' };
+    }
+    return { texto: '🏠 Domicilio', clase: 'bg-orange-100 text-orange-700' };
+  }
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -151,7 +177,8 @@ export default function PaginaPedidos() {
           ) : (
             <div className="space-y-2">
               {pedidos.map(p => {
-                const est = ESTADOS[p.estado] || ESTADOS.nuevo;
+                const est = infoEstado(p);
+                const entrega = etiquetaEntrega(p);
                 return (
                   <button
                     key={p.id}
@@ -164,6 +191,11 @@ export default function PaginaPedidos() {
                       <span className="font-semibold">#{p.id.slice(-4).toUpperCase()}</span>
                       <span className={`text-xs px-2 py-1 rounded-full ${est.color}`}>
                         {est.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${entrega.clase}`}>
+                        {entrega.texto}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600">{p.cliente_telefono}</p>
@@ -190,9 +222,14 @@ export default function PaginaPedidos() {
                   <h2 className="text-2xl font-bold">Pedido #{seleccionado.id.slice(-4).toUpperCase()}</h2>
                   <p className="text-gray-500 text-sm">{formatearFecha(seleccionado.creado_en)}</p>
                 </div>
-                <span className={`text-sm px-3 py-1 rounded-full ${ESTADOS[seleccionado.estado].color}`}>
-                  {ESTADOS[seleccionado.estado].label}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`text-sm px-3 py-1 rounded-full ${infoEstado(seleccionado).color}`}>
+                    {infoEstado(seleccionado).label}
+                  </span>
+                  <span className={`text-xs px-3 py-1 rounded-full ${etiquetaEntrega(seleccionado).clase}`}>
+                    {etiquetaEntrega(seleccionado).texto}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
@@ -204,10 +241,18 @@ export default function PaginaPedidos() {
                   <p className="text-gray-500">Cliente</p>
                   <p className="font-medium">{seleccionado.cliente_nombre || '-'}</p>
                 </div>
-                <div className="col-span-2">
-                  <p className="text-gray-500">Dirección</p>
-                  <p className="font-medium">{seleccionado.cliente_direccion || '-'}</p>
-                </div>
+                {seleccionado.tipo_entrega !== 'recogida' && (
+                  <div className="col-span-2">
+                    <p className="text-gray-500">Dirección</p>
+                    <p className="font-medium">{seleccionado.cliente_direccion || '-'}</p>
+                  </div>
+                )}
+                {seleccionado.tipo_entrega === 'recogida' && (
+                  <div className="col-span-2">
+                    <p className="text-gray-500">Tipo</p>
+                    <p className="font-medium">El cliente recoge en el local</p>
+                  </div>
+                )}
               </div>
 
               <div className="border-t pt-4 mb-6">
@@ -240,13 +285,18 @@ export default function PaginaPedidos() {
                 </table>
               </div>
 
-              {ESTADOS[seleccionado.estado].siguiente && (
+              {infoEstado(seleccionado).siguiente && (
                 <button
-                  onClick={() => cambiarEstado(seleccionado, ESTADOS[seleccionado.estado].siguiente)}
+                  onClick={() => cambiarEstado(seleccionado, infoEstado(seleccionado).siguiente)}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition"
                 >
-                  {ESTADOS[seleccionado.estado].siguienteLabel} →
+                  {infoEstado(seleccionado).siguienteLabel} →
                 </button>
+              )}
+              {!infoEstado(seleccionado).siguiente && (
+                <div className="w-full bg-gray-100 text-gray-500 text-center font-medium py-3 rounded-lg">
+                  Pedido finalizado
+                </div>
               )}
             </div>
           )}
