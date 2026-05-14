@@ -36,8 +36,6 @@ function columnaDe(pedido) {
   return 'proceso';
 }
 
-// Limpia un telefono para usarlo en un enlace de llamada.
-// Quita el prefijo "whatsapp:" y los espacios.
 function telefonoLimpio(tel) {
   if (!tel) return '';
   return tel.replace('whatsapp:', '').replace(/\s/g, '').trim();
@@ -228,6 +226,9 @@ export default function PaginaPedidos() {
             <span className="text-sm text-gray-500">{usuario?.email}</span>
             <a href="/carta" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
               🍕 Mi carta
+            </a>
+            <a href="/horarios" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              🕐 Horarios
             </a>
             {esAdmin && (
               <a href="/admin" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
