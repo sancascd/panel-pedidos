@@ -148,6 +148,21 @@ export default function PaginaPedidos() {
     return { texto: '🏠 Domicilio', clase: 'bg-orange-100 text-orange-700' };
   }
 
+  // Texto del metodo de pago para mostrar en el detalle
+  function textoPago(pedido) {
+    if (pedido.metodo_pago === 'tarjeta') {
+      return '💳 Tarjeta';
+    }
+    if (pedido.metodo_pago === 'efectivo') {
+      if (pedido.cambio && Number(pedido.cambio) > 0) {
+        return '💵 Efectivo — paga con ' + Number(pedido.paga_con).toFixed(2) +
+               '€ — cambio: ' + Number(pedido.cambio).toFixed(2) + '€';
+      }
+      return '💵 Efectivo — importe justo';
+    }
+    return 'No especificado';
+  }
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -273,7 +288,7 @@ export default function PaginaPedidos() {
               </button>
             </div>
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2 mb-6 flex-wrap">
               <span className={`text-sm px-3 py-1 rounded-full ${infoEstado(seleccionado).color}`}>
                 {infoEstado(seleccionado).label}
               </span>
@@ -302,6 +317,10 @@ export default function PaginaPedidos() {
                   <p className="font-medium">El cliente recoge en el local</p>
                 </div>
               )}
+              <div>
+                <p className="text-gray-500">Pago</p>
+                <p className="font-medium">{textoPago(seleccionado)}</p>
+              </div>
             </div>
 
             <div className="border-t pt-4 mb-6">
