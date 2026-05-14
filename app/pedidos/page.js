@@ -26,10 +26,6 @@ function infoEstado(pedido) {
   return flujo[pedido.estado] || { label: pedido.estado, color: 'bg-gray-100 text-gray-700', siguiente: null, siguienteLabel: null };
 }
 
-// Decide en que columna kanban va cada pedido.
-// Columna 1: recibidos -> hay que cocinar ya
-// Columna 2: en proceso -> listo (domicilio) o en_reparto
-// Columna 3: finalizados -> entregado, o recogida ya lista
 function columnaDe(pedido) {
   const estado = pedido.estado;
   const esRecogida = pedido.tipo_entrega === 'recogida';
@@ -37,7 +33,6 @@ function columnaDe(pedido) {
   if (estado === 'recibido') return 'recibidos';
   if (estado === 'entregado') return 'finalizados';
   if (esRecogida && estado === 'listo') return 'finalizados';
-  // domicilio en 'listo' o 'en_reparto'
   return 'proceso';
 }
 
@@ -161,21 +156,18 @@ export default function PaginaPedidos() {
     );
   }
 
-  // Repartir los pedidos en las tres columnas
   const columnas = {
     recibidos: pedidos.filter(p => columnaDe(p) === 'recibidos'),
     proceso: pedidos.filter(p => columnaDe(p) === 'proceso'),
     finalizados: pedidos.filter(p => columnaDe(p) === 'finalizados'),
   };
 
-  // Definicion visual de cada columna
   const defColumnas = [
     { key: 'recibidos',  titulo: 'Recibidos',   emoji: '🔴', sub: 'Hay que prepararlos' },
     { key: 'proceso',    titulo: 'En proceso',  emoji: '🟡', sub: 'Listos o en reparto' },
     { key: 'finalizados', titulo: 'Finalizados', emoji: '✅', sub: 'Entregados o recogidos' },
   ];
 
-  // Tarjeta de un pedido (se usa en las columnas)
   function TarjetaPedido({ p }) {
     const est = infoEstado(p);
     const entrega = etiquetaEntrega(p);
@@ -255,14 +247,15 @@ export default function PaginaPedidos() {
         </div>
       </main>
 
-      {/* Panel de detalle (se superpone cuando hay un pedido seleccionado) */}
+      {/* Modal de detalle centrado, con fondo desenfocado */}
       {seleccionado && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 flex justify-end z-50"
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{ backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
           onClick={cerrarDetalle}
         >
           <div
-            className="bg-white w-full max-w-md h-full overflow-y-auto p-6 shadow-xl"
+            className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-start mb-6">
