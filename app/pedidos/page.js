@@ -36,6 +36,13 @@ function columnaDe(pedido) {
   return 'proceso';
 }
 
+// Limpia un telefono para usarlo en un enlace de llamada.
+// Quita el prefijo "whatsapp:" y los espacios.
+function telefonoLimpio(tel) {
+  if (!tel) return '';
+  return tel.replace('whatsapp:', '').replace(/\s/g, '').trim();
+}
+
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -148,7 +155,6 @@ export default function PaginaPedidos() {
     return { texto: '🏠 Domicilio', clase: 'bg-orange-100 text-orange-700' };
   }
 
-  // Texto del metodo de pago para mostrar en el detalle
   function textoPago(pedido) {
     if (pedido.metodo_pago === 'tarjeta') {
       return '💳 Tarjeta';
@@ -302,6 +308,30 @@ export default function PaginaPedidos() {
                 <p className="text-gray-500">Teléfono</p>
                 <p className="font-medium">{seleccionado.cliente_telefono}</p>
               </div>
+
+              {/* QR para llamar rapido al cliente */}
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('tel:' + telefonoLimpio(seleccionado.cliente_telefono))}`}
+                  alt="QR para llamar al cliente"
+                  width="90"
+                  height="90"
+                  className="rounded bg-white p-1"
+                />
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">Llamar al cliente</p>
+                  <p className="text-gray-500">
+                    Escanea este código con la cámara del móvil para llamar directamente.
+                  </p>
+                  <a
+                    href={`tel:${telefonoLimpio(seleccionado.cliente_telefono)}`}
+                    className="text-blue-600 hover:underline text-xs"
+                  >
+                    O pulsa aquí para llamar
+                  </a>
+                </div>
+              </div>
+
               <div>
                 <p className="text-gray-500">Cliente</p>
                 <p className="font-medium">{seleccionado.cliente_nombre || '-'}</p>
