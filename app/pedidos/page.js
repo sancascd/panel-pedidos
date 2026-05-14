@@ -122,6 +122,9 @@ export default function PaginaPedidos() {
           <h1 className="text-xl font-bold text-gray-900">📋 Panel de Pedidos</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">{usuario?.email}</span>
+            <a href="/carta" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              🍕 Mi carta
+            </a>
             {esAdmin && (
               <a href="/admin" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                 🛡️ Admin
