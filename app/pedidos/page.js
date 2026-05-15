@@ -126,6 +126,12 @@ export default function PaginaPedidos() {
     setSeleccionado({ ...pedido, estado: nuevoEstado });
   }
 
+  // Imprimir comanda: dispara la ventana de imprimir del navegador.
+  // Solo se imprime la zona marcada con la clase "imprimible" gracias al CSS de print.
+  function imprimirComanda() {
+    window.print();
+  }
+
   async function cerrarSesion() {
     await supabase.auth.signOut();
     router.push('/');
@@ -219,7 +225,77 @@ export default function PaginaPedidos() {
     <div className="min-h-screen">
       <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" />
 
-      <header className="bg-white border-b shadow-sm">
+      {/* Estilos especiales para la impresion.
+          Al imprimir, solo se ve la "zona-imprimible". El resto se oculta. */}
+      <style>{`
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 3mm;
+          }
+          body {
+            background: white !important;
+          }
+          .no-imprimir { display: none !important; }
+          .zona-imprimible {
+            display: block !important;
+            position: static !important;
+            background: white !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: none !important;
+            max-height: none !important;
+            overflow: visible !important;
+            color: black !important;
+          }
+          .zona-imprimible * {
+            color: black !important;
+          }
+          .ticket {
+            font-family: 'Courier New', monospace;
+            font-size: 12pt;
+            line-height: 1.3;
+          }
+          .ticket h1 {
+            font-size: 22pt;
+            text-align: center;
+            margin: 0 0 4mm 0;
+          }
+          .ticket .separador {
+            border-top: 1px dashed #000;
+            margin: 3mm 0;
+          }
+          .ticket .grande {
+            font-size: 14pt;
+            font-weight: bold;
+          }
+          .ticket table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .ticket table th,
+          .ticket table td {
+            text-align: left;
+            padding: 1mm 0;
+          }
+          .ticket table .col-cant { width: 12%; text-align: center; }
+          .ticket table .col-prod { width: 60%; }
+          .ticket table .col-tot { width: 28%; text-align: right; }
+          .ticket .total {
+            font-size: 16pt;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 2mm;
+          }
+        }
+        /* En pantalla, ocultamos el contenido SOLO de impresion */
+        @media screen {
+          .solo-imprimir { display: none; }
+        }
+      `}</style>
+
+      <header className="bg-white border-b shadow-sm no-imprimir">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-900">📋 Panel de Pedidos</h1>
           <div className="flex items-center gap-4">
@@ -245,7 +321,7 @@ export default function PaginaPedidos() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6">
+      <main className="max-w-7xl mx-auto px-6 py-6 no-imprimir">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {defColumnas.map(col => (
             <div key={col.key} className="bg-gray-100 rounded-xl p-3">
@@ -272,7 +348,7 @@ export default function PaginaPedidos() {
       {/* Modal de detalle centrado, con fondo desenfocado */}
       {seleccionado && (
         <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir"
           style={{ backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
           onClick={cerrarDetalle}
         >
@@ -295,13 +371,20 @@ export default function PaginaPedidos() {
               </button>
             </div>
 
-            <div className="flex gap-2 mb-6 flex-wrap">
+            <div className="flex gap-2 mb-6 flex-wrap items-center">
               <span className={`text-sm px-3 py-1 rounded-full ${infoEstado(seleccionado).color}`}>
                 {infoEstado(seleccionado).label}
               </span>
               <span className={`text-sm px-3 py-1 rounded-full ${etiquetaEntrega(seleccionado).clase}`}>
                 {etiquetaEntrega(seleccionado).texto}
               </span>
+              <button
+                onClick={imprimirComanda}
+                className="ml-auto text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg"
+                title="Imprimir comanda"
+              >
+                🖨️ Imprimir comanda
+              </button>
             </div>
 
             <div className="space-y-3 mb-6 text-sm">
@@ -395,6 +478,67 @@ export default function PaginaPedidos() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Zona imprimible: solo se ve al imprimir, contiene la comanda en formato ticket */}
+      {seleccionado && (
+        <div className="zona-imprimible solo-imprimir ticket">
+          <h1>PEDIDO #{seleccionado.id.slice(-4).toUpperCase()}</h1>
+          <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(seleccionado.creado_en)}</p>
+
+          <div className="separador"></div>
+
+          <p className="grande">
+            {seleccionado.tipo_entrega === 'recogida' ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}
+          </p>
+
+          <div className="separador"></div>
+
+          <p><strong>Cliente:</strong> {seleccionado.cliente_nombre || '-'}</p>
+          <p><strong>Telefono:</strong> {telefonoLimpio(seleccionado.cliente_telefono)}</p>
+          {seleccionado.tipo_entrega !== 'recogida' && (
+            <p><strong>Direccion:</strong> {seleccionado.cliente_direccion || '-'}</p>
+          )}
+
+          <div className="separador"></div>
+
+          <table>
+            <thead>
+              <tr>
+                <th className="col-cant">Cant</th>
+                <th className="col-prod">Producto</th>
+                <th className="col-tot">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineas.map(l => (
+                <tr key={l.id}>
+                  <td className="col-cant">{l.cantidad}x</td>
+                  <td className="col-prod">{l.nombre_producto}</td>
+                  <td className="col-tot">{(l.cantidad * l.precio_unitario).toFixed(2)}€</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="separador"></div>
+
+          <p className="total">TOTAL: {Number(seleccionado.total).toFixed(2)}€</p>
+
+          <div className="separador"></div>
+
+          <p><strong>Pago:</strong> {
+            seleccionado.metodo_pago === 'tarjeta' ? 'TARJETA' :
+            seleccionado.metodo_pago === 'efectivo' ?
+              (seleccionado.cambio && Number(seleccionado.cambio) > 0
+                ? 'EFECTIVO (paga con ' + Number(seleccionado.paga_con).toFixed(2) + 'EUR, cambio ' + Number(seleccionado.cambio).toFixed(2) + 'EUR)'
+                : 'EFECTIVO (importe justo)')
+            : '-'
+          }</p>
+
+          <div className="separador"></div>
+          <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
         </div>
       )}
     </div>
