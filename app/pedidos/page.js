@@ -7,7 +7,6 @@ import { crearClienteSupabase } from '@/lib/supabase';
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
 const HORAS_LIMITE_AVISO = 24;
 
-// El "dia de trabajo" empieza a las 6:00 de la madrugada
 const HORA_INICIO_DIA = 6;
 
 const FLUJO_DOMICILIO = {
@@ -50,9 +49,6 @@ function horasDesde(iso) {
   return (Date.now() - new Date(iso).getTime()) / 1000 / 3600;
 }
 
-// Devuelve la fecha (timestamp) de inicio del "dia de trabajo" actual.
-// Si ahora son las 14:00 -> hoy a las 6:00
-// Si ahora son las 03:00 -> ayer a las 6:00
 function inicioDiaTrabajo() {
   const ahora = new Date();
   const inicio = new Date(ahora);
@@ -63,7 +59,6 @@ function inicioDiaTrabajo() {
   return inicio.getTime();
 }
 
-// Es un pedido "del dia actual de trabajo"?
 function esDelDiaActual(pedido) {
   if (!pedido.creado_en) return false;
   return new Date(pedido.creado_en).getTime() >= inicioDiaTrabajo();
@@ -74,25 +69,21 @@ export default function PaginaPedidos() {
   const supabase = crearClienteSupabase();
 
   const [usuario, setUsuario] = useState(null);
+  const [restaurante, setRestaurante] = useState(null); // nombre + logo del restaurante actual
   const [pedidos, setPedidos] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [lineas, setLineas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
 
-  // Estado de la pestaña activa: "hoy" o "historial"
   const [pestana, setPestana] = useState('hoy');
-
-  // Pliegue de la columna Finalizados (por defecto plegada)
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
-  // Para el historial: pedidos cargados y filtros
   const [historialPedidos, setHistorialPedidos] = useState([]);
   const [historialCargando, setHistorialCargando] = useState(false);
   const [filtroTelefono, setFiltroTelefono] = useState('');
   const [filtroFecha, setFiltroFecha] = useState('');
 
-  // Estados del editor
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [lineasEditadas, setLineasEditadas] = useState([]);
@@ -111,6 +102,18 @@ export default function PaginaPedidos() {
       setUsuario(session.user);
       const { data: admin } = await supabase.rpc('soy_superadmin');
       setEsAdmin(admin === true);
+
+      // Cargamos los datos del restaurante (nombre + logo) para mostrarlos en la cabecera
+      const { data: restId } = await supabase.rpc('mi_restaurante_id');
+      if (restId) {
+        const { data: rest } = await supabase
+          .from('restaurantes')
+          .select('id, nombre, logo_url')
+          .eq('id', restId)
+          .maybeSingle();
+        if (rest) setRestaurante(rest);
+      }
+
       await cargarPedidos();
       setCargando(false);
     }
@@ -135,7 +138,6 @@ export default function PaginaPedidos() {
     setPedidos(data || []);
   }
 
-  // Carga el historial con filtros
   async function cargarHistorial() {
     setHistorialCargando(true);
     let query = supabase.from('pedidos').select('*').order('creado_en', { ascending: false });
@@ -155,11 +157,8 @@ export default function PaginaPedidos() {
     setHistorialCargando(false);
   }
 
-  // Cuando cambiamos a la pestaña Historial, cargar de inmediato
   useEffect(() => {
-    if (pestana === 'historial') {
-      cargarHistorial();
-    }
+    if (pestana === 'historial') cargarHistorial();
   }, [pestana]);
 
   async function abrirPedido(pedido) {
@@ -367,7 +366,7 @@ export default function PaginaPedidos() {
     return { texto: '🏠 Domicilio', clase: 'bg-orange-100 text-orange-700' };
   }
 
-function textoPago(pedido) {
+  function textoPago(pedido) {
     if (pedido.metodo_pago === 'tarjeta') return '💳 Tarjeta';
     if (pedido.metodo_pago === 'pago_en_local') return '💰 Pago al recoger en local';
     if (pedido.metodo_pago === 'efectivo') {
@@ -388,7 +387,6 @@ function textoPago(pedido) {
     );
   }
 
-  // Filtramos los pedidos del kanban: solo los del dia de trabajo actual
   const pedidosHoy = pedidos.filter(esDelDiaActual);
 
   const columnas = {
@@ -456,23 +454,37 @@ function textoPago(pedido) {
       `}</style>
 
       <header className="bg-white border-b shadow-sm no-imprimir">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">📋 Panel de Pedidos</h1>
+        <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            {restaurante?.logo_url && (
+              <img
+                src={restaurante.logo_url}
+                alt="Logo"
+                className="w-10 h-10 rounded-lg object-cover bg-gray-100"
+              />
+            )}
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">
+                {restaurante?.nombre || 'Panel de Pedidos'}
+              </h1>
+              <p className="text-xs text-gray-500">Panel de pedidos</p>
+            </div>
+          </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{usuario?.email}</span>
-            <a href="/carta" className="text-sm text-blue-600 hover:text-blue-700 font-medium">🍕 Mi carta</a>
+            <span className="text-sm text-gray-500 hidden md:inline">{usuario?.email}</span>
+            <a href="/carta" className="text-sm text-blue-600 hover:text-blue-700 font-medium">🍕 Carta</a>
             <a href="/horarios" className="text-sm text-blue-600 hover:text-blue-700 font-medium">🕐 Horarios</a>
+            <a href="/ajustes" className="text-sm text-blue-600 hover:text-blue-700 font-medium">⚙️ Ajustes</a>
             {esAdmin && (
               <a href="/admin" className="text-sm text-blue-600 hover:text-blue-700 font-medium">🛡️ Admin</a>
             )}
             <button onClick={cerrarSesion} className="text-sm text-gray-600 hover:text-red-600">
-              Cerrar sesión
+              Salir
             </button>
           </div>
         </div>
       </header>
 
-      {/* Pestañas */}
       <div className="bg-white border-b no-imprimir">
         <div className="max-w-7xl mx-auto px-6 flex gap-4">
           <button
@@ -503,10 +515,8 @@ function textoPago(pedido) {
           <div className="bg-blue-50 text-blue-800 p-3 rounded-lg mb-4">{mensajeEdicion}</div>
         )}
 
-        {/* PESTAÑA HOY: kanban */}
         {pestana === 'hoy' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Recibidos */}
             <div className="bg-gray-100 rounded-xl p-3">
               <div className="mb-3 px-1">
                 <h2 className="font-bold text-gray-900">🔴 Recibidos ({columnas.recibidos.length})</h2>
@@ -521,7 +531,6 @@ function textoPago(pedido) {
               </div>
             </div>
 
-            {/* En proceso */}
             <div className="bg-gray-100 rounded-xl p-3">
               <div className="mb-3 px-1">
                 <h2 className="font-bold text-gray-900">🟡 En proceso ({columnas.proceso.length})</h2>
@@ -536,7 +545,6 @@ function textoPago(pedido) {
               </div>
             </div>
 
-            {/* Finalizados (plegable) */}
             <div className="bg-gray-100 rounded-xl p-3">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
@@ -563,7 +571,6 @@ function textoPago(pedido) {
           </div>
         )}
 
-        {/* PESTAÑA HISTORIAL */}
         {pestana === 'historial' && (
           <div>
             <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
@@ -644,7 +651,6 @@ function textoPago(pedido) {
         )}
       </main>
 
-      {/* Modal de detalle / edicion */}
       {seleccionado && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir"
           style={{ backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
@@ -685,6 +691,7 @@ function textoPago(pedido) {
                       className="w-full px-3 py-2 border border-gray-300 rounded">
                       <option value="efectivo">Efectivo</option>
                       <option value="tarjeta">Tarjeta</option>
+                      <option value="pago_en_local">Pago en local</option>
                     </select>
                   </div>
                   {datosEditados.metodo_pago === 'efectivo' && (
@@ -882,6 +889,9 @@ function textoPago(pedido) {
         <div className="zona-imprimible solo-imprimir ticket">
           <h1>PEDIDO #{seleccionado.id.slice(-4).toUpperCase()}</h1>
           <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(seleccionado.creado_en)}</p>
+          {restaurante?.nombre && (
+            <p style={{ textAlign: 'center', margin: '0 0 3mm 0', fontSize: '18pt' }}>{restaurante.nombre}</p>
+          )}
           <div className="separador"></div>
           <p className="grande">{seleccionado.tipo_entrega === 'recogida' ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
           <div className="separador"></div>
@@ -914,6 +924,7 @@ function textoPago(pedido) {
           <div className="separador"></div>
           <p><strong>Pago:</strong> {
             seleccionado.metodo_pago === 'tarjeta' ? 'TARJETA' :
+            seleccionado.metodo_pago === 'pago_en_local' ? 'AL RECOGER' :
             seleccionado.metodo_pago === 'efectivo' ?
               (seleccionado.cambio && Number(seleccionado.cambio) > 0
                 ? 'EFECTIVO (paga con ' + Number(seleccionado.paga_con).toFixed(2) + 'EUR, cambio ' + Number(seleccionado.cambio).toFixed(2) + 'EUR)'
