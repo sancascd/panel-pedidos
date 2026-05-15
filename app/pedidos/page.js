@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 
-// URL del bot para mandar notificaciones al cliente.
-// Puedes cambiar esta URL si tu bot esta en otro sitio.
+// URL del bot. Cambia esto si tu bot esta en otro sitio.
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
 
-// Flujos de estado segun tipo de entrega
+// Limite de horas para mandar avisos al cliente (regla de WhatsApp).
+const HORAS_LIMITE_AVISO = 24;
+
 const FLUJO_DOMICILIO = {
   recibido:   { label: 'Pedido recibido', color: 'bg-red-100 text-red-700',       siguiente: 'listo',      siguienteLabel: 'Marcar como listo' },
   listo:      { label: 'Listo',           color: 'bg-yellow-100 text-yellow-700', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
@@ -33,7 +34,6 @@ function infoEstado(pedido) {
 function columnaDe(pedido) {
   const estado = pedido.estado;
   const esRecogida = pedido.tipo_entrega === 'recogida';
-
   if (estado === 'recibido') return 'recibidos';
   if (estado === 'entregado') return 'finalizados';
   if (esRecogida && estado === 'listo') return 'finalizados';
@@ -43,6 +43,12 @@ function columnaDe(pedido) {
 function telefonoLimpio(tel) {
   if (!tel) return '';
   return tel.replace('whatsapp:', '').replace(/\s/g, '').trim();
+}
+
+// Calcula horas pasadas desde creado_en
+function horasDesde(iso) {
+  if (!iso) return 0;
+  return (Date.now() - new Date(iso).getTime()) / 1000 / 3600;
 }
 
 export default function PaginaPedidos() {
@@ -56,11 +62,11 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
 
-  // Estados nuevos para el editor
+  // Estados del editor
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
-  const [lineasEditadas, setLineasEditadas] = useState([]); // las lineas en edicion
-  const [datosEditados, setDatosEditados] = useState(null); // nombre, direccion, metodo_pago, paga_con
+  const [lineasEditadas, setLineasEditadas] = useState([]);
+  const [datosEditados, setDatosEditados] = useState(null);
   const [avisarCliente, setAvisarCliente] = useState(true);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [mensajeEdicion, setMensajeEdicion] = useState('');
@@ -71,15 +77,10 @@ export default function PaginaPedidos() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/');
-        return;
-      }
+      if (!session) { router.push('/'); return; }
       setUsuario(session.user);
-
       const { data: admin } = await supabase.rpc('soy_superadmin');
       setEsAdmin(admin === true);
-
       await cargarPedidos();
       setCargando(false);
     }
@@ -87,34 +88,20 @@ export default function PaginaPedidos() {
   }, []);
 
   useEffect(() => {
-    const canal = supabase
-      .channel('pedidos-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pedidos' },
-        () => {
-          if (audioRef.current) {
-            audioRef.current.play().catch(() => {});
-          }
-          cargarPedidos();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-        () => cargarPedidos()
-      )
+    const canal = supabase.channel('pedidos-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
+        if (audioRef.current) audioRef.current.play().catch(() => {});
+        cargarPedidos();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => cargarPedidos())
       .subscribe();
-
     return () => { supabase.removeChannel(canal); };
   }, []);
 
   async function cargarPedidos() {
     const { data } = await supabase
-      .from('pedidos')
-      .select('*')
-      .order('creado_en', { ascending: true })
-      .limit(100);
+      .from('pedidos').select('*')
+      .order('creado_en', { ascending: true }).limit(100);
     setPedidos(data || []);
   }
 
@@ -123,9 +110,7 @@ export default function PaginaPedidos() {
     setEditando(false);
     setMensajeEdicion('');
     const { data } = await supabase
-      .from('lineas_pedido')
-      .select('*')
-      .eq('pedido_id', pedido.id);
+      .from('lineas_pedido').select('*').eq('pedido_id', pedido.id);
     setLineas(data || []);
   }
 
@@ -136,35 +121,25 @@ export default function PaginaPedidos() {
   }
 
   async function cambiarEstado(pedido, nuevoEstado) {
-    await supabase
-      .from('pedidos')
-      .update({ estado: nuevoEstado })
-      .eq('id', pedido.id);
+    await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedido.id);
     setSeleccionado({ ...pedido, estado: nuevoEstado });
   }
 
-  // ---------- EDICION DE PEDIDOS ----------
+  // ---------- EDICION ----------
 
   async function abrirEditor() {
-    // Cargamos los productos disponibles para poder añadir
     const { data: productos } = await supabase
-      .from('productos')
-      .select('id, nombre, precio')
+      .from('productos').select('id, nombre, precio')
       .eq('restaurante_id', seleccionado.restaurante_id)
-      .eq('disponible', true)
-      .order('nombre');
+      .eq('disponible', true).order('nombre');
     setProductosDisponibles(productos || []);
 
-    // Copiamos las lineas actuales para editar
     setLineasEditadas(lineas.map(l => ({
-      id: l.id, // si tiene id, es una linea existente
-      producto_id: l.producto_id,
+      id: l.id, producto_id: l.producto_id,
       nombre_producto: l.nombre_producto,
-      cantidad: l.cantidad,
-      precio_unitario: Number(l.precio_unitario)
+      cantidad: l.cantidad, precio_unitario: Number(l.precio_unitario)
     })));
 
-    // Copiamos los datos editables del pedido
     setDatosEditados({
       cliente_nombre: seleccionado.cliente_nombre || '',
       cliente_direccion: seleccionado.cliente_direccion || '',
@@ -172,7 +147,10 @@ export default function PaginaPedidos() {
       paga_con: seleccionado.paga_con ? Number(seleccionado.paga_con) : 0
     });
 
-    setAvisarCliente(true);
+    // Si han pasado mas de 24h, NO se puede avisar al cliente
+    const horas = horasDesde(seleccionado.creado_en);
+    setAvisarCliente(horas <= HORAS_LIMITE_AVISO);
+
     setEditando(true);
     setMensajeEdicion('');
   }
@@ -185,7 +163,6 @@ export default function PaginaPedidos() {
     setMensajeEdicion('');
   }
 
-  // Cambia la cantidad de una linea editada
   function cambiarCantidad(index, nuevaCantidad) {
     const cantidad = Math.max(0, parseInt(nuevaCantidad, 10) || 0);
     setLineasEditadas(prev => {
@@ -195,27 +172,21 @@ export default function PaginaPedidos() {
     });
   }
 
-  // Elimina una linea
   function eliminarLinea(index) {
     setLineasEditadas(prev => prev.filter((_, i) => i !== index));
   }
 
-  // Añade un producto nuevo al pedido
   function agregarProducto() {
     if (!productoAAgregar) return;
     const prod = productosDisponibles.find(p => p.id === productoAAgregar);
     if (!prod) return;
-
-    // Si ya esta en el pedido, sumamos una unidad
     const yaExiste = lineasEditadas.findIndex(l => l.producto_id === prod.id);
     if (yaExiste >= 0) {
       cambiarCantidad(yaExiste, lineasEditadas[yaExiste].cantidad + 1);
     } else {
       setLineasEditadas(prev => [...prev, {
-        id: null, // null = linea nueva
-        producto_id: prod.id,
-        nombre_producto: prod.nombre,
-        cantidad: 1,
+        id: null, producto_id: prod.id,
+        nombre_producto: prod.nombre, cantidad: 1,
         precio_unitario: Number(prod.precio)
       }]);
     }
@@ -238,7 +209,6 @@ export default function PaginaPedidos() {
 
     try {
       const lineasValidas = lineasEditadas.filter(l => l.cantidad > 0);
-
       if (lineasValidas.length === 0) {
         setMensajeEdicion('El pedido debe tener al menos un producto.');
         setGuardandoEdicion(false);
@@ -247,10 +217,8 @@ export default function PaginaPedidos() {
 
       const nuevoTotal = totalEditado();
       const cambio = (datosEditados.metodo_pago === 'efectivo' && datosEditados.paga_con > 0)
-        ? Math.max(0, datosEditados.paga_con - nuevoTotal)
-        : null;
+        ? Math.max(0, datosEditados.paga_con - nuevoTotal) : null;
 
-      // 1. Actualizar el pedido
       const { error: errPedido } = await supabase
         .from('pedidos')
         .update({
@@ -258,37 +226,26 @@ export default function PaginaPedidos() {
           cliente_direccion: datosEditados.cliente_direccion,
           metodo_pago: datosEditados.metodo_pago,
           paga_con: datosEditados.paga_con > 0 ? datosEditados.paga_con : null,
-          cambio: cambio,
-          total: nuevoTotal
+          cambio: cambio, total: nuevoTotal
         })
         .eq('id', seleccionado.id);
-
       if (errPedido) throw errPedido;
 
-      // 2. Borrar todas las lineas viejas
-      await supabase
-        .from('lineas_pedido')
-        .delete()
-        .eq('pedido_id', seleccionado.id);
+      await supabase.from('lineas_pedido').delete().eq('pedido_id', seleccionado.id);
 
-      // 3. Insertar las nuevas
       const lineasNuevas = lineasValidas.map(l => ({
-        pedido_id: seleccionado.id,
-        producto_id: l.producto_id,
-        nombre_producto: l.nombre_producto,
-        cantidad: l.cantidad,
-        precio_unitario: l.precio_unitario,
-        restaurante_id: seleccionado.restaurante_id
+        pedido_id: seleccionado.id, producto_id: l.producto_id,
+        nombre_producto: l.nombre_producto, cantidad: l.cantidad,
+        precio_unitario: l.precio_unitario, restaurante_id: seleccionado.restaurante_id
       }));
-
-      const { error: errLineas } = await supabase
-        .from('lineas_pedido')
-        .insert(lineasNuevas);
-
+      const { error: errLineas } = await supabase.from('lineas_pedido').insert(lineasNuevas);
       if (errLineas) throw errLineas;
 
-      // 4. Si el usuario marco "avisar al cliente", llamamos al bot
-      if (avisarCliente) {
+      // Avisar al cliente solo si esta marcado Y no han pasado 24h
+      const horas = horasDesde(seleccionado.creado_en);
+      const dentroDeVentana = horas <= HORAS_LIMITE_AVISO;
+
+      if (avisarCliente && dentroDeVentana) {
         try {
           const resp = await fetch(BOT_URL + '/notificar', {
             method: 'POST',
@@ -296,38 +253,31 @@ export default function PaginaPedidos() {
             body: JSON.stringify({ pedido_id: seleccionado.id })
           });
           if (!resp.ok) {
-            console.log('Aviso al cliente fallido, status:', resp.status);
-            setMensajeEdicion('Pedido guardado, pero no se pudo avisar al cliente.');
+            const errData = await resp.json().catch(() => ({}));
+            setMensajeEdicion('Pedido guardado, pero el aviso fallo: ' + (errData.error || 'desconocido'));
           } else {
             setMensajeEdicion('Pedido guardado y cliente avisado por WhatsApp.');
           }
         } catch (e) {
-          console.log('Error avisando al cliente:', e);
           setMensajeEdicion('Pedido guardado, pero no se pudo avisar al cliente.');
         }
+      } else if (avisarCliente && !dentroDeVentana) {
+        setMensajeEdicion('Pedido guardado, pero NO se aviso al cliente (han pasado mas de 24h).');
       } else {
         setMensajeEdicion('Pedido guardado (sin avisar al cliente).');
       }
 
-      // 5. Recargar lineas y pedido en pantalla
       const { data: lineasFrescas } = await supabase
-        .from('lineas_pedido')
-        .select('*')
-        .eq('pedido_id', seleccionado.id);
+        .from('lineas_pedido').select('*').eq('pedido_id', seleccionado.id);
       setLineas(lineasFrescas || []);
 
       const { data: pedidoFresco } = await supabase
-        .from('pedidos')
-        .select('*')
-        .eq('id', seleccionado.id)
-        .maybeSingle();
+        .from('pedidos').select('*').eq('id', seleccionado.id).maybeSingle();
       if (pedidoFresco) setSeleccionado(pedidoFresco);
 
       setGuardandoEdicion(false);
       setEditando(false);
-
-      // Quitar mensaje despues de unos segundos
-      setTimeout(() => setMensajeEdicion(''), 5000);
+      setTimeout(() => setMensajeEdicion(''), 6000);
 
     } catch (e) {
       console.log('Error guardarCambios:', e);
@@ -336,10 +286,7 @@ export default function PaginaPedidos() {
     }
   }
 
-  // Imprimir comanda
-  function imprimirComanda() {
-    window.print();
-  }
+  function imprimirComanda() { window.print(); }
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -350,8 +297,7 @@ export default function PaginaPedidos() {
     if (!iso) return '';
     const d = new Date(iso);
     return d.toLocaleString('es-ES', {
-      day: '2-digit', month: '2-digit',
-      hour: '2-digit', minute: '2-digit'
+      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
     });
   }
 
@@ -369,9 +315,7 @@ export default function PaginaPedidos() {
   }
 
   function textoPago(pedido) {
-    if (pedido.metodo_pago === 'tarjeta') {
-      return '💳 Tarjeta';
-    }
+    if (pedido.metodo_pago === 'tarjeta') return '💳 Tarjeta';
     if (pedido.metodo_pago === 'efectivo') {
       if (pedido.cambio && Number(pedido.cambio) > 0) {
         return '💵 Efectivo — paga con ' + Number(pedido.paga_con).toFixed(2) +
@@ -406,21 +350,15 @@ export default function PaginaPedidos() {
     const est = infoEstado(p);
     const entrega = etiquetaEntrega(p);
     return (
-      <button
-        onClick={() => abrirPedido(p)}
-        className="w-full text-left bg-white p-3 rounded-lg shadow-sm hover:shadow-md transition border border-gray-200"
-      >
+      <button onClick={() => abrirPedido(p)}
+        className="w-full text-left bg-white p-3 rounded-lg shadow-sm hover:shadow-md transition border border-gray-200">
         <div className="flex justify-between items-start mb-1">
           <span className="font-bold text-gray-900">#{p.id.slice(-4).toUpperCase()}</span>
           <span className="text-xs text-gray-400">{formatearHora(p.creado_en)}</span>
         </div>
         <div className="flex items-center gap-1 mb-2 flex-wrap">
-          <span className={`text-xs px-2 py-0.5 rounded-full ${entrega.clase}`}>
-            {entrega.texto}
-          </span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${est.color}`}>
-            {est.label}
-          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${entrega.clase}`}>{entrega.texto}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${est.color}`}>{est.label}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-500">{p.cliente_telefono}</span>
@@ -430,15 +368,15 @@ export default function PaginaPedidos() {
     );
   }
 
-  // Si esta editado, mostramos la interfaz de edicion en lugar del detalle normal
   const seEstaEditando = editando && seleccionado;
   const sePuedeEditar = seleccionado && seleccionado.estado !== 'entregado';
+  const horasPedido = seleccionado ? horasDesde(seleccionado.creado_en) : 0;
+  const dentroDeVentana24h = horasPedido <= HORAS_LIMITE_AVISO;
 
   return (
     <div className="min-h-screen">
       <audio ref={audioRef} src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto" />
 
-      {/* Estilos especiales para la impresion. */}
       <style>{`
         @media print {
           @page { size: 80mm auto; margin: 3mm; }
@@ -452,24 +390,16 @@ export default function PaginaPedidos() {
             overflow: visible !important; color: black !important;
           }
           .zona-imprimible * { color: black !important; }
-          .ticket {
-            font-family: 'Courier New', monospace;
-            font-size: 16pt; line-height: 1.35; font-weight: bold;
-          }
+          .ticket { font-family: 'Courier New', monospace; font-size: 16pt; line-height: 1.35; font-weight: bold; }
           .ticket h1 { font-size: 28pt; text-align: center; margin: 0 0 4mm 0; }
           .ticket .separador { border-top: 2px dashed #000; margin: 3mm 0; }
           .ticket .grande { font-size: 20pt; font-weight: bold; }
           .ticket table { width: 100%; border-collapse: collapse; }
-          .ticket table th, .ticket table td {
-            text-align: left; padding: 1.5mm 0; font-size: 17pt;
-          }
+          .ticket table th, .ticket table td { text-align: left; padding: 1.5mm 0; font-size: 17pt; }
           .ticket table .col-cant { width: 14%; text-align: center; }
           .ticket table .col-prod { width: 58%; }
           .ticket table .col-tot { width: 28%; text-align: right; }
-          .ticket .total {
-            font-size: 22pt; font-weight: bold;
-            text-align: right; margin-top: 2mm;
-          }
+          .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
         }
         @media screen { .solo-imprimir { display: none; } }
       `}</style>
@@ -516,17 +446,12 @@ export default function PaginaPedidos() {
         </div>
       </main>
 
-      {/* MODAL: detalle o edicion */}
       {seleccionado && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir"
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir"
           style={{ backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
-          onClick={cerrarDetalle}
-        >
-          <div
-            className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          onClick={cerrarDetalle}>
+          <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-bold">
@@ -537,38 +462,28 @@ export default function PaginaPedidos() {
               <button onClick={cerrarDetalle} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
 
-            {/* ===================== MODO EDICION ===================== */}
             {seEstaEditando ? (
               <div>
-                {/* Datos del cliente */}
                 <div className="space-y-3 mb-6 text-sm">
                   <div>
                     <label className="text-gray-500 block mb-1">Nombre del cliente</label>
-                    <input
-                      type="text"
-                      value={datosEditados.cliente_nombre}
+                    <input type="text" value={datosEditados.cliente_nombre}
                       onChange={(e) => actualizarDatos('cliente_nombre', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                    />
+                      className="w-full px-3 py-2 border border-gray-300 rounded" />
                   </div>
                   {seleccionado.tipo_entrega !== 'recogida' && (
                     <div>
                       <label className="text-gray-500 block mb-1">Dirección</label>
-                      <input
-                        type="text"
-                        value={datosEditados.cliente_direccion}
+                      <input type="text" value={datosEditados.cliente_direccion}
                         onChange={(e) => actualizarDatos('cliente_direccion', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded"
-                      />
+                        className="w-full px-3 py-2 border border-gray-300 rounded" />
                     </div>
                   )}
                   <div>
                     <label className="text-gray-500 block mb-1">Método de pago</label>
-                    <select
-                      value={datosEditados.metodo_pago}
+                    <select value={datosEditados.metodo_pago}
                       onChange={(e) => actualizarDatos('metodo_pago', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded"
-                    >
+                      className="w-full px-3 py-2 border border-gray-300 rounded">
                       <option value="efectivo">Efectivo</option>
                       <option value="tarjeta">Tarjeta</option>
                     </select>
@@ -576,19 +491,13 @@ export default function PaginaPedidos() {
                   {datosEditados.metodo_pago === 'efectivo' && (
                     <div>
                       <label className="text-gray-500 block mb-1">Paga con (€) — déjalo en 0 si es justo</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={datosEditados.paga_con}
+                      <input type="number" step="0.01" min="0" value={datosEditados.paga_con}
                         onChange={(e) => actualizarDatos('paga_con', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded"
-                      />
+                        className="w-full px-3 py-2 border border-gray-300 rounded" />
                     </div>
                   )}
                 </div>
 
-                {/* Productos editables */}
                 <div className="border-t pt-4 mb-4">
                   <h3 className="font-semibold mb-3">Productos</h3>
                   <div className="space-y-2 mb-4">
@@ -598,34 +507,24 @@ export default function PaginaPedidos() {
                           <p className="font-medium">{l.nombre_producto}</p>
                           <p className="text-gray-500 text-xs">{l.precio_unitario.toFixed(2)}€ / unidad</p>
                         </div>
-                        <input
-                          type="number"
-                          min="0"
-                          value={l.cantidad}
+                        <input type="number" min="0" value={l.cantidad}
                           onChange={(e) => cambiarCantidad(idx, e.target.value)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm"
-                        />
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm" />
                         <span className="text-sm w-16 text-right font-medium">
                           {(l.cantidad * l.precio_unitario).toFixed(2)}€
                         </span>
-                        <button
-                          onClick={() => eliminarLinea(idx)}
-                          className="text-red-500 hover:text-red-700 text-lg leading-none px-1"
-                          title="Eliminar"
-                        >
+                        <button onClick={() => eliminarLinea(idx)}
+                          className="text-red-500 hover:text-red-700 text-lg leading-none px-1" title="Eliminar">
                           🗑️
                         </button>
                       </div>
                     ))}
                   </div>
 
-                  {/* Añadir producto nuevo */}
                   <div className="flex gap-2 mb-2">
-                    <select
-                      value={productoAAgregar}
+                    <select value={productoAAgregar}
                       onChange={(e) => setProductoAAgregar(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                    >
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm">
                       <option value="">Añadir producto...</option>
                       {productosDisponibles.map(p => (
                         <option key={p.id} value={p.id}>
@@ -633,56 +532,51 @@ export default function PaginaPedidos() {
                         </option>
                       ))}
                     </select>
-                    <button
-                      onClick={agregarProducto}
-                      disabled={!productoAAgregar}
-                      className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-4 py-2 rounded text-sm"
-                    >
+                    <button onClick={agregarProducto} disabled={!productoAAgregar}
+                      className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-4 py-2 rounded text-sm">
                       + Añadir
                     </button>
                   </div>
                 </div>
 
-                {/* Total */}
                 <div className="border-t pt-3 mb-4 flex justify-between font-bold text-lg">
                   <span>Total</span>
                   <span>{totalEditado().toFixed(2)}€</span>
                 </div>
 
-                {/* Avisar cliente */}
-                <label className="flex items-start gap-2 mb-4 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={avisarCliente}
-                    onChange={(e) => setAvisarCliente(e.target.checked)}
-                    className="mt-1 w-4 h-4"
-                  />
-                  <span>
-                    <strong>Avisar al cliente por WhatsApp</strong> de los cambios.
-                    {' '}<span className="text-gray-500">(Recomendado si has cambiado productos o el total)</span>
-                  </span>
-                </label>
+                {/* Aviso al cliente: deshabilitado si fuera de 24h */}
+                {dentroDeVentana24h ? (
+                  <label className="flex items-start gap-2 mb-4 text-sm cursor-pointer">
+                    <input type="checkbox" checked={avisarCliente}
+                      onChange={(e) => setAvisarCliente(e.target.checked)}
+                      className="mt-1 w-4 h-4" />
+                    <span>
+                      <strong>Avisar al cliente por WhatsApp</strong> de los cambios.
+                      {' '}<span className="text-gray-500">(Recomendado si has cambiado productos o el total)</span>
+                    </span>
+                  </label>
+                ) : (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                    <p className="font-medium text-yellow-900">⚠️ No se puede avisar al cliente</p>
+                    <p className="text-yellow-700 mt-1">
+                      Han pasado más de 24 horas desde este pedido. Por las normas de WhatsApp,
+                      el aviso automático no está disponible. Puedes guardar los cambios igualmente.
+                    </p>
+                  </div>
+                )}
 
-                {/* Botones de accion */}
                 <div className="flex gap-2">
-                  <button
-                    onClick={cancelarEdicion}
-                    disabled={guardandoEdicion}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-lg"
-                  >
+                  <button onClick={cancelarEdicion} disabled={guardandoEdicion}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 rounded-lg">
                     Cancelar
                   </button>
-                  <button
-                    onClick={guardarCambios}
-                    disabled={guardandoEdicion}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 rounded-lg"
-                  >
+                  <button onClick={guardarCambios} disabled={guardandoEdicion}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 rounded-lg">
                     {guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
                   </button>
                 </div>
               </div>
             ) : (
-              /* ===================== MODO DETALLE (NO EDICION) ===================== */
               <div>
                 <div className="flex gap-2 mb-6 flex-wrap items-center">
                   <span className={`text-sm px-3 py-1 rounded-full ${infoEstado(seleccionado).color}`}>
@@ -691,17 +585,13 @@ export default function PaginaPedidos() {
                   <span className={`text-sm px-3 py-1 rounded-full ${etiquetaEntrega(seleccionado).clase}`}>
                     {etiquetaEntrega(seleccionado).texto}
                   </span>
-                  <button
-                    onClick={imprimirComanda}
-                    className="ml-auto text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg"
-                  >
+                  <button onClick={imprimirComanda}
+                    className="ml-auto text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg">
                     🖨️ Imprimir
                   </button>
                   {sePuedeEditar && (
-                    <button
-                      onClick={abrirEditor}
-                      className="text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium px-3 py-1.5 rounded-lg"
-                    >
+                    <button onClick={abrirEditor}
+                      className="text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-medium px-3 py-1.5 rounded-lg">
                       ✏️ Editar pedido
                     </button>
                   )}
@@ -714,12 +604,8 @@ export default function PaginaPedidos() {
                   </div>
 
                   <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 no-imprimir">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('tel:' + telefonoLimpio(seleccionado.cliente_telefono))}`}
-                      alt="QR para llamar al cliente"
-                      width="90" height="90"
-                      className="rounded bg-white p-1"
-                    />
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('tel:' + telefonoLimpio(seleccionado.cliente_telefono))}`}
+                      alt="QR" width="90" height="90" className="rounded bg-white p-1" />
                     <div className="text-sm">
                       <p className="font-medium text-gray-900">Llamar al cliente</p>
                       <p className="text-gray-500">Escanea con la cámara del móvil.</p>
@@ -779,10 +665,8 @@ export default function PaginaPedidos() {
                 </div>
 
                 {infoEstado(seleccionado).siguiente ? (
-                  <button
-                    onClick={() => cambiarEstado(seleccionado, infoEstado(seleccionado).siguiente)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg"
-                  >
+                  <button onClick={() => cambiarEstado(seleccionado, infoEstado(seleccionado).siguiente)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg">
                     {infoEstado(seleccionado).siguienteLabel} →
                   </button>
                 ) : (
@@ -796,7 +680,6 @@ export default function PaginaPedidos() {
         </div>
       )}
 
-      {/* Zona imprimible */}
       {seleccionado && !editando && (
         <div className="zona-imprimible solo-imprimir ticket">
           <h1>PEDIDO #{seleccionado.id.slice(-4).toUpperCase()}</h1>
