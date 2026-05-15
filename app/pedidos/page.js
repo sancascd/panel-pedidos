@@ -394,7 +394,7 @@ export default function PaginaPedidos() {
               </div>
 
               {/* QR para llamar rapido al cliente */}
-              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+           <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 no-imprimir">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent('tel:' + telefonoLimpio(seleccionado.cliente_telefono))}`}
                   alt="QR para llamar al cliente"
