@@ -7,6 +7,9 @@ import { crearClienteSupabase } from '@/lib/supabase';
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
 const HORAS_LIMITE_AVISO = 24;
 
+// El "dia de trabajo" empieza a las 6:00 de la madrugada
+const HORA_INICIO_DIA = 6;
+
 const FLUJO_DOMICILIO = {
   recibido:   { label: 'Pedido recibido', color: 'bg-red-100 text-red-700',       siguiente: 'listo',      siguienteLabel: 'Marcar como listo' },
   listo:      { label: 'Listo',           color: 'bg-yellow-100 text-yellow-700', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
@@ -47,6 +50,25 @@ function horasDesde(iso) {
   return (Date.now() - new Date(iso).getTime()) / 1000 / 3600;
 }
 
+// Devuelve la fecha (timestamp) de inicio del "dia de trabajo" actual.
+// Si ahora son las 14:00 -> hoy a las 6:00
+// Si ahora son las 03:00 -> ayer a las 6:00
+function inicioDiaTrabajo() {
+  const ahora = new Date();
+  const inicio = new Date(ahora);
+  inicio.setHours(HORA_INICIO_DIA, 0, 0, 0);
+  if (ahora.getHours() < HORA_INICIO_DIA) {
+    inicio.setDate(inicio.getDate() - 1);
+  }
+  return inicio.getTime();
+}
+
+// Es un pedido "del dia actual de trabajo"?
+function esDelDiaActual(pedido) {
+  if (!pedido.creado_en) return false;
+  return new Date(pedido.creado_en).getTime() >= inicioDiaTrabajo();
+}
+
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -58,6 +80,19 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
 
+  // Estado de la pestaña activa: "hoy" o "historial"
+  const [pestana, setPestana] = useState('hoy');
+
+  // Pliegue de la columna Finalizados (por defecto plegada)
+  const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
+
+  // Para el historial: pedidos cargados y filtros
+  const [historialPedidos, setHistorialPedidos] = useState([]);
+  const [historialCargando, setHistorialCargando] = useState(false);
+  const [filtroTelefono, setFiltroTelefono] = useState('');
+  const [filtroFecha, setFiltroFecha] = useState('');
+
+  // Estados del editor
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [lineasEditadas, setLineasEditadas] = useState([]);
@@ -96,9 +131,36 @@ export default function PaginaPedidos() {
   async function cargarPedidos() {
     const { data } = await supabase
       .from('pedidos').select('*')
-      .order('creado_en', { ascending: true }).limit(100);
+      .order('creado_en', { ascending: true }).limit(500);
     setPedidos(data || []);
   }
+
+  // Carga el historial con filtros
+  async function cargarHistorial() {
+    setHistorialCargando(true);
+    let query = supabase.from('pedidos').select('*').order('creado_en', { ascending: false });
+
+    if (filtroTelefono.trim()) {
+      query = query.ilike('cliente_telefono', '%' + filtroTelefono.trim() + '%');
+    }
+    if (filtroFecha) {
+      const inicio = new Date(filtroFecha + 'T00:00:00');
+      const fin = new Date(filtroFecha + 'T23:59:59');
+      query = query.gte('creado_en', inicio.toISOString()).lte('creado_en', fin.toISOString());
+    }
+    query = query.limit(200);
+
+    const { data } = await query;
+    setHistorialPedidos(data || []);
+    setHistorialCargando(false);
+  }
+
+  // Cuando cambiamos a la pestaña Historial, cargar de inmediato
+  useEffect(() => {
+    if (pestana === 'historial') {
+      cargarHistorial();
+    }
+  }, [pestana]);
 
   async function abrirPedido(pedido) {
     setSeleccionado(pedido);
@@ -325,17 +387,14 @@ export default function PaginaPedidos() {
     );
   }
 
-  const columnas = {
-    recibidos: pedidos.filter(p => columnaDe(p) === 'recibidos'),
-    proceso: pedidos.filter(p => columnaDe(p) === 'proceso'),
-    finalizados: pedidos.filter(p => columnaDe(p) === 'finalizados'),
-  };
+  // Filtramos los pedidos del kanban: solo los del dia de trabajo actual
+  const pedidosHoy = pedidos.filter(esDelDiaActual);
 
-  const defColumnas = [
-    { key: 'recibidos',  titulo: 'Recibidos',   emoji: '🔴', sub: 'Hay que prepararlos' },
-    { key: 'proceso',    titulo: 'En proceso',  emoji: '🟡', sub: 'Listos o en reparto' },
-    { key: 'finalizados', titulo: 'Finalizados', emoji: '✅', sub: 'Entregados o recogidos' },
-  ];
+  const columnas = {
+    recibidos: pedidosHoy.filter(p => columnaDe(p) === 'recibidos'),
+    proceso: pedidosHoy.filter(p => columnaDe(p) === 'proceso'),
+    finalizados: pedidosHoy.filter(p => columnaDe(p) === 'finalizados'),
+  };
 
   function TarjetaPedido({ p }) {
     const est = infoEstado(p);
@@ -412,31 +471,179 @@ export default function PaginaPedidos() {
         </div>
       </header>
 
+      {/* Pestañas */}
+      <div className="bg-white border-b no-imprimir">
+        <div className="max-w-7xl mx-auto px-6 flex gap-4">
+          <button
+            onClick={() => setPestana('hoy')}
+            className={`py-3 px-2 border-b-2 font-medium text-sm ${
+              pestana === 'hoy'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📅 Hoy ({pedidosHoy.length})
+          </button>
+          <button
+            onClick={() => setPestana('historial')}
+            className={`py-3 px-2 border-b-2 font-medium text-sm ${
+              pestana === 'historial'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📚 Historial
+          </button>
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto px-6 py-6 no-imprimir">
         {mensajeEdicion && (
           <div className="bg-blue-50 text-blue-800 p-3 rounded-lg mb-4">{mensajeEdicion}</div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {defColumnas.map(col => (
-            <div key={col.key} className="bg-gray-100 rounded-xl p-3">
+
+        {/* PESTAÑA HOY: kanban */}
+        {pestana === 'hoy' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Recibidos */}
+            <div className="bg-gray-100 rounded-xl p-3">
               <div className="mb-3 px-1">
-                <h2 className="font-bold text-gray-900">
-                  {col.emoji} {col.titulo} ({columnas[col.key].length})
-                </h2>
-                <p className="text-xs text-gray-500">{col.sub}</p>
+                <h2 className="font-bold text-gray-900">🔴 Recibidos ({columnas.recibidos.length})</h2>
+                <p className="text-xs text-gray-500">Hay que prepararlos</p>
               </div>
               <div className="space-y-2">
-                {columnas[col.key].length === 0 ? (
+                {columnas.recibidos.length === 0 ? (
                   <p className="text-sm text-gray-400 px-1 py-4 text-center">Sin pedidos aquí</p>
                 ) : (
-                  columnas[col.key].map(p => <TarjetaPedido key={p.id} p={p} />)
+                  columnas.recibidos.map(p => <TarjetaPedido key={p.id} p={p} />)
                 )}
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* En proceso */}
+            <div className="bg-gray-100 rounded-xl p-3">
+              <div className="mb-3 px-1">
+                <h2 className="font-bold text-gray-900">🟡 En proceso ({columnas.proceso.length})</h2>
+                <p className="text-xs text-gray-500">Listos o en reparto</p>
+              </div>
+              <div className="space-y-2">
+                {columnas.proceso.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-1 py-4 text-center">Sin pedidos aquí</p>
+                ) : (
+                  columnas.proceso.map(p => <TarjetaPedido key={p.id} p={p} />)
+                )}
+              </div>
+            </div>
+
+            {/* Finalizados (plegable) */}
+            <div className="bg-gray-100 rounded-xl p-3">
+              <button
+                onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
+                className="w-full text-left mb-3 px-1 flex items-center justify-between hover:bg-gray-200 rounded p-1 -m-1 transition"
+              >
+                <div>
+                  <h2 className="font-bold text-gray-900">✅ Finalizados ({columnas.finalizados.length})</h2>
+                  <p className="text-xs text-gray-500">Entregados o recogidos</p>
+                </div>
+                <span className="text-gray-500 text-lg">
+                  {finalizadosAbierto ? '▼' : '▶'}
+                </span>
+              </button>
+              {finalizadosAbierto && (
+                <div className="space-y-2">
+                  {columnas.finalizados.length === 0 ? (
+                    <p className="text-sm text-gray-400 px-1 py-4 text-center">Sin pedidos aquí</p>
+                  ) : (
+                    columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} />)
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* PESTAÑA HISTORIAL */}
+        {pestana === 'historial' && (
+          <div>
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+              <div className="flex gap-3 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Buscar por teléfono..."
+                  value={filtroTelefono}
+                  onChange={(e) => setFiltroTelefono(e.target.value)}
+                  className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded"
+                />
+                <input
+                  type="date"
+                  value={filtroFecha}
+                  onChange={(e) => setFiltroFecha(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded"
+                />
+                <button
+                  onClick={cargarHistorial}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded"
+                >
+                  Buscar
+                </button>
+                <button
+                  onClick={() => {
+                    setFiltroTelefono('');
+                    setFiltroFecha('');
+                    setTimeout(cargarHistorial, 0);
+                  }}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded"
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            {historialCargando ? (
+              <p className="text-gray-500 text-center py-8">Cargando historial...</p>
+            ) : historialPedidos.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No hay pedidos que coincidan.</p>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600 text-left">
+                    <tr>
+                      <th className="py-3 px-4">Pedido</th>
+                      <th className="py-3 px-4">Fecha</th>
+                      <th className="py-3 px-4">Cliente</th>
+                      <th className="py-3 px-4">Teléfono</th>
+                      <th className="py-3 px-4">Entrega</th>
+                      <th className="py-3 px-4 text-right">Total</th>
+                      <th className="py-3 px-4">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialPedidos.map(p => (
+                      <tr key={p.id}
+                        onClick={() => abrirPedido(p)}
+                        className="border-t hover:bg-gray-50 cursor-pointer">
+                        <td className="py-3 px-4 font-medium">#{p.id.slice(-4).toUpperCase()}</td>
+                        <td className="py-3 px-4 text-gray-600">{formatearFecha(p.creado_en)}</td>
+                        <td className="py-3 px-4">{p.cliente_nombre || '-'}</td>
+                        <td className="py-3 px-4 text-gray-600">{telefonoLimpio(p.cliente_telefono)}</td>
+                        <td className="py-3 px-4">{p.tipo_entrega === 'recogida' ? '🏪' : '🏠'}</td>
+                        <td className="py-3 px-4 text-right font-medium">{Number(p.total).toFixed(2)}€</td>
+                        <td className="py-3 px-4">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${infoEstado(p).color}`}>
+                            {infoEstado(p).label}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
+      {/* Modal de detalle / edicion */}
       {seleccionado && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir"
           style={{ backgroundColor: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
