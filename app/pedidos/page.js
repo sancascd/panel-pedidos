@@ -252,22 +252,23 @@ export default function PaginaPedidos() {
           .zona-imprimible * {
             color: black !important;
           }
-          .ticket {
+.ticket {
             font-family: 'Courier New', monospace;
-            font-size: 12pt;
-            line-height: 1.3;
+            font-size: 16pt;
+            line-height: 1.35;
+            font-weight: bold;
           }
           .ticket h1 {
-            font-size: 22pt;
+            font-size: 28pt;
             text-align: center;
             margin: 0 0 4mm 0;
           }
           .ticket .separador {
-            border-top: 1px dashed #000;
+            border-top: 2px dashed #000;
             margin: 3mm 0;
           }
           .ticket .grande {
-            font-size: 14pt;
+            font-size: 20pt;
             font-weight: bold;
           }
           .ticket table {
@@ -277,13 +278,14 @@ export default function PaginaPedidos() {
           .ticket table th,
           .ticket table td {
             text-align: left;
-            padding: 1mm 0;
+            padding: 1.5mm 0;
+            font-size: 17pt;
           }
-          .ticket table .col-cant { width: 12%; text-align: center; }
-          .ticket table .col-prod { width: 60%; }
+          .ticket table .col-cant { width: 14%; text-align: center; }
+          .ticket table .col-prod { width: 58%; }
           .ticket table .col-tot { width: 28%; text-align: right; }
           .ticket .total {
-            font-size: 16pt;
+            font-size: 22pt;
             font-weight: bold;
             text-align: right;
             margin-top: 2mm;
