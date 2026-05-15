@@ -367,8 +367,9 @@ export default function PaginaPedidos() {
     return { texto: '🏠 Domicilio', clase: 'bg-orange-100 text-orange-700' };
   }
 
-  function textoPago(pedido) {
+function textoPago(pedido) {
     if (pedido.metodo_pago === 'tarjeta') return '💳 Tarjeta';
+    if (pedido.metodo_pago === 'pago_en_local') return '💰 Pago al recoger en local';
     if (pedido.metodo_pago === 'efectivo') {
       if (pedido.cambio && Number(pedido.cambio) > 0) {
         return '💵 Efectivo — paga con ' + Number(pedido.paga_con).toFixed(2) +
