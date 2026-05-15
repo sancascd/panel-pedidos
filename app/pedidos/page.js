@@ -4,10 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 
-// URL del bot. Cambia esto si tu bot esta en otro sitio.
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
-
-// Limite de horas para mandar avisos al cliente (regla de WhatsApp).
 const HORAS_LIMITE_AVISO = 24;
 
 const FLUJO_DOMICILIO = {
@@ -45,7 +42,6 @@ function telefonoLimpio(tel) {
   return tel.replace('whatsapp:', '').replace(/\s/g, '').trim();
 }
 
-// Calcula horas pasadas desde creado_en
 function horasDesde(iso) {
   if (!iso) return 0;
   return (Date.now() - new Date(iso).getTime()) / 1000 / 3600;
@@ -62,7 +58,6 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
 
-  // Estados del editor
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
   const [lineasEditadas, setLineasEditadas] = useState([]);
@@ -125,8 +120,6 @@ export default function PaginaPedidos() {
     setSeleccionado({ ...pedido, estado: nuevoEstado });
   }
 
-  // ---------- EDICION ----------
-
   async function abrirEditor() {
     const { data: productos } = await supabase
       .from('productos').select('id, nombre, precio')
@@ -147,7 +140,6 @@ export default function PaginaPedidos() {
       paga_con: seleccionado.paga_con ? Number(seleccionado.paga_con) : 0
     });
 
-    // Si han pasado mas de 24h, NO se puede avisar al cliente
     const horas = horasDesde(seleccionado.creado_en);
     setAvisarCliente(horas <= HORAS_LIMITE_AVISO);
 
@@ -241,7 +233,6 @@ export default function PaginaPedidos() {
       const { error: errLineas } = await supabase.from('lineas_pedido').insert(lineasNuevas);
       if (errLineas) throw errLineas;
 
-      // Avisar al cliente solo si esta marcado Y no han pasado 24h
       const horas = horasDesde(seleccionado.creado_en);
       const dentroDeVentana = horas <= HORAS_LIMITE_AVISO;
 
@@ -544,7 +535,6 @@ export default function PaginaPedidos() {
                   <span>{totalEditado().toFixed(2)}€</span>
                 </div>
 
-                {/* Aviso al cliente: deshabilitado si fuera de 24h */}
                 {dentroDeVentana24h ? (
                   <label className="flex items-start gap-2 mb-4 text-sm cursor-pointer">
                     <input type="checkbox" checked={avisarCliente}
