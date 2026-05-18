@@ -69,7 +69,7 @@ export default function PaginaPedidos() {
   const supabase = crearClienteSupabase();
 
   const [usuario, setUsuario] = useState(null);
-  const [restaurante, setRestaurante] = useState(null); // nombre + logo del restaurante actual
+  const [restaurante, setRestaurante] = useState(null);
   const [pedidos, setPedidos] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [lineas, setLineas] = useState([]);
@@ -103,7 +103,6 @@ export default function PaginaPedidos() {
       const { data: admin } = await supabase.rpc('soy_superadmin');
       setEsAdmin(admin === true);
 
-      // Cargamos los datos del restaurante (nombre + logo) para mostrarlos en la cabecera
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
       if (restId) {
         const { data: rest } = await supabase
@@ -191,7 +190,8 @@ export default function PaginaPedidos() {
     setLineasEditadas(lineas.map(l => ({
       id: l.id, producto_id: l.producto_id,
       nombre_producto: l.nombre_producto,
-      cantidad: l.cantidad, precio_unitario: Number(l.precio_unitario)
+      cantidad: l.cantidad, precio_unitario: Number(l.precio_unitario),
+      notas: l.notas || ''
     })));
 
     setDatosEditados({
@@ -225,6 +225,14 @@ export default function PaginaPedidos() {
     });
   }
 
+  function cambiarNota(index, nuevaNota) {
+    setLineasEditadas(prev => {
+      const copia = [...prev];
+      copia[index] = { ...copia[index], notas: nuevaNota };
+      return copia;
+    });
+  }
+
   function eliminarLinea(index) {
     setLineasEditadas(prev => prev.filter((_, i) => i !== index));
   }
@@ -240,7 +248,8 @@ export default function PaginaPedidos() {
       setLineasEditadas(prev => [...prev, {
         id: null, producto_id: prod.id,
         nombre_producto: prod.nombre, cantidad: 1,
-        precio_unitario: Number(prod.precio)
+        precio_unitario: Number(prod.precio),
+        notas: ''
       }]);
     }
     setProductoAAgregar('');
@@ -289,7 +298,8 @@ export default function PaginaPedidos() {
       const lineasNuevas = lineasValidas.map(l => ({
         pedido_id: seleccionado.id, producto_id: l.producto_id,
         nombre_producto: l.nombre_producto, cantidad: l.cantidad,
-        precio_unitario: l.precio_unitario, restaurante_id: seleccionado.restaurante_id
+        precio_unitario: l.precio_unitario, restaurante_id: seleccionado.restaurante_id,
+        notas: l.notas && l.notas.trim() !== '' ? l.notas.trim() : null
       }));
       const { error: errLineas } = await supabase.from('lineas_pedido').insert(lineasNuevas);
       if (errLineas) throw errLineas;
@@ -444,10 +454,11 @@ export default function PaginaPedidos() {
           .ticket .separador { border-top: 2px dashed #000; margin: 3mm 0; }
           .ticket .grande { font-size: 20pt; font-weight: bold; }
           .ticket table { width: 100%; border-collapse: collapse; }
-          .ticket table th, .ticket table td { text-align: left; padding: 1.5mm 0; font-size: 17pt; }
+          .ticket table th, .ticket table td { text-align: left; padding: 1.5mm 0; font-size: 17pt; vertical-align: top; }
           .ticket table .col-cant { width: 14%; text-align: center; }
           .ticket table .col-prod { width: 58%; }
           .ticket table .col-tot { width: 28%; text-align: right; }
+          .ticket .nota { font-size: 14pt; font-style: italic; padding-left: 4mm; }
           .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
         }
         @media screen { .solo-imprimir { display: none; } }
@@ -708,21 +719,27 @@ export default function PaginaPedidos() {
                   <h3 className="font-semibold mb-3">Productos</h3>
                   <div className="space-y-2 mb-4">
                     {lineasEditadas.map((l, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
-                        <div className="flex-1 text-sm">
-                          <p className="font-medium">{l.nombre_producto}</p>
-                          <p className="text-gray-500 text-xs">{l.precio_unitario.toFixed(2)}€ / unidad</p>
+                      <div key={idx} className="bg-gray-50 p-2 rounded">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 text-sm">
+                            <p className="font-medium">{l.nombre_producto}</p>
+                            <p className="text-gray-500 text-xs">{l.precio_unitario.toFixed(2)}€ / unidad</p>
+                          </div>
+                          <input type="number" min="0" value={l.cantidad}
+                            onChange={(e) => cambiarCantidad(idx, e.target.value)}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm" />
+                          <span className="text-sm w-16 text-right font-medium">
+                            {(l.cantidad * l.precio_unitario).toFixed(2)}€
+                          </span>
+                          <button onClick={() => eliminarLinea(idx)}
+                            className="text-red-500 hover:text-red-700 text-lg leading-none px-1" title="Eliminar">
+                            🗑️
+                          </button>
                         </div>
-                        <input type="number" min="0" value={l.cantidad}
-                          onChange={(e) => cambiarCantidad(idx, e.target.value)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm" />
-                        <span className="text-sm w-16 text-right font-medium">
-                          {(l.cantidad * l.precio_unitario).toFixed(2)}€
-                        </span>
-                        <button onClick={() => eliminarLinea(idx)}
-                          className="text-red-500 hover:text-red-700 text-lg leading-none px-1" title="Eliminar">
-                          🗑️
-                        </button>
+                        <input type="text" value={l.notas || ''}
+                          onChange={(e) => cambiarNota(idx, e.target.value)}
+                          placeholder="Notas (ej: sin cebolla, extra queso...)"
+                          className="w-full mt-2 px-2 py-1 border border-gray-200 rounded text-xs italic text-gray-700" />
                       </div>
                     ))}
                   </div>
@@ -843,30 +860,27 @@ export default function PaginaPedidos() {
 
                 <div className="border-t pt-4 mb-6">
                   <h3 className="font-semibold mb-3">Productos</h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-500 text-left">
-                        <th className="pb-2">Producto</th>
-                        <th className="pb-2 text-center">Cant.</th>
-                        <th className="pb-2 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineas.map(l => (
-                        <tr key={l.id} className="border-t">
-                          <td className="py-2">{l.nombre_producto}</td>
-                          <td className="py-2 text-center">{l.cantidad}</td>
-                          <td className="py-2 text-right">{(l.cantidad * l.precio_unitario).toFixed(2)}€</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t font-semibold">
-                        <td colSpan="2" className="pt-3 text-right">Total</td>
-                        <td className="pt-3 text-right">{Number(seleccionado.total).toFixed(2)}€</td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                  <div className="space-y-2">
+                    {lineas.map(l => (
+                      <div key={l.id} className="border-b pb-2 last:border-b-0">
+                        <div className="flex justify-between text-sm">
+                          <span className="flex-1">
+                            <span className="font-medium">{l.cantidad}×</span> {l.nombre_producto}
+                          </span>
+                          <span className="font-medium">{(l.cantidad * l.precio_unitario).toFixed(2)}€</span>
+                        </div>
+                        {l.notas && l.notas.trim() !== '' && (
+                          <p className="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-2 py-1 mt-1 italic">
+                            📝 {l.notas}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    <div className="flex justify-between font-bold pt-3 border-t">
+                      <span>Total</span>
+                      <span>{Number(seleccionado.total).toFixed(2)}€</span>
+                    </div>
+                  </div>
                 </div>
 
                 {infoEstado(seleccionado).siguiente ? (
@@ -911,11 +925,18 @@ export default function PaginaPedidos() {
             </thead>
             <tbody>
               {lineas.map(l => (
-                <tr key={l.id}>
-                  <td className="col-cant">{l.cantidad}x</td>
-                  <td className="col-prod">{l.nombre_producto}</td>
-                  <td className="col-tot">{(l.cantidad * l.precio_unitario).toFixed(2)}€</td>
-                </tr>
+                <>
+                  <tr key={l.id}>
+                    <td className="col-cant">{l.cantidad}x</td>
+                    <td className="col-prod">{l.nombre_producto}</td>
+                    <td className="col-tot">{(l.cantidad * l.precio_unitario).toFixed(2)}€</td>
+                  </tr>
+                  {l.notas && l.notas.trim() !== '' && (
+                    <tr key={l.id + '-notas'}>
+                      <td colSpan="3" className="nota">→ {l.notas}</td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
