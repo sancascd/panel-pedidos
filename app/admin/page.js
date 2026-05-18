@@ -2,42 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { crearClienteSupabase } from '@/lib/supabase';
-
-const ESTADO_COLORES = {
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  activo: 'bg-green-100 text-green-800',
-  suspendido: 'bg-red-100 text-red-800',
-};
+import {
+  ArrowLeft, Shield, Loader2, AlertCircle, CheckCircle2,
+  Clock, Check, X, Store, Mail, Phone, MapPin, User
+} from 'lucide-react';
 
 export default function PaginaAdmin() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
 
-  const [esAdmin, setEsAdmin] = useState(null); // null = comprobando
-  const [restaurantes, setRestaurantes] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState('pendiente');
-  const [mensaje, setMensaje] = useState('');
+  const [esAdmin, setEsAdmin] = useState(false);
+  const [restaurantes, setRestaurantes] = useState([]);
+  const [pestana, setPestana] = useState('pendientes');
+  const [procesando, setProcesando] = useState(null);
+  const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
 
-  // Comprobar sesión + permisos al cargar
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/');
-        return;
-      }
-
-      // Comprobar si es superadmin
+      if (!session) { router.push('/'); return; }
       const { data: admin } = await supabase.rpc('soy_superadmin');
-      if (!admin) {
-        setEsAdmin(false);
-        setCargando(false);
+      if (admin !== true) {
+        router.push('/pedidos');
         return;
       }
-
       setEsAdmin(true);
       await cargarRestaurantes();
       setCargando(false);
@@ -47,192 +37,215 @@ export default function PaginaAdmin() {
 
   async function cargarRestaurantes() {
     const { data, error } = await supabase.rpc('listar_restaurantes_admin');
-    if (error) {
-      console.error(error);
-      return;
-    }
+    if (error) { console.log('Error:', error); return; }
     setRestaurantes(data || []);
   }
 
-  async function aprobar(id, nombre) {
-    if (!confirm(`¿Aprobar "${nombre}"?`)) return;
-    const { error } = await supabase.rpc('aprobar_restaurante', { restaurante_id_in: id });
-    if (error) {
-      setMensaje('Error: ' + error.message);
-      return;
-    }
-    setMensaje(`✅ "${nombre}" aprobado`);
-    setTimeout(() => setMensaje(''), 3000);
+  function avisar(texto, tipo = 'success') {
+    setMensaje({ texto, tipo });
+    setTimeout(() => setMensaje({ texto: '', tipo: 'success' }), 5000);
+  }
+
+  async function aprobar(restId) {
+    setProcesando(restId);
+    const { error } = await supabase.rpc('aprobar_restaurante', { p_restaurante_id: restId });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar('Restaurante aprobado.');
     await cargarRestaurantes();
   }
 
-  async function rechazar(id, nombre) {
-    if (!confirm(`¿Suspender "${nombre}"? No podrá recibir pedidos.`)) return;
-    const { error } = await supabase.rpc('rechazar_restaurante', { restaurante_id_in: id });
-    if (error) {
-      setMensaje('Error: ' + error.message);
-      return;
-    }
-    setMensaje(`❌ "${nombre}" suspendido`);
-    setTimeout(() => setMensaje(''), 3000);
+  async function rechazar(restId) {
+    if (!confirm('¿Rechazar este restaurante? La cuenta no podrá iniciar sesión.')) return;
+    setProcesando(restId);
+    const { error } = await supabase.rpc('rechazar_restaurante', { p_restaurante_id: restId });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar('Restaurante rechazado.');
     await cargarRestaurantes();
   }
 
-  function formatearFecha(iso) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleString('es-ES', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  }
-
-  // Filtrar según pestaña activa
-  const filtrados = restaurantes.filter(r => {
-    if (filtro === 'todos') return true;
-    return r.estado === filtro;
-  });
-
-  const contadores = {
-    pendiente: restaurantes.filter(r => r.estado === 'pendiente').length,
-    activo: restaurantes.filter(r => r.estado === 'activo').length,
-    suspendido: restaurantes.filter(r => r.estado === 'suspendido').length,
-  };
-
-  // Pantallas según estado
   if (cargando) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <Loader2 className="w-6 h-6 animate-spin text-accent" />
       </div>
     );
   }
 
-  if (esAdmin === false) {
+  const pendientes = restaurantes.filter(r => r.estado === 'pendiente');
+  const aprobados = restaurantes.filter(r => r.estado === 'aprobado');
+  const rechazados = restaurantes.filter(r => r.estado === 'rechazado');
+
+  function listaActual() {
+    if (pestana === 'pendientes') return pendientes;
+    if (pestana === 'aprobados') return aprobados;
+    return rechazados;
+  }
+
+  function badgeEstado(estado) {
+    if (estado === 'pendiente') {
+      return (
+        <span className="badge bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/20">
+          <Clock className="w-3 h-3" /> Pendiente
+        </span>
+      );
+    }
+    if (estado === 'aprobado') {
+      return (
+        <span className="badge bg-accent/10 text-accent border border-accent/20">
+          <Check className="w-3 h-3" /> Aprobado
+        </span>
+      );
+    }
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
-          <div className="text-5xl mb-4">🚫</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso denegado</h1>
-          <p className="text-gray-600 mb-6">No tienes permisos para acceder a esta sección.</p>
-          <Link href="/pedidos" className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg">
-            Volver a pedidos
-          </Link>
-        </div>
-      </div>
+      <span className="badge bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+        <X className="w-3 h-3" /> Rechazado
+      </span>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Cabecera */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">🛡️ Panel de Administración</h1>
-          <Link href="/pedidos" className="text-sm text-blue-600 hover:underline">
-            ← Volver al panel de pedidos
-          </Link>
+    <div className="min-h-screen bg-bg">
+      <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-text">Panel de administración</h1>
+              <p className="text-xs text-text-muted hidden sm:block">Gestión de restaurantes</p>
+            </div>
+          </div>
+          <a href="/pedidos" className="btn-ghost">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Volver</span>
+          </a>
         </div>
       </header>
 
-      {/* Contenido */}
-      <main className="max-w-7xl mx-auto px-6 py-6">
-        <h2 className="text-2xl font-bold mb-4">Restaurantes registrados</h2>
+      {/* Pestañas */}
+      <div className="border-b border-border bg-bg">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1">
+          {[
+            { id: 'pendientes', label: 'Pendientes', count: pendientes.length, icon: Clock },
+            { id: 'aprobados', label: 'Aprobados', count: aprobados.length, icon: Check },
+            { id: 'rechazados', label: 'Rechazados', count: rechazados.length, icon: X },
+          ].map(t => {
+            const Icono = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setPestana(t.id)}
+                className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
+                  pestana === t.id
+                    ? 'border-accent text-text'
+                    : 'border-transparent text-text-muted hover:text-text'
+                }`}
+              >
+                <Icono className="w-4 h-4" />
+                {t.label}
+                <span className="tabular-nums text-xs px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        {mensaje && (
-          <div className="bg-blue-50 text-blue-800 p-3 rounded-lg mb-4">{mensaje}</div>
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {mensaje.texto && (
+          <div className={`mb-4 flex items-start gap-2 p-3 rounded-lg border text-sm animate-fade-in ${
+            mensaje.tipo === 'error'
+              ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+              : 'bg-accent/10 border-accent/20 text-accent'
+          }`}>
+            {mensaje.tipo === 'error' ?
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
+              <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            }
+            <span>{mensaje.texto}</span>
+          </div>
         )}
 
-        {/* Pestañas */}
-        <div className="flex gap-2 mb-6 border-b">
-          {[
-            { key: 'pendiente', label: 'Pendientes', count: contadores.pendiente },
-            { key: 'activo', label: 'Activos', count: contadores.activo },
-            { key: 'suspendido', label: 'Suspendidos', count: contadores.suspendido },
-            { key: 'todos', label: 'Todos', count: restaurantes.length },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setFiltro(tab.key)}
-              className={`px-4 py-2 font-medium text-sm transition border-b-2 ${
-                filtro === tab.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          ))}
-        </div>
-
-        {/* Lista */}
-        {filtrados.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg text-center text-gray-500">
-            No hay restaurantes en esta categoría.
+        {listaActual().length === 0 ? (
+          <div className="card p-12 text-center">
+            <Store className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
+            <p className="text-text-muted">
+              No hay restaurantes {pestana === 'pendientes' ? 'pendientes' : pestana === 'aprobados' ? 'aprobados' : 'rechazados'}.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filtrados.map(r => (
-              <div key={r.id} className="bg-white rounded-lg shadow-sm p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-lg font-bold">{r.nombre}</h3>
-                    <p className="text-sm text-gray-500">Registrado el {formatearFecha(r.creado_en)}</p>
-                  </div>
-                  <span className={`text-xs px-3 py-1 rounded-full font-medium ${ESTADO_COLORES[r.estado]}`}>
-                    {r.estado.toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Email</p>
-                    <p className="font-medium">{r.email_contacto || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Teléfono</p>
-                    <p className="font-medium">{r.telefono || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Dirección</p>
-                    <p className="font-medium">{r.direccion || '-'}</p>
+            {listaActual().map(r => (
+              <div key={r.id} className="card p-5">
+                <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <h3 className="text-base font-semibold text-text">{r.nombre || 'Sin nombre'}</h3>
+                      {badgeEstado(r.estado)}
+                    </div>
+                    {r.descripcion && (
+                      <p className="text-sm text-text-muted mb-3">{r.descripcion}</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Botones según estado */}
-                <div className="flex gap-2">
-                  {r.estado === 'pendiente' && (
-                    <>
-                      <button
-                        onClick={() => aprobar(r.id, r.nombre)}
-                        className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-                      >
-                        ✅ Aprobar
-                      </button>
-                      <button
-                        onClick={() => rechazar(r.id, r.nombre)}
-                        className="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-                      >
-                        ❌ Rechazar
-                      </button>
-                    </>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {r.email_contacto && (
+                    <div className="flex items-center gap-2 text-text-muted">
+                      <Mail className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{r.email_contacto}</span>
+                    </div>
                   )}
-                  {r.estado === 'activo' && (
-                    <button
-                      onClick={() => rechazar(r.id, r.nombre)}
-                      className="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium px-4 py-2 rounded-lg"
-                    >
-                      Suspender
-                    </button>
+                  {r.telefono && (
+                    <div className="flex items-center gap-2 text-text-muted">
+                      <Phone className="w-4 h-4 flex-shrink-0" />
+                      <span>{r.telefono}</span>
+                    </div>
                   )}
-                  {r.estado === 'suspendido' && (
-                    <button
-                      onClick={() => aprobar(r.id, r.nombre)}
-                      className="bg-green-100 hover:bg-green-200 text-green-700 text-sm font-medium px-4 py-2 rounded-lg"
-                    >
-                      Reactivar
-                    </button>
+                  {r.direccion && (
+                    <div className="flex items-center gap-2 text-text-muted">
+                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{r.direccion}</span>
+                    </div>
+                  )}
+                  {r.email_usuario && (
+                    <div className="flex items-center gap-2 text-text-muted">
+                      <User className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{r.email_usuario}</span>
+                    </div>
                   )}
                 </div>
+
+                {r.estado === 'pendiente' && (
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                    <button
+                      onClick={() => aprobar(r.id)}
+                      disabled={procesando === r.id}
+                      className="btn-primary flex-1"
+                    >
+                      {procesando === r.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Aprobar
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => rechazar(r.id)}
+                      disabled={procesando === r.id}
+                      className="btn-danger flex-1"
+                    >
+                      <X className="w-4 h-4" />
+                      Rechazar
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
