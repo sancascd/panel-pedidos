@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import {
+  ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink
+} from 'lucide-react';
 
 export default function PaginaAjustes() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
-  const fileInputLogoRef = useRef(null);
-  const fileInputPdfRef = useRef(null);
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [subiendoPdf, setSubiendoPdf] = useState(false);
-  const [mensaje, setMensaje] = useState('');
-  const [restauranteId, setRestauranteId] = useState(null);
+  const [restaurante, setRestaurante] = useState(null);
+  const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
 
   const [datos, setDatos] = useState({
     nombre: '',
@@ -23,40 +25,26 @@ export default function PaginaAjustes() {
     telefono: '',
     direccion: '',
     email_contacto: '',
-    logo_url: '',
     carta_url: '',
-    carta_pdf_url: ''
   });
 
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/'); return; }
-
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
-      if (!restId) {
-        setMensaje('No tienes ningún restaurante asignado.');
-        setCargando(false);
-        return;
-      }
-      setRestauranteId(restId);
-
+      if (!restId) { setCargando(false); return; }
       const { data: rest } = await supabase
-        .from('restaurantes')
-        .select('nombre, descripcion, telefono, direccion, email_contacto, logo_url, carta_url, carta_pdf_url')
-        .eq('id', restId)
-        .maybeSingle();
-
+        .from('restaurantes').select('*').eq('id', restId).maybeSingle();
       if (rest) {
+        setRestaurante(rest);
         setDatos({
           nombre: rest.nombre || '',
           descripcion: rest.descripcion || '',
           telefono: rest.telefono || '',
           direccion: rest.direccion || '',
           email_contacto: rest.email_contacto || '',
-          logo_url: rest.logo_url || '',
           carta_url: rest.carta_url || '',
-          carta_pdf_url: rest.carta_pdf_url || ''
         });
       }
       setCargando(false);
@@ -64,369 +52,323 @@ export default function PaginaAjustes() {
     init();
   }, []);
 
-  function actualizar(campo, valor) {
-    setDatos(prev => ({ ...prev, [campo]: valor }));
+  function avisar(texto, tipo = 'success') {
+    setMensaje({ texto, tipo });
+    setTimeout(() => setMensaje({ texto: '', tipo: 'success' }), 5000);
   }
 
-  function avisar(texto) {
-    setMensaje(texto);
-    setTimeout(() => setMensaje(''), 4000);
-  }
-
-  async function guardarDatos() {
-    if (!datos.nombre.trim()) {
-      avisar('El nombre del restaurante no puede estar vacío.');
-      return;
-    }
+  async function guardar() {
     setGuardando(true);
     const { error } = await supabase
       .from('restaurantes')
       .update({
-        nombre: datos.nombre.trim(),
+        nombre: datos.nombre.trim() || null,
         descripcion: datos.descripcion.trim() || null,
         telefono: datos.telefono.trim() || null,
         direccion: datos.direccion.trim() || null,
         email_contacto: datos.email_contacto.trim() || null,
-        carta_url: datos.carta_url.trim() || null
+        carta_url: datos.carta_url.trim() || null,
       })
-      .eq('id', restauranteId);
+      .eq('id', restaurante.id);
     setGuardando(false);
-    if (error) {
-      avisar('Error al guardar: ' + error.message);
-      return;
-    }
-    avisar('Datos guardados correctamente.');
+    if (error) { avisar('Error al guardar: ' + error.message, 'error'); return; }
+    avisar('Cambios guardados correctamente.');
   }
 
   async function subirLogo(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      avisar('Solo se permiten imágenes.');
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      avisar('La imagen no puede pesar más de 2 MB.');
-      return;
-    }
     setSubiendoLogo(true);
-    const ext = file.name.split('.').pop().toLowerCase();
-    const nombreArchivo = restauranteId + '/logo-' + Date.now() + '.' + ext;
-    const { error: errSubida } = await supabase.storage
-      .from('logos')
-      .upload(nombreArchivo, file, { upsert: true });
-    if (errSubida) {
+    const ext = file.name.split('.').pop();
+    const path = `${restaurante.id}/logo.${ext}`;
+    const { error: errUp } = await supabase.storage
+      .from('logos').upload(path, file, { upsert: true });
+    if (errUp) {
       setSubiendoLogo(false);
-      avisar('Error al subir el logo: ' + errSubida.message);
+      avisar('Error subiendo logo: ' + errUp.message, 'error');
       return;
     }
-    const { data: urlData } = supabase.storage.from('logos').getPublicUrl(nombreArchivo);
-    const urlPublica = urlData?.publicUrl;
-    const { error: errUpdate } = await supabase
-      .from('restaurantes')
-      .update({ logo_url: urlPublica })
-      .eq('id', restauranteId);
+    const { data: urlData } = supabase.storage.from('logos').getPublicUrl(path);
+    const url = urlData.publicUrl + '?t=' + Date.now();
+    await supabase.from('restaurantes').update({ logo_url: url }).eq('id', restaurante.id);
+    setRestaurante({ ...restaurante, logo_url: url });
     setSubiendoLogo(false);
-    if (errUpdate) {
-      avisar('Logo subido, pero no se pudo guardar la URL: ' + errUpdate.message);
-      return;
-    }
-    setDatos(prev => ({ ...prev, logo_url: urlPublica }));
-    avisar('Logo actualizado correctamente.');
-    if (fileInputLogoRef.current) fileInputLogoRef.current.value = '';
+    avisar('Logo actualizado.');
   }
 
-  async function quitarLogo() {
-    if (!confirm('¿Seguro que quieres quitar el logo?')) return;
-    const { error } = await supabase
-      .from('restaurantes')
-      .update({ logo_url: null })
-      .eq('id', restauranteId);
-    if (error) {
-      avisar('Error al quitar el logo: ' + error.message);
-      return;
-    }
-    setDatos(prev => ({ ...prev, logo_url: '' }));
+  async function borrarLogo() {
+    if (!confirm('¿Borrar el logo?')) return;
+    await supabase.from('restaurantes').update({ logo_url: null }).eq('id', restaurante.id);
+    setRestaurante({ ...restaurante, logo_url: null });
     avisar('Logo eliminado.');
   }
 
   async function subirPdf(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== 'application/pdf') {
-      avisar('Solo se permiten archivos PDF.');
-      return;
-    }
-    // Limite 5 MB (Twilio admite hasta 16 MB pero mejor mantener algo razonable)
-    if (file.size > 5 * 1024 * 1024) {
-      avisar('El PDF no puede pesar más de 5 MB.');
-      return;
-    }
     setSubiendoPdf(true);
-    const nombreArchivo = restauranteId + '/carta-' + Date.now() + '.pdf';
-    const { error: errSubida } = await supabase.storage
-      .from('cartas')
-      .upload(nombreArchivo, file, { upsert: true, contentType: 'application/pdf' });
-    if (errSubida) {
+    const path = `${restaurante.id}/carta.pdf`;
+    const { error: errUp } = await supabase.storage
+      .from('cartas').upload(path, file, { upsert: true });
+    if (errUp) {
       setSubiendoPdf(false);
-      avisar('Error al subir el PDF: ' + errSubida.message);
+      avisar('Error subiendo PDF: ' + errUp.message, 'error');
       return;
     }
-    const { data: urlData } = supabase.storage.from('cartas').getPublicUrl(nombreArchivo);
-    const urlPublica = urlData?.publicUrl;
-    const { error: errUpdate } = await supabase
-      .from('restaurantes')
-      .update({ carta_pdf_url: urlPublica })
-      .eq('id', restauranteId);
+    const { data: urlData } = supabase.storage.from('cartas').getPublicUrl(path);
+    const url = urlData.publicUrl + '?t=' + Date.now();
+    await supabase.from('restaurantes').update({ carta_pdf_url: url }).eq('id', restaurante.id);
+    setRestaurante({ ...restaurante, carta_pdf_url: url });
     setSubiendoPdf(false);
-    if (errUpdate) {
-      avisar('PDF subido, pero no se pudo guardar la URL: ' + errUpdate.message);
-      return;
-    }
-    setDatos(prev => ({ ...prev, carta_pdf_url: urlPublica }));
-    avisar('Carta PDF actualizada correctamente.');
-    if (fileInputPdfRef.current) fileInputPdfRef.current.value = '';
+    avisar('PDF de la carta actualizado.');
   }
 
-  async function quitarPdf() {
-    if (!confirm('¿Seguro que quieres quitar el PDF de la carta?')) return;
-    const { error } = await supabase
-      .from('restaurantes')
-      .update({ carta_pdf_url: null })
-      .eq('id', restauranteId);
-    if (error) {
-      avisar('Error al quitar el PDF: ' + error.message);
-      return;
-    }
-    setDatos(prev => ({ ...prev, carta_pdf_url: '' }));
+  async function borrarPdf() {
+    if (!confirm('¿Borrar el PDF de la carta?')) return;
+    await supabase.from('restaurantes').update({ carta_pdf_url: null }).eq('id', restaurante.id);
+    setRestaurante({ ...restaurante, carta_pdf_url: null });
     avisar('PDF eliminado.');
   }
 
   if (cargando) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <Loader2 className="w-6 h-6 animate-spin text-accent" />
+      </div>
+    );
+  }
+
+  if (!restaurante) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg p-6">
+        <div className="card p-6 max-w-md text-center">
+          <AlertCircle className="w-10 h-10 text-text-muted mx-auto mb-3" />
+          <p className="text-text">No tienes restaurante asignado.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">⚙️ Ajustes del restaurante</h1>
-          <a href="/pedidos" className="text-sm text-blue-600 hover:underline">
-            ← Volver a pedidos
+    <div className="min-h-screen bg-bg">
+      <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Settings className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-text">Ajustes</h1>
+              <p className="text-xs text-text-muted hidden sm:block">Datos de tu restaurante</p>
+            </div>
+          </div>
+          <a href="/pedidos" className="btn-ghost">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Volver</span>
           </a>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-6">
-
-        {mensaje && (
-          <div className="bg-blue-50 text-blue-800 p-3 rounded-lg mb-4">{mensaje}</div>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {mensaje.texto && (
+          <div className={`flex items-start gap-2 p-3 rounded-lg border text-sm animate-fade-in ${
+            mensaje.tipo === 'error'
+              ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+              : 'bg-accent/10 border-accent/20 text-accent'
+          }`}>
+            {mensaje.tipo === 'error' ?
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> :
+              <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            }
+            <span>{mensaje.texto}</span>
+          </div>
         )}
 
-        {/* Logo */}
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-4">
-          <h2 className="font-semibold text-gray-900 mb-3">Logo</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Sube una imagen cuadrada (mínimo 200×200 px). Máximo 2 MB.
-          </p>
-
-          <div className="flex items-center gap-4 mb-3">
-            {datos.logo_url ? (
-              <img
-                src={datos.logo_url}
-                alt="Logo actual"
-                className="w-24 h-24 rounded-lg object-cover bg-gray-100 border"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs text-center">
-                Sin logo
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <input
-                ref={fileInputLogoRef}
-                type="file"
-                accept="image/*"
-                onChange={subirLogo}
-                disabled={subiendoLogo}
-                className="text-sm"
-              />
-              {datos.logo_url && (
-                <button
-                  onClick={quitarLogo}
-                  className="text-sm text-red-600 hover:underline text-left"
-                >
-                  Quitar logo
-                </button>
-              )}
-              {subiendoLogo && (
-                <p className="text-sm text-gray-500">Subiendo...</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Carta del restaurante */}
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-4">
-          <h2 className="font-semibold text-gray-900 mb-2">Carta para WhatsApp</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Cuando un cliente pida la carta, el bot intentará mandar primero la <strong>URL web</strong> si la tienes;
-            si no, el <strong>PDF</strong>; y si no tienes nada, mostrará la lista de productos de la sección "🍕 Carta".
-          </p>
-
-          {/* URL de carta web */}
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              URL de tu carta en internet (opcional)
-            </label>
-            <input
-              type="url"
-              value={datos.carta_url}
-              onChange={(e) => actualizar('carta_url', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded"
-              placeholder="https://www.elrestaurante.com/carta"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Si tu web ya tiene la carta, pega aquí el enlace exacto. (No olvides guardar al final.)
-            </p>
-          </div>
-
-          {/* PDF de la carta */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              PDF de la carta (opcional)
-            </label>
-            <p className="text-xs text-gray-500 mb-2">
-              Si no tienes web pero tienes la carta en PDF, súbela aquí. Máximo 5 MB.
-            </p>
-
-            <div className="flex items-center gap-4">
-              {datos.carta_pdf_url ? (
-                <a
-                  href={datos.carta_pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100 text-sm"
-                >
-                  📄 Ver PDF actual
-                </a>
-              ) : (
-                <p className="text-sm text-gray-400 italic">Aún no has subido ningún PDF</p>
-              )}
-            </div>
-
-            <div className="mt-3 flex flex-col gap-2">
-              <input
-                ref={fileInputPdfRef}
-                type="file"
-                accept="application/pdf"
-                onChange={subirPdf}
-                disabled={subiendoPdf}
-                className="text-sm"
-              />
-              {datos.carta_pdf_url && (
-                <button
-                  onClick={quitarPdf}
-                  className="text-sm text-red-600 hover:underline text-left"
-                >
-                  Quitar PDF
-                </button>
-              )}
-              {subiendoPdf && (
-                <p className="text-sm text-gray-500">Subiendo PDF...</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Datos del restaurante */}
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-4">
-          <h2 className="font-semibold text-gray-900 mb-4">Datos del restaurante</h2>
-
+        {/* Datos básicos */}
+        <div className="card p-6">
+          <h2 className="text-base font-semibold text-text mb-4">Datos del restaurante</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre del restaurante *
-              </label>
+              <label className="label">Nombre del restaurante *</label>
               <input
                 type="text"
                 value={datos.nombre}
-                onChange={(e) => actualizar('nombre', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-                placeholder="Ej: Pizzería La Marina"
+                onChange={(e) => setDatos({ ...datos, nombre: e.target.value })}
+                className="input"
+                placeholder="Ej: Pizzería Bella Napoli"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Este nombre aparecerá en el saludo del bot ("Bienvenido a...") y en el panel.
-              </p>
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción (opcional)
-              </label>
+              <label className="label">Descripción breve</label>
               <textarea
                 value={datos.descripcion}
-                onChange={(e) => actualizar('descripcion', e.target.value)}
+                onChange={(e) => setDatos({ ...datos, descripcion: e.target.value })}
+                className="input"
                 rows="2"
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-                placeholder="Ej: La mejor pizza artesana de Córdoba"
+                placeholder="Ej: Auténtica pizza italiana hecha en horno de leña"
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Teléfono
-              </label>
-              <input
-                type="text"
-                value={datos.telefono}
-                onChange={(e) => actualizar('telefono', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-                placeholder="Ej: 957 123 456"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Teléfono</label>
+                <input
+                  type="tel"
+                  value={datos.telefono}
+                  onChange={(e) => setDatos({ ...datos, telefono: e.target.value })}
+                  className="input"
+                  placeholder="957 12 34 56"
+                />
+              </div>
+              <div>
+                <label className="label">Email de contacto</label>
+                <input
+                  type="email"
+                  value={datos.email_contacto}
+                  onChange={(e) => setDatos({ ...datos, email_contacto: e.target.value })}
+                  className="input"
+                  placeholder="hola@turestaurante.com"
+                />
+              </div>
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Dirección
-              </label>
+              <label className="label">Dirección</label>
               <input
                 type="text"
                 value={datos.direccion}
-                onChange={(e) => actualizar('direccion', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-                placeholder="Ej: Calle Mayor 5, Córdoba"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email de contacto
-              </label>
-              <input
-                type="email"
-                value={datos.email_contacto}
-                onChange={(e) => actualizar('email_contacto', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded"
-                placeholder="Ej: info@pizzeriamarina.com"
+                onChange={(e) => setDatos({ ...datos, direccion: e.target.value })}
+                className="input"
+                placeholder="Calle Mayor 5, Córdoba"
               />
             </div>
           </div>
-
-          <button
-            onClick={guardarDatos}
-            disabled={guardando}
-            className="mt-5 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 rounded-lg"
-          >
-            {guardando ? 'Guardando...' : 'Guardar datos'}
-          </button>
         </div>
 
+        {/* Logo */}
+        <div className="card p-6">
+          <h2 className="text-base font-semibold text-text mb-4">Logo</h2>
+          <p className="text-sm text-text-muted mb-4">
+            Aparecerá arriba a la izquierda en el panel y en futuras comunicaciones.
+          </p>
+          <div className="flex items-center gap-4">
+            {restaurante.logo_url ? (
+              <img
+                src={restaurante.logo_url}
+                alt="Logo"
+                className="w-20 h-20 rounded-xl object-cover bg-surface-2 border border-border"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-surface-2 border border-border flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 text-text-muted" />
+              </div>
+            )}
+            <div className="flex gap-2">
+              <label className="btn-primary cursor-pointer">
+                {subiendoLogo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Subiendo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    {restaurante.logo_url ? 'Cambiar logo' : 'Subir logo'}
+                  </>
+                )}
+                <input type="file" accept="image/*" onChange={subirLogo} className="hidden" />
+              </label>
+              {restaurante.logo_url && (
+                <button onClick={borrarLogo} className="btn-ghost hover:text-red-500">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Carta */}
+        <div className="card p-6">
+          <h2 className="text-base font-semibold text-text mb-2">Carta para clientes</h2>
+          <p className="text-sm text-text-muted mb-5">
+            El bot enviará la carta al cliente cuando salude.
+            Si tienes una <strong>URL web</strong> se manda eso. Si no, intenta el <strong>PDF</strong>.
+            Si tampoco, manda la carta del panel como texto.
+          </p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="label">URL de la carta web (opcional)</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={datos.carta_url}
+                  onChange={(e) => setDatos({ ...datos, carta_url: e.target.value })}
+                  className="input"
+                  placeholder="https://miweb.com/carta"
+                />
+                {datos.carta_url && (
+                  <a href={datos.carta_url} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="label">PDF de la carta (opcional)</label>
+              <div className="flex items-center gap-3">
+                {restaurante.carta_pdf_url ? (
+                  <a
+                    href={restaurante.carta_pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center gap-2 p-3 bg-surface-2 rounded-lg border border-border hover:border-accent/30 transition-colors"
+                  >
+                    <FileText className="w-5 h-5 text-accent" />
+                    <span className="text-sm text-text">PDF subido</span>
+                    <ExternalLink className="w-4 h-4 text-text-muted ml-auto" />
+                  </a>
+                ) : (
+                  <div className="flex-1 flex items-center gap-2 p-3 bg-surface-2 rounded-lg border border-border">
+                    <FileText className="w-5 h-5 text-text-muted" />
+                    <span className="text-sm text-text-muted">Sin PDF</span>
+                  </div>
+                )}
+
+                <label className="btn-secondary cursor-pointer">
+                  {subiendoPdf ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span className="hidden sm:inline">{restaurante.carta_pdf_url ? 'Cambiar' : 'Subir'}</span>
+                    </>
+                  )}
+                  <input type="file" accept="application/pdf" onChange={subirPdf} className="hidden" />
+                </label>
+                {restaurante.carta_pdf_url && (
+                  <button onClick={borrarPdf} className="btn-ghost hover:text-red-500">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-4">
+          <button onClick={guardar} disabled={guardando} className="btn-primary w-full shadow-lift">
+            {guardando ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              'Guardar cambios'
+            )}
+          </button>
+        </div>
       </main>
     </div>
   );
