@@ -3,397 +3,432 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import {
+  ArrowLeft, Plus, Pencil, Trash2, Check, X, GripVertical,
+  UtensilsCrossed, Loader2, AlertCircle, ChevronDown, ChevronRight
+} from 'lucide-react';
 
 export default function PaginaCarta() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
 
+  const [cargando, setCargando] = useState(true);
   const [restauranteId, setRestauranteId] = useState(null);
   const [categorias, setCategorias] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const [productosPorCategoria, setProductosPorCategoria] = useState({});
   const [mensaje, setMensaje] = useState('');
 
-  // Formulario de categoría nueva
+  // Estados de edicion de categoria
+  const [editandoCatId, setEditandoCatId] = useState(null);
   const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [nombreCatEdicion, setNombreCatEdicion] = useState('');
 
-  // Formulario de producto nuevo (uno por categoría, guardamos cuál está abierto)
-  const [prodForm, setProdForm] = useState({}); // { [categoriaId]: {nombre, descripcion, precio} }
+  // Estados de edicion de producto
+  const [editandoProdId, setEditandoProdId] = useState(null);
+  const [agregandoProductoEnCat, setAgregandoProductoEnCat] = useState(null);
+  const [datosProd, setDatosProd] = useState({ nombre: '', precio: '', descripcion: '', disponible: true });
+
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState({});
 
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/');
-        return;
-      }
-
-      // Obtener el restaurante del usuario
+      if (!session) { router.push('/'); return; }
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
       if (!restId) {
-        setMensaje('No tienes ningún restaurante asignado.');
+        avisar('No tienes restaurante asignado.');
         setCargando(false);
         return;
       }
       setRestauranteId(restId);
-      await cargarCarta(restId);
+      await cargarCategorias(restId);
       setCargando(false);
     }
     init();
   }, []);
 
-  async function cargarCarta(restId) {
-    const { data: cats } = await supabase
-      .from('categorias')
-      .select('*')
-      .eq('restaurante_id', restId)
-      .order('orden', { ascending: true });
-
-    const { data: prods } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('restaurante_id', restId)
-      .order('nombre', { ascending: true });
-
-    setCategorias(cats || []);
-    setProductos(prods || []);
-  }
-
   function avisar(texto) {
     setMensaje(texto);
-    setTimeout(() => setMensaje(''), 3000);
+    setTimeout(() => setMensaje(''), 4000);
   }
 
-  // ---------- CATEGORÍAS ----------
+  async function cargarCategorias(restId) {
+    const { data } = await supabase
+      .from('categorias').select('*')
+      .eq('restaurante_id', restId).order('orden');
+    setCategorias(data || []);
+    // Por defecto todas abiertas
+    const abiertas = {};
+    (data || []).forEach(c => { abiertas[c.id] = true; });
+    setCategoriasAbiertas(abiertas);
+    // Cargar productos de cada categoria
+    for (const cat of (data || [])) {
+      await cargarProductos(cat.id);
+    }
+  }
 
-  async function crearCategoria(e) {
-    e.preventDefault();
+  async function cargarProductos(catId) {
+    const { data } = await supabase
+      .from('productos').select('*')
+      .eq('categoria_id', catId).order('nombre');
+    setProductosPorCategoria(prev => ({ ...prev, [catId]: data || [] }));
+  }
+
+  async function crearCategoria() {
     if (!nuevaCategoria.trim()) return;
-
-    const { error } = await supabase.from('categorias').insert({
-      restaurante_id: restauranteId,
-      nombre: nuevaCategoria.trim(),
-      orden: categorias.length,
-    });
-
-    if (error) {
-      avisar('Error al crear la categoría: ' + error.message);
-      return;
-    }
-    setNuevaCategoria('');
-    avisar('Categoría creada');
-    await cargarCarta(restauranteId);
-  }
-
-  async function borrarCategoria(cat) {
-    const productosEnCat = productos.filter(p => p.categoria_id === cat.id);
-    const aviso = productosEnCat.length > 0
-      ? `"${cat.nombre}" tiene ${productosEnCat.length} producto(s). Si la borras, se borrarán también. ¿Continuar?`
-      : `¿Borrar la categoría "${cat.nombre}"?`;
-    if (!confirm(aviso)) return;
-
-    // Borrar primero los productos de esa categoría
-    if (productosEnCat.length > 0) {
-      await supabase.from('productos').delete().eq('categoria_id', cat.id);
-    }
-    const { error } = await supabase.from('categorias').delete().eq('id', cat.id);
-
-    if (error) {
-      avisar('Error al borrar: ' + error.message);
-      return;
-    }
-    avisar('Categoría borrada');
-    await cargarCarta(restauranteId);
-  }
-
-  async function renombrarCategoria(cat) {
-    const nuevoNombre = prompt('Nuevo nombre para la categoría:', cat.nombre);
-    if (!nuevoNombre || !nuevoNombre.trim()) return;
-
+    const orden = categorias.length + 1;
     const { error } = await supabase
       .from('categorias')
-      .update({ nombre: nuevoNombre.trim() })
-      .eq('id', cat.id);
-
-    if (error) {
-      avisar('Error al renombrar: ' + error.message);
-      return;
-    }
-    avisar('Categoría renombrada');
-    await cargarCarta(restauranteId);
+      .insert({ restaurante_id: restauranteId, nombre: nuevaCategoria.trim(), orden });
+    if (error) { avisar('Error: ' + error.message); return; }
+    setNuevaCategoria('');
+    await cargarCategorias(restauranteId);
   }
 
-  // ---------- PRODUCTOS ----------
-
-  function actualizarProdForm(catId, campo, valor) {
-    setProdForm(prev => ({
-      ...prev,
-      [catId]: { ...(prev[catId] || {}), [campo]: valor },
-    }));
+  async function guardarCategoria(catId) {
+    if (!nombreCatEdicion.trim()) return;
+    const { error } = await supabase
+      .from('categorias').update({ nombre: nombreCatEdicion.trim() }).eq('id', catId);
+    if (error) { avisar('Error: ' + error.message); return; }
+    setEditandoCatId(null);
+    setNombreCatEdicion('');
+    await cargarCategorias(restauranteId);
   }
 
-  async function crearProducto(e, catId) {
-    e.preventDefault();
-    const form = prodForm[catId] || {};
-    const nombre = (form.nombre || '').trim();
-    const descripcion = (form.descripcion || '').trim();
-    const precio = parseFloat(form.precio);
-
-    if (!nombre) {
-      avisar('El producto necesita un nombre');
-      return;
-    }
-    if (isNaN(precio) || precio < 0) {
-      avisar('Pon un precio válido');
-      return;
-    }
-
-    const { error } = await supabase.from('productos').insert({
-      restaurante_id: restauranteId,
-      categoria_id: catId,
-      nombre: nombre,
-      descripcion: descripcion || null,
-      precio: precio,
-      disponible: true,
-    });
-
-    if (error) {
-      avisar('Error al crear el producto: ' + error.message);
-      return;
-    }
-    // Limpiar el formulario de esa categoría
-    setProdForm(prev => ({ ...prev, [catId]: { nombre: '', descripcion: '', precio: '' } }));
-    avisar('Producto añadido');
-    await cargarCarta(restauranteId);
+  async function borrarCategoria(catId) {
+    if (!confirm('¿Borrar esta categoría con todos sus productos?')) return;
+    await supabase.from('productos').delete().eq('categoria_id', catId);
+    const { error } = await supabase.from('categorias').delete().eq('id', catId);
+    if (error) { avisar('Error: ' + error.message); return; }
+    await cargarCategorias(restauranteId);
   }
 
-  async function borrarProducto(prod) {
-    if (!confirm(`¿Borrar el producto "${prod.nombre}"?`)) return;
-    const { error } = await supabase.from('productos').delete().eq('id', prod.id);
-    if (error) {
-      avisar('Error al borrar: ' + error.message);
-      return;
-    }
-    avisar('Producto borrado');
-    await cargarCarta(restauranteId);
+  async function crearProducto(catId) {
+    if (!datosProd.nombre.trim() || !datosProd.precio) return;
+    const { error } = await supabase
+      .from('productos').insert({
+        restaurante_id: restauranteId,
+        categoria_id: catId,
+        nombre: datosProd.nombre.trim(),
+        precio: parseFloat(datosProd.precio),
+        descripcion: datosProd.descripcion.trim() || null,
+        disponible: datosProd.disponible
+      });
+    if (error) { avisar('Error: ' + error.message); return; }
+    setAgregandoProductoEnCat(null);
+    setDatosProd({ nombre: '', precio: '', descripcion: '', disponible: true });
+    await cargarProductos(catId);
+  }
+
+  async function guardarProducto(prodId, catId) {
+    if (!datosProd.nombre.trim() || !datosProd.precio) return;
+    const { error } = await supabase
+      .from('productos').update({
+        nombre: datosProd.nombre.trim(),
+        precio: parseFloat(datosProd.precio),
+        descripcion: datosProd.descripcion.trim() || null,
+        disponible: datosProd.disponible
+      }).eq('id', prodId);
+    if (error) { avisar('Error: ' + error.message); return; }
+    setEditandoProdId(null);
+    setDatosProd({ nombre: '', precio: '', descripcion: '', disponible: true });
+    await cargarProductos(catId);
+  }
+
+  async function borrarProducto(prodId, catId) {
+    if (!confirm('¿Borrar este producto?')) return;
+    const { error } = await supabase.from('productos').delete().eq('id', prodId);
+    if (error) { avisar('Error: ' + error.message); return; }
+    await cargarProductos(catId);
   }
 
   async function toggleDisponible(prod) {
-    const { error } = await supabase
-      .from('productos')
+    await supabase.from('productos')
       .update({ disponible: !prod.disponible })
       .eq('id', prod.id);
-    if (error) {
-      avisar('Error: ' + error.message);
-      return;
-    }
-    await cargarCarta(restauranteId);
+    await cargarProductos(prod.categoria_id);
   }
 
-  async function editarProducto(prod) {
-    const nuevoNombre = prompt('Nombre del producto:', prod.nombre);
-    if (nuevoNombre === null) return;
-    const nuevaDesc = prompt('Descripción (puede quedar vacía):', prod.descripcion || '');
-    if (nuevaDesc === null) return;
-    const nuevoPrecioStr = prompt('Precio:', prod.precio);
-    if (nuevoPrecioStr === null) return;
-
-    const nuevoPrecio = parseFloat(nuevoPrecioStr);
-    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
-      avisar('Precio no válido');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('productos')
-      .update({
-        nombre: nuevoNombre.trim(),
-        descripcion: nuevaDesc.trim() || null,
-        precio: nuevoPrecio,
-      })
-      .eq('id', prod.id);
-
-    if (error) {
-      avisar('Error al editar: ' + error.message);
-      return;
-    }
-    avisar('Producto actualizado');
-    await cargarCarta(restauranteId);
+  function empezarEditarProducto(prod) {
+    setEditandoProdId(prod.id);
+    setDatosProd({
+      nombre: prod.nombre,
+      precio: String(prod.precio),
+      descripcion: prod.descripcion || '',
+      disponible: prod.disponible
+    });
   }
 
-  // ---------- RENDER ----------
+  function toggleCategoria(catId) {
+    setCategoriasAbiertas(prev => ({ ...prev, [catId]: !prev[catId] }));
+  }
 
   if (cargando) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg">
+        <Loader2 className="w-6 h-6 animate-spin text-accent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Cabecera */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">🍕 Gestión de la Carta</h1>
-          <a href="/pedidos" className="text-sm text-blue-600 hover:underline">
-            ← Volver a pedidos
+    <div className="min-h-screen bg-bg">
+      <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
+              <UtensilsCrossed className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-text">Mi carta</h1>
+              <p className="text-xs text-text-muted hidden sm:block">Categorías y productos</p>
+            </div>
+          </div>
+          <a href="/pedidos" className="btn-ghost">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Volver</span>
           </a>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
-
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         {mensaje && (
-          <div className="bg-blue-50 text-blue-800 p-3 rounded-lg mb-4">{mensaje}</div>
+          <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 text-accent text-sm animate-fade-in">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{mensaje}</span>
+          </div>
         )}
 
-        {/* Crear categoría nueva */}
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
-          <h2 className="font-semibold mb-3">Añadir una categoría</h2>
-          <form onSubmit={crearCategoria} className="flex gap-2">
+        {/* Crear nueva categoria */}
+        <div className="card p-4 mb-6">
+          <label className="label">Crear nueva categoría</label>
+          <div className="flex gap-2">
             <input
               type="text"
               value={nuevaCategoria}
               onChange={(e) => setNuevaCategoria(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && crearCategoria()}
+              className="input"
               placeholder="Ej: Pizzas, Bebidas, Postres..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-lg"
-            >
-              Añadir
+            <button onClick={crearCategoria} disabled={!nuevaCategoria.trim()} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Crear</span>
             </button>
-          </form>
+          </div>
         </div>
 
-        {/* Lista de categorías con sus productos */}
+        {/* Lista de categorias */}
         {categorias.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg text-center text-gray-500">
-            Aún no tienes categorías. Crea la primera arriba (por ejemplo "Pizzas").
+          <div className="card p-12 text-center">
+            <UtensilsCrossed className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
+            <p className="text-text-muted">Aún no tienes categorías. Crea la primera arriba.</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {categorias.map(cat => {
-              const prodsCat = productos.filter(p => p.categoria_id === cat.id);
-              const form = prodForm[cat.id] || { nombre: '', descripcion: '', precio: '' };
-              return (
-                <div key={cat.id} className="bg-white rounded-lg shadow-sm p-5">
-                  {/* Cabecera de la categoría */}
-                  <div className="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 className="text-lg font-bold">{cat.nombre}</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => renombrarCategoria(cat)}
-                        className="text-sm text-gray-600 hover:text-blue-600"
-                      >
-                        Renombrar
-                      </button>
-                      <button
-                        onClick={() => borrarCategoria(cat)}
-                        className="text-sm text-gray-600 hover:text-red-600"
-                      >
-                        Borrar
-                      </button>
-                    </div>
-                  </div>
+          <div className="space-y-3">
+            {categorias.map(cat => (
+              <div key={cat.id} className="card overflow-hidden">
+                <div className="flex items-center gap-2 p-4">
+                  <button
+                    onClick={() => toggleCategoria(cat.id)}
+                    className="btn-ghost p-1"
+                  >
+                    {categoriasAbiertas[cat.id] ?
+                      <ChevronDown className="w-4 h-4" /> :
+                      <ChevronRight className="w-4 h-4" />
+                    }
+                  </button>
 
-                  {/* Productos de la categoría */}
-                  {prodsCat.length === 0 ? (
-                    <p className="text-sm text-gray-400 mb-4">
-                      Sin productos en esta categoría todavía.
-                    </p>
+                  {editandoCatId === cat.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={nombreCatEdicion}
+                        onChange={(e) => setNombreCatEdicion(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && guardarCategoria(cat.id)}
+                        className="input flex-1"
+                        autoFocus
+                      />
+                      <button onClick={() => guardarCategoria(cat.id)} className="btn-primary p-2">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditandoCatId(null)} className="btn-ghost p-2">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
                   ) : (
-                    <div className="space-y-2 mb-4">
-                      {prodsCat.map(prod => (
-                        <div
-                          key={prod.id}
-                          className={`flex justify-between items-start p-3 rounded-lg border ${
-                            prod.disponible ? 'border-gray-200' : 'border-gray-200 bg-gray-50 opacity-60'
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{prod.nombre}</span>
-                              {!prod.disponible && (
-                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
-                                  Agotado
+                    <>
+                      <h2 className="flex-1 text-base font-semibold text-text">{cat.nombre}</h2>
+                      <span className="text-xs text-text-muted">
+                        {(productosPorCategoria[cat.id] || []).length} productos
+                      </span>
+                      <button
+                        onClick={() => { setEditandoCatId(cat.id); setNombreCatEdicion(cat.nombre); }}
+                        className="btn-ghost p-2"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => borrarCategoria(cat.id)} className="btn-ghost p-2 hover:text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {categoriasAbiertas[cat.id] && (
+                  <div className="border-t border-border bg-surface-2/30">
+                    {/* Lista de productos */}
+                    {(productosPorCategoria[cat.id] || []).map(prod => (
+                      <div key={prod.id} className="border-b border-border last:border-b-0 p-4">
+                        {editandoProdId === prod.id ? (
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={datosProd.nombre}
+                              onChange={(e) => setDatosProd({ ...datosProd, nombre: e.target.value })}
+                              className="input"
+                              placeholder="Nombre del producto"
+                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={datosProd.precio}
+                                onChange={(e) => setDatosProd({ ...datosProd, precio: e.target.value })}
+                                className="input flex-1"
+                                placeholder="Precio"
+                              />
+                              <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={datosProd.disponible}
+                                  onChange={(e) => setDatosProd({ ...datosProd, disponible: e.target.checked })}
+                                  className="accent-accent"
+                                />
+                                <span className="text-sm">Disponible</span>
+                              </label>
+                            </div>
+                            <textarea
+                              value={datosProd.descripcion}
+                              onChange={(e) => setDatosProd({ ...datosProd, descripcion: e.target.value })}
+                              className="input"
+                              rows="2"
+                              placeholder="Descripción (opcional)"
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => guardarProducto(prod.id, cat.id)} className="btn-primary flex-1">
+                                <Check className="w-4 h-4" />
+                                Guardar
+                              </button>
+                              <button onClick={() => setEditandoProdId(null)} className="btn-secondary">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline gap-2 flex-wrap">
+                                <h3 className={`font-medium text-text ${!prod.disponible ? 'line-through opacity-50' : ''}`}>
+                                  {prod.nombre}
+                                </h3>
+                                <span className="text-sm font-semibold text-accent tabular-nums">
+                                  {Number(prod.precio).toFixed(2)}€
                                 </span>
+                                {!prod.disponible && (
+                                  <span className="badge bg-surface-2 text-text-muted border border-border">
+                                    No disponible
+                                  </span>
+                                )}
+                              </div>
+                              {prod.descripcion && (
+                                <p className="text-sm text-text-muted mt-1">{prod.descripcion}</p>
                               )}
                             </div>
-                            {prod.descripcion && (
-                              <p className="text-sm text-gray-500">{prod.descripcion}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 ml-4">
-                            <span className="font-semibold text-gray-900">
-                              {Number(prod.precio).toFixed(2)}€
-                            </span>
                             <button
                               onClick={() => toggleDisponible(prod)}
-                              className="text-xs text-gray-600 hover:text-blue-600"
-                              title={prod.disponible ? 'Marcar como agotado' : 'Marcar como disponible'}
+                              className="btn-ghost p-2"
+                              title={prod.disponible ? 'Desactivar' : 'Activar'}
                             >
-                              {prod.disponible ? '🟢' : '⚪'}
+                              {prod.disponible ?
+                                <Check className="w-4 h-4 text-accent" /> :
+                                <X className="w-4 h-4 text-text-muted" />
+                              }
                             </button>
-                            <button
-                              onClick={() => editarProducto(prod)}
-                              className="text-sm text-gray-600 hover:text-blue-600"
-                            >
-                              Editar
+                            <button onClick={() => empezarEditarProducto(prod)} className="btn-ghost p-2">
+                              <Pencil className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => borrarProducto(prod)}
-                              className="text-sm text-gray-600 hover:text-red-600"
-                            >
-                              Borrar
+                            <button onClick={() => borrarProducto(prod.id, cat.id)} className="btn-ghost p-2 hover:text-red-500">
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    ))}
 
-                  {/* Formulario para añadir producto a esta categoría */}
-                  <form
-                    onSubmit={(e) => crearProducto(e, cat.id)}
-                    className="bg-gray-50 rounded-lg p-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
-                  >
-                    <input
-                      type="text"
-                      value={form.nombre}
-                      onChange={(e) => actualizarProdForm(cat.id, 'nombre', e.target.value)}
-                      placeholder="Nombre del producto"
-                      className="md:col-span-3 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      value={form.descripcion}
-                      onChange={(e) => actualizarProdForm(cat.id, 'descripcion', e.target.value)}
-                      placeholder="Descripción (ej: tomate, mozzarella, albahaca)"
-                      className="md:col-span-6 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.precio}
-                      onChange={(e) => actualizarProdForm(cat.id, 'precio', e.target.value)}
-                      placeholder="Precio"
-                      className="md:col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      type="submit"
-                      className="md:col-span-1 bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-2 rounded-lg text-sm"
-                    >
-                      +
-                    </button>
-                  </form>
-                </div>
-              );
-            })}
+                    {/* Agregar nuevo producto */}
+                    {agregandoProductoEnCat === cat.id ? (
+                      <div className="p-4 bg-surface space-y-3">
+                        <input
+                          type="text"
+                          value={datosProd.nombre}
+                          onChange={(e) => setDatosProd({ ...datosProd, nombre: e.target.value })}
+                          className="input"
+                          placeholder="Nombre del producto"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={datosProd.precio}
+                            onChange={(e) => setDatosProd({ ...datosProd, precio: e.target.value })}
+                            className="input flex-1"
+                            placeholder="Precio"
+                          />
+                          <label className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2 border border-border cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={datosProd.disponible}
+                              onChange={(e) => setDatosProd({ ...datosProd, disponible: e.target.checked })}
+                              className="accent-accent"
+                            />
+                            <span className="text-sm">Disponible</span>
+                          </label>
+                        </div>
+                        <textarea
+                          value={datosProd.descripcion}
+                          onChange={(e) => setDatosProd({ ...datosProd, descripcion: e.target.value })}
+                          className="input"
+                          rows="2"
+                          placeholder="Descripción (opcional)"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => crearProducto(cat.id)} className="btn-primary flex-1">
+                            <Plus className="w-4 h-4" />
+                            Crear producto
+                          </button>
+                          <button
+                            onClick={() => { setAgregandoProductoEnCat(null); setDatosProd({ nombre: '', precio: '', descripcion: '', disponible: true }); }}
+                            className="btn-secondary"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAgregandoProductoEnCat(cat.id)}
+                        className="w-full p-4 text-sm font-medium text-text-muted hover:text-accent hover:bg-accent/5 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Añadir producto
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </main>
