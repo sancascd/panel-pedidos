@@ -38,12 +38,51 @@ function useScrollPosition() {
   return scrollY;
 }
 
-// Helper: aplica Reveal individual a cada hijo, con delay progresivo
-function StaggerChildren({ children, className = '', baseDelay = 0, stagger = 120 }) {
+// Hook: progreso de scroll para un elemento (0-1)
+// Devuelve cuánto ha entrado el elemento en su zona de animación
+function useScrollProgress(ref, { start = 0.92, end = 0.45 } = {}) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !ref.current) return;
+
+    let rafId = null;
+    const update = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const wh = window.innerHeight;
+      const startY = wh * start;
+      const endY = wh * end;
+      const range = startY - endY;
+      const raw = (startY - rect.top) / range;
+      const clamped = Math.max(0, Math.min(1, raw));
+      setProgress(clamped);
+      rafId = null;
+    };
+
+    const onScroll = () => {
+      if (rafId === null) rafId = requestAnimationFrame(update);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [ref, start, end]);
+
+  return progress;
+}
+
+// Helper: aplica Reveal a cada hijo con un offset escalonado en el scroll
+function StaggerChildren({ children, className = '', baseOffset = 0, stagger = 0.06 }) {
   return (
     <div className={className}>
       {Children.map(children, (child, i) => (
-        <Reveal key={i} delay={baseDelay + i * stagger}>
+        <Reveal key={i} offset={baseOffset + i * stagger}>
           {child}
         </Reveal>
       ))}
@@ -51,40 +90,25 @@ function StaggerChildren({ children, className = '', baseDelay = 0, stagger = 12
   );
 }
 
-// Componente: fade-in + slide-up + scale cuando entra en pantalla
-function Reveal({ children, delay = 0, className = '' }) {
+// Componente: la opacidad/posición/escala se ligan DIRECTAMENTE al scroll.
+// El elemento se "desliza" según el usuario va haciendo scroll, sin trigger.
+function Reveal({ children, className = '', offset = 0 }) {
   const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !ref.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      // Trigger más tarde para que la animación se vea claramente al hacer scroll
-      { threshold: 0.15, rootMargin: '0px 0px -140px 0px' }
-    );
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
+  const progress = useScrollProgress(ref, {
+    start: 0.92 - offset * 0.08,
+    end: 0.50 - offset * 0.08,
+  });
+  // Curva ease-out cúbica para suavizar el progreso (parece más natural)
+  const eased = 1 - Math.pow(1 - progress, 3);
 
   return (
     <div
       ref={ref}
       style={{
-        transitionDelay: `${delay}ms`,
-        // Curva "premium" tipo Apple/Linear: arranque rápido, salida muy suave
-        transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        transitionDuration: '1100ms',
-        // Estado de partida muy claro: más movimiento + escala + ligero blur
-        transform: visible ? 'translateY(0) scale(1)' : 'translateY(60px) scale(0.94)',
-        filter: visible ? 'blur(0)' : 'blur(6px)',
-        opacity: visible ? 1 : 0,
-        transitionProperty: 'opacity, transform, filter',
+        opacity: eased,
+        transform: `translateY(${(1 - eased) * 80}px) scale(${0.92 + eased * 0.08})`,
+        filter: `blur(${(1 - eased) * 8}px)`,
+        willChange: 'opacity, transform, filter',
       }}
       className={className}
     >
@@ -223,7 +247,7 @@ function MockupChat() {
 
 function PasoCard({ numero, icono: Icono, titulo, texto }) {
   return (
-    <div className="relative card p-6">
+    <div className="relative card p-6 h-full">
       <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-sm font-semibold shadow-lift">
         {numero}
       </div>
@@ -236,7 +260,7 @@ function PasoCard({ numero, icono: Icono, titulo, texto }) {
 
 function FeatureCard({ icono: Icono, titulo, texto }) {
   return (
-    <div className="relative card p-5">
+    <div className="relative card p-5 h-full">
       <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
         <Icono className="w-4 h-4 text-accent" />
       </div>
@@ -600,7 +624,7 @@ export default function PaginaLanding() {
         </StaggerChildren>
 
         {/* Implementación */}
-        <Reveal delay={200}>
+        <Reveal>
         <div className="card p-6 mt-8 bg-gradient-to-br from-surface to-accent/5 border-accent/20">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
@@ -648,7 +672,7 @@ export default function PaginaLanding() {
           </div>
         </Reveal>
         <StaggerChildren className="grid md:grid-cols-3 gap-4" baseDelay={100} stagger={180}>
-          <div className="relative card p-6 border-dashed">
+          <div className="relative card p-6 border-dashed h-full">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <ImageIcon className="w-4 h-4 text-accent" />
             </div>
@@ -659,7 +683,7 @@ export default function PaginaLanding() {
               antes que escribir.
             </p>
           </div>
-          <div className="relative card p-6 border-dashed">
+          <div className="relative card p-6 border-dashed h-full">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <QrCode className="w-4 h-4 text-accent" />
             </div>
@@ -669,7 +693,7 @@ export default function PaginaLanding() {
               llega directo a tu panel. Sin pasar por WhatsApp, sin esperar al camarero.
             </p>
           </div>
-          <div className="relative card p-6 border-dashed">
+          <div className="relative card p-6 border-dashed h-full">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <BarChart3 className="w-4 h-4 text-accent" />
             </div>
