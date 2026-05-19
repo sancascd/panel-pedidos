@@ -71,7 +71,7 @@ function MockupChat() {
   }, [paso]);
 
   return (
-    <div className="relative">
+    <div className="relative isolate">
       {/* Halo decorativo con respiración */}
       <div
         aria-hidden
