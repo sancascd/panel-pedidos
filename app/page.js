@@ -459,7 +459,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid md:grid-cols-3 gap-5" baseDelay={150} stagger={180}>
+        <StaggerChildren className="grid md:grid-cols-3 gap-5" stagger={0.06}>
           <PasoCard
             numero="1"
             icono={MessageSquare}
@@ -498,7 +498,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" baseDelay={100} stagger={100}>
+        <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" stagger={0.04}>
           <FeatureCard
             icono={Smartphone}
             titulo="Sin app para tu cliente"
@@ -578,7 +578,7 @@ export default function PaginaLanding() {
           </div>
         </Reveal>
 
-        <StaggerChildren className="grid md:grid-cols-3 gap-5 mt-6" baseDelay={100} stagger={180}>
+        <StaggerChildren className="grid md:grid-cols-3 gap-5 mt-6" stagger={0.06}>
           <PlanCard
             nombre="Básico"
             precio="99"
@@ -671,7 +671,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid md:grid-cols-3 gap-4" baseDelay={100} stagger={180}>
+        <StaggerChildren className="grid md:grid-cols-3 gap-4" stagger={0.06}>
           <div className="relative card p-6 border-dashed h-full">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <ImageIcon className="w-4 h-4 text-accent" />
@@ -718,7 +718,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="space-y-3" baseDelay={100} stagger={80}>
+        <StaggerChildren className="space-y-3" stagger={0.02}>
           <FAQItem
             pregunta="¿Necesito instalar algo en mi móvil o en el de mis clientes?"
             respuesta="No. El cliente usa el WhatsApp que ya tiene. Tú accedes al panel desde el navegador del móvil, tablet u ordenador. Sin apps, sin instalaciones, sin actualizaciones."
