@@ -369,7 +369,7 @@ export default function PaginaLanding() {
           ? 'bg-bg/95 backdrop-blur-xl border-border/70 shadow-card'
           : 'bg-bg/80 backdrop-blur-md border-border'
       }`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
               <MessageSquare className="w-4 h-4 text-accent" strokeWidth={2.5} />
@@ -397,8 +397,8 @@ export default function PaginaLanding() {
       </header>
 
       {/* HERO */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-20 lg:py-24">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
           <div className="animate-slide-up">
             <div
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-5"
@@ -420,21 +420,21 @@ export default function PaginaLanding() {
               Tus clientes piden por WhatsApp. Comandi entiende lo que escriben,
               organiza el pedido y te avisa. Una preocupación menos.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-col sm:flex-row sm:flex-wrap gap-3">
               <a
                 href={urlWhatsApp()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-primary"
+                className="btn-primary w-full sm:w-auto"
               >
                 Pedir demo por WhatsApp
                 <ArrowRight className="w-4 h-4" />
               </a>
-              <a href="#como-funciona" className="btn-secondary">
+              <a href="#como-funciona" className="btn-secondary w-full sm:w-auto">
                 Ver cómo funciona
               </a>
             </div>
-            <div className="mt-7 flex items-center gap-5 text-xs text-text-muted">
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-text-muted">
               <div className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" style={{ color: ACCENT_HEX }} />
                 Sin permanencia
@@ -457,7 +457,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* CÓMO FUNCIONA */}
-      <section id="como-funciona" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <section id="como-funciona" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <Reveal>
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
@@ -491,7 +491,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* POR QUÉ COMANDI */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 relative">
         <div
           aria-hidden
           className="absolute top-1/2 left-[25%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
@@ -542,7 +542,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* PARA QUIÉN */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <Reveal>
         <div className="card p-8 sm:p-12 bg-gradient-to-br from-surface to-surface-2 border-border">
           <div className="text-center max-w-2xl mx-auto">
@@ -569,7 +569,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* PRECIO */}
-      <section id="precio" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
+      <section id="precio" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 relative">
         <div
           aria-hidden
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
@@ -660,7 +660,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* PRÓXIMAMENTE */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 relative">
         <div
           aria-hidden
           className="absolute top-1/2 left-[75%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
@@ -716,7 +716,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* FAQ */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <Reveal>
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
@@ -768,7 +768,7 @@ export default function PaginaLanding() {
       </section>
 
       {/* CTA FINAL */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-24">
         <Reveal>
         <div className="card p-8 sm:p-12 relative overflow-hidden text-center">
           <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-accent/10 rounded-full blur-3xl -z-0" />
