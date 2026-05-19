@@ -154,7 +154,7 @@ function PasoCard({ numero, icono: Icono, titulo, texto }) {
 
 function FeatureCard({ icono: Icono, titulo, texto }) {
   return (
-    <div className="card p-5">
+    <div className="relative card p-5">
       <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
         <Icono className="w-4 h-4 text-accent" />
       </div>
@@ -540,7 +540,7 @@ export default function PaginaLanding() {
           </p>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <div className="card p-6 border-dashed">
+          <div className="relative card p-6 border-dashed">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <ImageIcon className="w-4 h-4 text-accent" />
             </div>
@@ -551,7 +551,7 @@ export default function PaginaLanding() {
               antes que escribir.
             </p>
           </div>
-          <div className="card p-6 border-dashed">
+          <div className="relative card p-6 border-dashed">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <QrCode className="w-4 h-4 text-accent" />
             </div>
