@@ -408,8 +408,8 @@ export default function PaginaLanding() {
               <span className="text-accent">Cero</span> esperas.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-text-muted leading-relaxed max-w-lg">
-              Tus clientes piden por WhatsApp como siempre. Comandi entiende lo que escriben,
-              organiza el pedido y te avisa. Tú solo cocinas.
+              Tus clientes piden por WhatsApp. Comandi entiende lo que escriben,
+              organiza el pedido y te avisa. Una preocupación menos.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a
