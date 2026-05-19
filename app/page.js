@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
@@ -13,6 +13,62 @@ const MENSAJE_DEMO = 'Hola, me interesa Comandi para mi restaurante. ¿Podemos h
 
 function urlWhatsApp() {
   return 'https://wa.me/' + WHATSAPP_VENTAS + '?text=' + encodeURIComponent(MENSAJE_DEMO);
+}
+
+// Hook: posición de scroll suavizada con requestAnimationFrame
+function useScrollPosition() {
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setScrollY(window.scrollY);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return scrollY;
+}
+
+// Componente: fade-in + slide-up cuando entra en pantalla
+function Reveal({ children, delay = 0, className = '' }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !ref.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.05, rootMargin: '0px 0px -80px 0px' }
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={`transition-all duration-700 ease-out ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 function BurbujaUsuario({ children, hora }) {
@@ -240,18 +296,31 @@ const TEMA_LANDING = {
 };
 
 export default function PaginaLanding() {
+  const scrollY = useScrollPosition();
+  const scrolled = scrollY > 20;
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={TEMA_LANDING}>
-      {/* Fondo decorativo del hero */}
-      <div className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none">
+      {/* Fondo decorativo del hero — con parallax y fade */}
+      <div
+        className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none"
+        style={{
+          transform: `translateY(${-scrollY * 0.2}px)`,
+          opacity: Math.max(0, 1 - scrollY / 800)
+        }}
+      >
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[800px]"
           style={{ background: 'radial-gradient(ellipse at top, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.05) 35%, transparent 70%)' }}
         />
       </div>
 
-      {/* Header de la landing */}
-      <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-md border-b border-border">
+      {/* Header de la landing — dinámico al scroll */}
+      <header className={`sticky top-0 z-30 border-b transition-all duration-300 ${
+        scrolled
+          ? 'bg-bg/95 backdrop-blur-xl border-border/70 shadow-card'
+          : 'bg-bg/80 backdrop-blur-md border-border'
+      }`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
@@ -334,34 +403,38 @@ export default function PaginaLanding() {
 
       {/* CÓMO FUNCIONA */}
       <section id="como-funciona" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Cómo funciona
-          </h2>
-          <p className="mt-3 text-text-muted">
-            Tres pasos. Sin instalar nada en el móvil del cliente, sin formar a nadie.
-          </p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          <PasoCard
-            numero="1"
-            icono={MessageSquare}
-            titulo="Tu cliente escribe por WhatsApp"
-            texto="Como siempre. Saluda, pide, pregunta — usa su WhatsApp normal. No descarga nada, no aprende ningún proceso nuevo."
-          />
-          <PasoCard
-            numero="2"
-            icono={Bot}
-            titulo="La IA entiende el pedido"
-            texto="Aunque escriba con faltas, mezcle productos en una frase o diga 'sin cebolla'. Pide los datos que faltan: dirección, pago, cambio."
-          />
-          <PasoCard
-            numero="3"
-            icono={LayoutDashboard}
-            titulo="Tú lo gestionas en tu panel"
-            texto="Un kanban claro con los pedidos del día. Imprimes comanda con un clic, marcas estados, editas si hace falta. El cliente recibe el aviso solo."
-          />
-        </div>
+        <Reveal>
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              Cómo funciona
+            </h2>
+            <p className="mt-3 text-text-muted">
+              Tres pasos. Sin instalar nada en el móvil del cliente, sin formar a nadie.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <div className="grid md:grid-cols-3 gap-5">
+            <PasoCard
+              numero="1"
+              icono={MessageSquare}
+              titulo="Tu cliente escribe por WhatsApp"
+              texto="Como siempre. Saluda, pide, pregunta — usa su WhatsApp normal. No descarga nada, no aprende ningún proceso nuevo."
+            />
+            <PasoCard
+              numero="2"
+              icono={Bot}
+              titulo="La IA entiende el pedido"
+              texto="Aunque escriba con faltas, mezcle productos en una frase o diga 'sin cebolla'. Pide los datos que faltan: dirección, pago, cambio."
+            />
+            <PasoCard
+              numero="3"
+              icono={LayoutDashboard}
+              titulo="Tú lo gestionas en tu panel"
+              texto="Un kanban claro con los pedidos del día. Imprimes comanda con un clic, marcas estados, editas si hace falta. El cliente recibe el aviso solo."
+            />
+          </div>
+        </Reveal>
       </section>
 
       {/* POR QUÉ COMANDI */}
@@ -371,50 +444,55 @@ export default function PaginaLanding() {
           className="absolute top-1/2 left-[25%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
         />
-        <div className="text-center max-w-2xl mx-auto mb-12 relative">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Por qué Comandi
-          </h2>
-          <p className="mt-3 text-text-muted">
-            Pensado para restaurantes españoles, no copiado de un SaaS de Silicon Valley.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FeatureCard
-            icono={Smartphone}
-            titulo="Sin app para tu cliente"
-            texto="WhatsApp ya lo tienen instalado. Cero fricción, cero curva de aprendizaje, cero quejas."
-          />
-          <FeatureCard
-            icono={Zap}
-            titulo="Sin comisión por pedido"
-            texto="Pagas una cuota fija al mes. No nos llevamos un porcentaje de cada venta. El margen es tuyo."
-          />
-          <FeatureCard
-            icono={Bot}
-            titulo="Entiende como sea que escriban"
-            texto="Faltas, abreviaturas, 'oye ponme también' en mitad de la conversación. La IA reinterpreta el pedido y suma lo nuevo."
-          />
-          <FeatureCard
-            icono={Star}
-            titulo="Reseñas automáticas"
-            texto="Tras entregar, el bot pide al cliente que valore el pedido. Recibes feedback real sin tener que pedirlo tú."
-          />
-          <FeatureCard
-            icono={Bell}
-            titulo="Avisos automáticos"
-            texto="Si editas un pedido, el cliente recibe el resumen actualizado en su WhatsApp. Sin llamadas confusas."
-          />
-          <FeatureCard
-            icono={ShieldCheck}
-            titulo="Datos seguros y RGPD"
-            texto="Cada restaurante ve solo sus pedidos y sus clientes. Hosteado en Europa. Cumplimos la normativa española."
-          />
-        </div>
+        <Reveal>
+          <div className="text-center max-w-2xl mx-auto mb-12 relative">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              Por qué Comandi
+            </h2>
+            <p className="mt-3 text-text-muted">
+              Pensado para restaurantes españoles, no copiado de un SaaS de Silicon Valley.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <FeatureCard
+              icono={Smartphone}
+              titulo="Sin app para tu cliente"
+              texto="WhatsApp ya lo tienen instalado. Cero fricción, cero curva de aprendizaje, cero quejas."
+            />
+            <FeatureCard
+              icono={Zap}
+              titulo="Sin comisión por pedido"
+              texto="Pagas una cuota fija al mes. No nos llevamos un porcentaje de cada venta. El margen es tuyo."
+            />
+            <FeatureCard
+              icono={Bot}
+              titulo="Entiende como sea que escriban"
+              texto="Faltas, abreviaturas, 'oye ponme también' en mitad de la conversación. La IA reinterpreta el pedido y suma lo nuevo."
+            />
+            <FeatureCard
+              icono={Star}
+              titulo="Reseñas automáticas"
+              texto="Tras entregar, el bot pide al cliente que valore el pedido. Recibes feedback real sin tener que pedirlo tú."
+            />
+            <FeatureCard
+              icono={Bell}
+              titulo="Avisos automáticos"
+              texto="Si editas un pedido, el cliente recibe el resumen actualizado en su WhatsApp. Sin llamadas confusas."
+            />
+            <FeatureCard
+              icono={ShieldCheck}
+              titulo="Datos seguros y RGPD"
+              texto="Cada restaurante ve solo sus pedidos y sus clientes. Hosteado en Europa. Cumplimos la normativa española."
+            />
+          </div>
+        </Reveal>
       </section>
 
       {/* PARA QUIÉN */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <Reveal>
         <div className="card p-8 sm:p-12 bg-gradient-to-br from-surface to-surface-2 border-border">
           <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-text">
@@ -436,6 +514,7 @@ export default function PaginaLanding() {
             </div>
           </div>
         </div>
+        </Reveal>
       </section>
 
       {/* PRECIO */}
@@ -445,16 +524,19 @@ export default function PaginaLanding() {
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
         />
-        <div className="text-center mb-12 max-w-2xl mx-auto relative">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Precio claro. Crece a tu ritmo.
-          </h2>
-          <p className="mt-3 text-text-muted">
-            Empieza por el plan básico. Cuando tu volumen lo justifique, te avisamos
-            para pasar al siguiente y que cada pedido te salga más barato.
-          </p>
-        </div>
+        <Reveal>
+          <div className="text-center mb-12 max-w-2xl mx-auto relative">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              Precio claro. Crece a tu ritmo.
+            </h2>
+            <p className="mt-3 text-text-muted">
+              Empieza por el plan básico. Cuando tu volumen lo justifique, te avisamos
+              para pasar al siguiente y que cada pedido te salga más barato.
+            </p>
+          </div>
+        </Reveal>
 
+        <Reveal delay={100}>
         <div className="grid md:grid-cols-3 gap-5 mt-6">
           <PlanCard
             nombre="Básico"
@@ -499,8 +581,10 @@ export default function PaginaLanding() {
             ]}
           />
         </div>
+        </Reveal>
 
         {/* Implementación */}
+        <Reveal delay={200}>
         <div className="card p-6 mt-8 bg-gradient-to-br from-surface to-accent/5 border-accent/20">
           <div className="flex items-start gap-4">
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
@@ -519,6 +603,7 @@ export default function PaginaLanding() {
             </div>
           </div>
         </div>
+        </Reveal>
 
         <p className="text-xs text-text-muted text-center mt-6">
           Sin permanencia. Cambia de plan o date de baja cuando quieras.
@@ -532,18 +617,21 @@ export default function PaginaLanding() {
           className="absolute top-1/2 left-[75%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
         />
-        <div className="text-center max-w-2xl mx-auto mb-12 relative">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
-            <Sparkles className="w-3 h-3" />
-            Próximamente
+        <Reveal>
+          <div className="text-center max-w-2xl mx-auto mb-12 relative">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
+              <Sparkles className="w-3 h-3" />
+              Próximamente
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              Sigue creciendo con nosotros
+            </h2>
+            <p className="mt-3 text-text-muted">
+              Lo que estamos cocinando para los próximos meses. Sin coste extra para los clientes actuales.
+            </p>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Sigue creciendo con nosotros
-          </h2>
-          <p className="mt-3 text-text-muted">
-            Lo que estamos cocinando para los próximos meses. Sin coste extra para los clientes actuales.
-          </p>
-        </div>
+        </Reveal>
+        <Reveal delay={100}>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="relative card p-6 border-dashed">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
@@ -577,18 +665,22 @@ export default function PaginaLanding() {
             </p>
           </div>
         </div>
+        </Reveal>
       </section>
 
       {/* FAQ */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
-            Preguntas frecuentes
-          </h2>
-          <p className="mt-3 text-text-muted">
-            Si te queda alguna otra, escríbenos por WhatsApp y te respondemos rápido.
-          </p>
-        </div>
+        <Reveal>
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              Preguntas frecuentes
+            </h2>
+            <p className="mt-3 text-text-muted">
+              Si te queda alguna otra, escríbenos por WhatsApp y te respondemos rápido.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
         <div className="space-y-3">
           <FAQItem
             pregunta="¿Necesito instalar algo en mi móvil o en el de mis clientes?"
@@ -627,10 +719,12 @@ export default function PaginaLanding() {
             respuesta="Para empezar te asignamos un número español dedicado para tu restaurante. Si más adelante quieres usar el tuyo propio, también se puede (requiere un trámite con WhatsApp Business)."
           />
         </div>
+        </Reveal>
       </section>
 
       {/* CTA FINAL */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <Reveal>
         <div className="card p-8 sm:p-12 relative overflow-hidden text-center">
           <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-accent/10 rounded-full blur-3xl -z-0" />
           <div className="relative">
@@ -652,6 +746,7 @@ export default function PaginaLanding() {
             </a>
           </div>
         </div>
+        </Reveal>
       </section>
 
       {/* FOOTER */}
