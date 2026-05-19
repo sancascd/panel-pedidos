@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star
 } from 'lucide-react';
 
 export default function PaginaAjustes() {
@@ -26,6 +26,7 @@ export default function PaginaAjustes() {
     direccion: '',
     email_contacto: '',
     carta_url: '',
+    resenas_activas: true,
   });
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function PaginaAjustes() {
           direccion: rest.direccion || '',
           email_contacto: rest.email_contacto || '',
           carta_url: rest.carta_url || '',
+          resenas_activas: rest.resenas_activas !== false,
         });
       }
       setCargando(false);
@@ -68,6 +70,7 @@ export default function PaginaAjustes() {
         direccion: datos.direccion.trim() || null,
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
+        resenas_activas: datos.resenas_activas,
       })
       .eq('id', restaurante.id);
     setGuardando(false);
@@ -355,6 +358,34 @@ export default function PaginaAjustes() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Reseñas automáticas */}
+        <div className="card p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <Star className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text">Reseñas automáticas</h2>
+              <p className="text-sm text-text-muted mt-1">
+                Cuando marques un pedido como entregado, el bot pedirá automáticamente al cliente
+                una puntuación del 1 al 5 por WhatsApp. Verás todas las reseñas en su sección propia del panel.
+              </p>
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={datos.resenas_activas}
+              onChange={(e) => setDatos({ ...datos, resenas_activas: e.target.checked })}
+              className="w-4 h-4 accent-accent"
+            />
+            <span className="text-sm text-text">
+              <strong className="font-medium">Activar reseñas automáticas</strong>
+              {' '}<span className="text-text-muted">(se piden 30 min después de entregar a domicilio, o al instante si es recogida)</span>
+            </span>
+          </label>
         </div>
 
         <div className="sticky bottom-4">

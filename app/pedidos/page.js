@@ -7,7 +7,7 @@ import {
   Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
-  MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt
+  MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -77,6 +77,12 @@ function esDelDiaActual(pedido) {
   return new Date(pedido.creado_en).getTime() >= inicioDiaTrabajo();
 }
 
+function estrellas(puntuacion) {
+  const llenas = '★'.repeat(puntuacion);
+  const vacias = '☆'.repeat(5 - puntuacion);
+  return llenas + vacias;
+}
+
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -86,6 +92,7 @@ export default function PaginaPedidos() {
   const [pedidos, setPedidos] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [lineas, setLineas] = useState([]);
+  const [resena, setResena] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
@@ -202,11 +209,15 @@ export default function PaginaPedidos() {
     const { data } = await supabase
       .from('lineas_pedido').select('*').eq('pedido_id', pedido.id);
     setLineas(data || []);
+    const { data: resenaData } = await supabase
+      .from('resenas').select('*').eq('pedido_id', pedido.id).maybeSingle();
+    setResena(resenaData || null);
   }
 
   function cerrarDetalle() {
     setSeleccionado(null);
     setLineas([]);
+    setResena(null);
     setEditando(false);
   }
 
@@ -556,6 +567,10 @@ export default function PaginaPedidos() {
               <Clock className="w-4 h-4" />
               <span className="hidden lg:inline">Horarios</span>
             </a>
+            <a href="/resenas" className="nav-link hidden md:inline-flex" title="Reseñas">
+              <Star className="w-4 h-4" />
+              <span className="hidden lg:inline">Reseñas</span>
+            </a>
             <a href="/ajustes" className="nav-link hidden md:inline-flex" title="Ajustes">
               <Settings className="w-4 h-4" />
               <span className="hidden lg:inline">Ajustes</span>
@@ -594,6 +609,9 @@ export default function PaginaPedidos() {
           </a>
           <a href="/horarios" className="nav-link whitespace-nowrap">
             <Clock className="w-4 h-4" />Horarios
+          </a>
+          <a href="/resenas" className="nav-link whitespace-nowrap">
+            <Star className="w-4 h-4" />Reseñas
           </a>
           <a href="/ajustes" className="nav-link whitespace-nowrap">
             <Settings className="w-4 h-4" />Ajustes
@@ -1144,6 +1162,26 @@ export default function PaginaPedidos() {
                       </div>
                     </div>
                   </div>
+
+                  {resena && (
+                    <div className="border-t border-border pt-4 mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Star className="w-4 h-4 text-accent" />
+                        <h3 className="text-sm font-semibold text-text">Reseña del cliente</h3>
+                      </div>
+                      <div className="bg-surface-2 rounded-lg p-3 border border-border">
+                        <p className="text-yellow-500 text-lg tabular-nums mb-1">
+                          {estrellas(resena.puntuacion)}
+                        </p>
+                        {resena.comentario && (
+                          <p className="text-sm text-text italic mb-1">"{resena.comentario}"</p>
+                        )}
+                        <p className="text-xs text-text-muted tabular-nums">
+                          {formatearFecha(resena.creado_en)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {infoEstado(seleccionado).siguiente ? (
                     <button
