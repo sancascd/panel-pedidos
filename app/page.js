@@ -490,12 +490,13 @@ export default function PaginaLanding() {
             </div>
             <div>
               <h3 className="font-semibold text-text mb-1">
-                Primer mes: +99€ de implementación
+                Implementación: 99€ una sola vez
               </h3>
               <p className="text-sm text-text-muted leading-relaxed">
-                El primer mes incluye reuniones contigo para ajustar el bot a tu carta,
-                tu tono y tus horarios, formación de tu equipo y ajustes hasta que todo
-                funcione exactamente a tu gusto. A partir del mes 2, solo pagas el precio del plan.
+                Antes de arrancar, hacemos juntos la puesta en marcha: reuniones contigo
+                para ajustar el bot a tu carta, tu tono y tus horarios, formación de tu equipo
+                y todos los ajustes hasta que todo funcione exactamente a tu gusto.
+                Una vez listo, solo pagas la mensualidad del plan que elijas.
               </p>
             </div>
           </div>
@@ -577,8 +578,8 @@ export default function PaginaLanding() {
             respuesta="Sí. Cada mes analizamos tu volumen y te avisamos si te conviene cambiar. Tú decides. Sin papeleo, sin penalizaciones, sin permanencia."
           />
           <FAQItem
-            pregunta="¿Qué incluye exactamente el primer mes de implementación?"
-            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 99€ que solo pagas el mes 1."
+            pregunta="¿Qué incluye la implementación y cuándo se paga?"
+            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 99€ que pagas al inicio, antes de empezar. A partir de ahí solo pagas la mensualidad del plan elegido."
           />
           <FAQItem
             pregunta="¿Cómo se contrata y cómo se paga?"
