@@ -10,6 +10,8 @@ import {
 
 const WHATSAPP_VENTAS = '34685246694';
 const MENSAJE_DEMO = 'Hola, me interesa Comandi para mi restaurante. ¿Podemos hablar?';
+// Verde de Comandi en hex, para inline-styles que NO dependan de variables CSS
+const ACCENT_HEX = '#10b981';
 
 function urlWhatsApp() {
   return 'https://wa.me/' + WHATSAPP_VENTAS + '?text=' + encodeURIComponent(MENSAJE_DEMO);
@@ -398,14 +400,21 @@ export default function PaginaLanding() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 lg:py-24">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           <div className="animate-slide-up">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-5">
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-5"
+              style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                color: ACCENT_HEX,
+              }}
+            >
               <Sparkles className="w-3 h-3" />
               Asistente con IA · solo por WhatsApp
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
-              <span className="text-accent">Cero</span> apps.<br />
-              <span className="text-accent">Cero</span> comisiones.<br />
-              <span className="text-accent">Cero</span> esperas.
+              <span style={{ color: ACCENT_HEX }}>Cero</span> apps.<br />
+              <span style={{ color: ACCENT_HEX }}>Cero</span> comisiones.<br />
+              <span style={{ color: ACCENT_HEX }}>Cero</span> esperas.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-text-muted leading-relaxed max-w-lg">
               Tus clientes piden por WhatsApp. Comandi entiende lo que escriben,
@@ -427,15 +436,15 @@ export default function PaginaLanding() {
             </div>
             <div className="mt-7 flex items-center gap-5 text-xs text-text-muted">
               <div className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-accent" />
+                <Check className="w-3.5 h-3.5" style={{ color: ACCENT_HEX }} />
                 Sin permanencia
               </div>
               <div className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-accent" />
+                <Check className="w-3.5 h-3.5" style={{ color: ACCENT_HEX }} />
                 Listo en 24h
               </div>
               <div className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-accent" />
+                <Check className="w-3.5 h-3.5" style={{ color: ACCENT_HEX }} />
                 Plan que crece contigo
               </div>
             </div>
