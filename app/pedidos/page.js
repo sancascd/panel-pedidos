@@ -116,13 +116,10 @@ export default function PaginaPedidos() {
 
   const audioRef = useRef(null);
 
-  // Inicializar modo oscuro segun el localStorage
+  // Inicializar modo oscuro según localStorage (sin depender del modo del sistema)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = stored === 'dark' || (!stored && prefersDark);
-    setModoOscuro(isDark);
+    setModoOscuro(localStorage.getItem('theme') === 'dark');
   }, []);
 
   function alternarTema() {

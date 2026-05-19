@@ -14,8 +14,8 @@ export default function RootLayout({ children }) {
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('theme');
-                  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  // Solo respeta la elección manual del usuario (sin mirar la preferencia del sistema)
+                  if (localStorage.getItem('theme') === 'dark') {
                     document.documentElement.classList.add('dark');
                   }
                 } catch (e) {}
