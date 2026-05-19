@@ -405,7 +405,7 @@ export default function PaginaLanding() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
               <span className="text-accent">Cero</span> apps.<br />
               <span className="text-accent">Cero</span> comisiones.<br />
-              <span className="text-accent">Cero</span> pedidos perdidos.
+              <span className="text-accent">Cero</span> esperas.
             </h1>
             <p className="mt-6 text-base sm:text-lg text-text-muted leading-relaxed max-w-lg">
               Tus clientes piden por WhatsApp como siempre. Comandi entiende lo que escriben,
