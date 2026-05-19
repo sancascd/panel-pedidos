@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
   Smartphone, Zap, ShieldCheck, Sparkles, ArrowRight,
-  ChevronDown, QrCode, Image as ImageIcon
+  ChevronDown, QrCode, Image as ImageIcon, BarChart3
 } from 'lucide-react';
 
 const WHATSAPP_VENTAS = '34685246694';
@@ -543,7 +543,7 @@ export default function PaginaLanding() {
             Lo que estamos cocinando para los próximos meses. Sin coste extra para los clientes actuales.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-3 gap-4">
           <div className="relative card p-6 border-dashed">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <ImageIcon className="w-4 h-4 text-accent" />
@@ -563,6 +563,16 @@ export default function PaginaLanding() {
             <p className="text-sm text-text-muted leading-relaxed">
               La misma carta web vale para tus mesas. Cada mesa con su QR, el cliente pide desde su móvil,
               llega directo a tu panel. Sin pasar por WhatsApp, sin esperar al camarero.
+            </p>
+          </div>
+          <div className="relative card p-6 border-dashed">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
+              <BarChart3 className="w-4 h-4 text-accent" />
+            </div>
+            <h3 className="text-sm font-semibold text-text mb-1.5">Análisis de tu negocio</h3>
+            <p className="text-sm text-text-muted leading-relaxed">
+              Productos más y menos vendidos, ingresos por día, semana y mes, comparativas entre periodos.
+              Detecta tendencias y toma decisiones con datos reales de tu propio restaurante.
             </p>
           </div>
         </div>
