@@ -36,7 +36,7 @@ export default function PaginaResenas() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/'); return; }
+      if (!session) { router.push('/login'); return; }
       await cargar();
       setCargando(false);
     }

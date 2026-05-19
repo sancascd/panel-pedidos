@@ -32,7 +32,7 @@ export default function PaginaAjustes() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/'); return; }
+      if (!session) { router.push('/login'); return; }
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
       if (!restId) { setCargando(false); return; }
       const { data: rest } = await supabase

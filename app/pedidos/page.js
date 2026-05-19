@@ -140,7 +140,7 @@ export default function PaginaPedidos() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/'); return; }
+      if (!session) { router.push('/login'); return; }
       setUsuario(session.user);
       const { data: admin } = await supabase.rpc('soy_superadmin');
       setEsAdmin(admin === true);
@@ -398,7 +398,7 @@ export default function PaginaPedidos() {
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
-    router.push('/');
+    router.push('/login');
   }
 
   function formatearFecha(iso) {
