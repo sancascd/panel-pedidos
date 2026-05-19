@@ -262,7 +262,7 @@ function PasoCard({ numero, icono: Icono, titulo, texto }) {
 
 function FeatureCard({ icono: Icono, titulo, texto }) {
   return (
-    <div className="relative card p-5 h-full">
+    <div className="relative card p-4 sm:p-5 h-full">
       <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
         <Icono className="w-4 h-4 text-accent" />
       </div>
@@ -286,7 +286,7 @@ function FAQItem({ pregunta, respuesta }) {
 
 function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
   return (
-    <div className={`relative card p-6 flex flex-col h-full ${
+    <div className={`relative card p-5 md:p-6 flex flex-col h-full ${
       recomendado ? 'border-accent ring-1 ring-accent shadow-lift' : ''
     }`}>
       {recomendado && (
@@ -294,10 +294,10 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
           Más popular
         </div>
       )}
-      <div className="mb-5">
+      <div className="mb-4 md:mb-5">
         <h3 className="text-lg font-semibold text-text">{nombre}</h3>
-        <div className="mt-3 flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-text tabular-nums">{precio}€</span>
+        <div className="mt-2 md:mt-3 flex items-baseline gap-1">
+          <span className="text-3xl md:text-4xl font-bold text-text tabular-nums">{precio}€</span>
           <span className="text-text-muted text-sm">/mes</span>
         </div>
         <p className="text-sm text-text-muted mt-1.5">
@@ -305,7 +305,7 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
         </p>
       </div>
 
-      <ul className="space-y-2.5 flex-1 mb-6">
+      <ul className="space-y-2 md:space-y-2.5 flex-1 mb-4 md:mb-6">
         {features.map(f => (
           <li key={f} className="flex items-start gap-2 text-sm text-text">
             <Check className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
@@ -369,12 +369,12 @@ export default function PaginaLanding() {
           ? 'bg-bg/95 backdrop-blur-xl border-border/70 shadow-card'
           : 'bg-bg/80 backdrop-blur-md border-border'
       }`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 sm:h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-accent" strokeWidth={2.5} />
+            <div className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5 sm:w-4 sm:h-4 text-accent" strokeWidth={2.5} />
             </div>
-            <span className="text-base font-bold tracking-tight text-text">Comandi</span>
+            <span className="text-lg sm:text-base font-bold tracking-tight text-text">Comandi</span>
           </div>
           <nav className="flex items-center gap-2">
             <a href="#como-funciona" className="nav-link hidden sm:inline-flex">Cómo funciona</a>
@@ -411,7 +411,7 @@ export default function PaginaLanding() {
               <Sparkles className="w-3 h-3" />
               Asistente con IA · solo por WhatsApp
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
+            <h1 className="text-5xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
               <span style={{ color: ACCENT_HEX }}>Cero</span> apps.<br />
               <span style={{ color: ACCENT_HEX }}>Cero</span> comisiones.<br />
               <span style={{ color: ACCENT_HEX }}>Cero</span> esperas.
@@ -507,7 +507,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" stagger={0.04}>
+        <StaggerChildren className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4" stagger={0.04}>
           <FeatureCard
             icono={Smartphone}
             titulo="Sin app para tu cliente"
@@ -587,7 +587,7 @@ export default function PaginaLanding() {
           </div>
         </Reveal>
 
-        <StaggerChildren className="grid md:grid-cols-3 gap-5 mt-6" stagger={0.06}>
+        <StaggerChildren className="grid md:grid-cols-3 gap-3 md:gap-5 mt-4 md:mt-6" stagger={0.06}>
           <PlanCard
             nombre="Básico"
             precio="99"
@@ -680,39 +680,45 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid md:grid-cols-3 gap-4" stagger={0.06}>
-          <div className="relative card p-6 border-dashed h-full">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
-              <ImageIcon className="w-4 h-4 text-accent" />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+          <Reveal offset={0}>
+            <div className="relative card p-5 md:p-6 border-dashed h-full">
+              <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
+                <ImageIcon className="w-4 h-4 text-accent" />
+              </div>
+              <h3 className="text-sm font-semibold text-text mb-1.5">Carta web con fotos y carrito</h3>
+              <p className="text-sm text-text-muted leading-relaxed">
+                El bot enviará un enlace a una mini-web con tu carta ilustrada. El cliente añade al carrito,
+                vuelve a WhatsApp con el pedido pre-rellenado, y confirma. Para los que prefieren ver fotos
+                antes que escribir.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-text mb-1.5">Carta web con fotos y carrito</h3>
-            <p className="text-sm text-text-muted leading-relaxed">
-              El bot enviará un enlace a una mini-web con tu carta ilustrada. El cliente añade al carrito,
-              vuelve a WhatsApp con el pedido pre-rellenado, y confirma. Para los que prefieren ver fotos
-              antes que escribir.
-            </p>
-          </div>
-          <div className="relative card p-6 border-dashed h-full">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
-              <QrCode className="w-4 h-4 text-accent" />
+          </Reveal>
+          <Reveal offset={0.06}>
+            <div className="relative card p-5 md:p-6 border-dashed h-full">
+              <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
+                <QrCode className="w-4 h-4 text-accent" />
+              </div>
+              <h3 className="text-sm font-semibold text-text mb-1.5">Pedidos en mesa con QR</h3>
+              <p className="text-sm text-text-muted leading-relaxed">
+                La misma carta web vale para tus mesas. Cada mesa con su QR, el cliente pide desde su móvil,
+                llega directo a tu panel. Sin pasar por WhatsApp, sin esperar al camarero.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-text mb-1.5">Pedidos en mesa con QR</h3>
-            <p className="text-sm text-text-muted leading-relaxed">
-              La misma carta web vale para tus mesas. Cada mesa con su QR, el cliente pide desde su móvil,
-              llega directo a tu panel. Sin pasar por WhatsApp, sin esperar al camarero.
-            </p>
-          </div>
-          <div className="relative card p-6 border-dashed h-full">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
-              <BarChart3 className="w-4 h-4 text-accent" />
+          </Reveal>
+          <Reveal offset={0.12} className="col-span-2 md:col-span-1">
+            <div className="relative card p-5 md:p-6 border-dashed h-full">
+              <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
+                <BarChart3 className="w-4 h-4 text-accent" />
+              </div>
+              <h3 className="text-sm font-semibold text-text mb-1.5">Análisis de tu negocio</h3>
+              <p className="text-sm text-text-muted leading-relaxed">
+                Productos más y menos vendidos, ingresos por día, semana y mes, comparativas entre periodos.
+                Detecta tendencias y toma decisiones con datos reales de tu propio restaurante.
+              </p>
             </div>
-            <h3 className="text-sm font-semibold text-text mb-1.5">Análisis de tu negocio</h3>
-            <p className="text-sm text-text-muted leading-relaxed">
-              Productos más y menos vendidos, ingresos por día, semana y mes, comparativas entre periodos.
-              Detecta tendencias y toma decisiones con datos reales de tu propio restaurante.
-            </p>
-          </div>
-        </StaggerChildren>
+          </Reveal>
+        </div>
       </section>
 
       {/* FAQ */}
