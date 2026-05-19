@@ -228,12 +228,20 @@ export default function PaginaLanding() {
   // El panel sigue respetando el toggle claro/oscuro como hasta ahora.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const yaEraOscuro = document.documentElement.classList.contains('dark');
-    if (!yaEraOscuro) {
-      document.documentElement.classList.add('dark');
-    }
+
+    // Detectar la preferencia del usuario (la que se aplicará al salir de la landing)
+    const stored = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const userPrefersDark = stored === 'dark' || (!stored && prefersDark);
+
+    // Asegurar modo oscuro en la landing (idempotente: si ya estaba, no pasa nada)
+    document.documentElement.classList.add('dark');
+
     return () => {
-      if (!yaEraOscuro) {
+      // Al salir de la landing, restaurar la preferencia real del usuario
+      if (userPrefersDark) {
+        document.documentElement.classList.add('dark');
+      } else {
         document.documentElement.classList.remove('dark');
       }
     };

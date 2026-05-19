@@ -14,6 +14,12 @@ export default function RootLayout({ children }) {
             __html: `
               (function() {
                 try {
+                  // La landing pública (/) siempre se ve en oscuro
+                  if (window.location.pathname === '/') {
+                    document.documentElement.classList.add('dark');
+                    return;
+                  }
+                  // El resto de páginas respetan la preferencia del usuario
                   var theme = localStorage.getItem('theme');
                   if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                     document.documentElement.classList.add('dark');
