@@ -220,8 +220,23 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
 }
 
 export default function PaginaLanding() {
+  // La landing siempre se ve en modo oscuro, sin importar la preferencia del usuario.
+  // El panel sigue respetando el toggle claro/oscuro como hasta ahora.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const yaEraOscuro = document.documentElement.classList.contains('dark');
+    if (!yaEraOscuro) {
+      document.documentElement.classList.add('dark');
+    }
+    return () => {
+      if (!yaEraOscuro) {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-bg overflow-x-hidden">
+    <div className="dark min-h-screen bg-bg overflow-x-hidden">
       {/* Fondo decorativo del hero */}
       <div className="fixed inset-x-0 top-0 -z-10 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-accent/8 blur-[120px]" />
