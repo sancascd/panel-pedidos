@@ -18,9 +18,9 @@ function urlWhatsApp() {
 function BurbujaUsuario({ children, hora }) {
   return (
     <div className="flex justify-end animate-slide-up">
-      <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-2xl rounded-br-md px-3.5 py-2 max-w-[85%] shadow-sm">
-        <div className="text-sm text-zinc-900 dark:text-zinc-100">{children}</div>
-        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-right mt-1">{hora} ✓✓</p>
+      <div className="bg-emerald-900/40 rounded-2xl rounded-br-md px-3.5 py-2 max-w-[85%] shadow-sm">
+        <div className="text-sm text-zinc-100">{children}</div>
+        <p className="text-[10px] text-zinc-400 text-right mt-1">{hora} ✓✓</p>
       </div>
     </div>
   );
@@ -29,9 +29,9 @@ function BurbujaUsuario({ children, hora }) {
 function BurbujaBot({ children, hora }) {
   return (
     <div className="flex justify-start animate-slide-up">
-      <div className="bg-white dark:bg-zinc-800 rounded-2xl rounded-bl-md px-3.5 py-2 max-w-[88%] shadow-sm">
-        <div className="text-sm text-zinc-900 dark:text-zinc-100">{children}</div>
-        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-right mt-1">{hora}</p>
+      <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-3.5 py-2 max-w-[88%] shadow-sm">
+        <div className="text-sm text-zinc-100">{children}</div>
+        <p className="text-[10px] text-zinc-400 text-right mt-1">{hora}</p>
       </div>
     </div>
   );
@@ -40,11 +40,11 @@ function BurbujaBot({ children, hora }) {
 function Escribiendo() {
   return (
     <div className="flex justify-start animate-fade-in">
-      <div className="bg-white dark:bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+      <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
         <div className="flex gap-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
       </div>
     </div>
@@ -96,7 +96,7 @@ function MockupChat() {
         </div>
 
         {/* Chat area */}
-        <div className="bg-zinc-50 dark:bg-zinc-900 p-4 space-y-2.5 h-[540px]">
+        <div className="bg-zinc-900 p-4 space-y-2.5 h-[540px]">
           {paso >= 1 && (
             <BurbujaUsuario hora="21:14" key="u1">
               Hola, quería pedir 2 hamburguesas BBQ y una Coca-Cola Zero
@@ -223,32 +223,24 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
   );
 }
 
+// Colores fijos para la landing (los del modo oscuro de Comandi).
+// Se aplican inline para que no haya ningún flash gris mientras carga el CSS.
+const TEMA_LANDING = {
+  '--bg': '9 9 11',
+  '--surface': '24 24 27',
+  '--surface-2': '39 39 42',
+  '--border': '39 39 42',
+  '--text': '250 250 250',
+  '--text-muted': '161 161 170',
+  '--accent': '16 185 129',
+  '--accent-hover': '52 211 153',
+  backgroundColor: 'rgb(9 9 11)',
+  color: 'rgb(250 250 250)',
+};
+
 export default function PaginaLanding() {
-  // La landing siempre se ve en modo oscuro, sin importar la preferencia del usuario.
-  // El panel sigue respetando el toggle claro/oscuro como hasta ahora.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Detectar la preferencia del usuario (la que se aplicará al salir de la landing)
-    const stored = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const userPrefersDark = stored === 'dark' || (!stored && prefersDark);
-
-    // Asegurar modo oscuro en la landing (idempotente: si ya estaba, no pasa nada)
-    document.documentElement.classList.add('dark');
-
-    return () => {
-      // Al salir de la landing, restaurar la preferencia real del usuario
-      if (userPrefersDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-  }, []);
-
   return (
-    <div className="dark min-h-screen bg-bg overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden" style={TEMA_LANDING}>
       {/* Fondo decorativo del hero */}
       <div className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none">
         <div
