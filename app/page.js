@@ -238,8 +238,11 @@ export default function PaginaLanding() {
   return (
     <div className="dark min-h-screen bg-bg overflow-x-hidden">
       {/* Fondo decorativo del hero */}
-      <div className="fixed inset-x-0 top-0 -z-10 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-accent/8 blur-[120px]" />
+      <div className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none">
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[800px]"
+          style={{ background: 'radial-gradient(ellipse at top, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.05) 35%, transparent 70%)' }}
+        />
       </div>
 
       {/* Header de la landing */}
@@ -358,7 +361,11 @@ export default function PaginaLanding() {
 
       {/* POR QUÉ COMANDI */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
-        <div aria-hidden className="absolute top-1/2 left-[25%] -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-accent/10 blur-[120px] pointer-events-none" />
+        <div
+          aria-hidden
+          className="absolute top-1/2 left-[25%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
+        />
         <div className="text-center max-w-2xl mx-auto mb-12 relative">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
             Por qué Comandi
@@ -428,7 +435,11 @@ export default function PaginaLanding() {
 
       {/* PRECIO */}
       <section id="precio" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
-        <div aria-hidden className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-accent/10 blur-[120px] pointer-events-none" />
+        <div
+          aria-hidden
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
+        />
         <div className="text-center mb-12 max-w-2xl mx-auto relative">
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">
             Precio claro. Crece a tu ritmo.
@@ -511,7 +522,11 @@ export default function PaginaLanding() {
 
       {/* PRÓXIMAMENTE */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 relative">
-        <div aria-hidden className="absolute top-1/2 left-[75%] -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] rounded-full bg-accent/10 blur-[120px] pointer-events-none" />
+        <div
+          aria-hidden
+          className="absolute top-1/2 left-[75%] -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0.06) 35%, transparent 70%)' }}
+        />
         <div className="text-center max-w-2xl mx-auto mb-12 relative">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-medium mb-4">
             <Sparkles className="w-3 h-3" />
