@@ -71,15 +71,15 @@ function MockupChat() {
   }, [paso]);
 
   return (
-    <div className="relative isolate">
-      {/* Halo decorativo con respiración */}
+    <div className="relative max-w-md mx-auto isolate">
+      {/* Halo decorativo con respiración — sigue la forma del chat */}
       <div
         aria-hidden
-        className="absolute -inset-24 -z-10 pointer-events-none animate-pulse-soft"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.32) 0%, rgba(16, 185, 129, 0.10) 40%, transparent 75%)' }}
+        className="absolute inset-0 rounded-3xl animate-pulse-soft pointer-events-none"
+        style={{ boxShadow: '0 0 80px 6px rgba(16, 185, 129, 0.4), 0 0 30px 0 rgba(16, 185, 129, 0.55)' }}
       />
 
-      <div className="bg-surface border border-border rounded-3xl shadow-lift overflow-hidden max-w-md mx-auto">
+      <div className="relative bg-surface border border-border rounded-3xl shadow-lift overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-3">
           <div className="relative">
