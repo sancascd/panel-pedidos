@@ -236,6 +236,7 @@ const TEMA_LANDING = {
   '--accent-hover': '52 211 153',
   backgroundColor: 'rgb(9 9 11)',
   color: 'rgb(250 250 250)',
+  colorScheme: 'dark',
 };
 
 export default function PaginaLanding() {
