@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Children } from 'react';
 import Link from 'next/link';
 import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
@@ -38,7 +38,20 @@ function useScrollPosition() {
   return scrollY;
 }
 
-// Componente: fade-in + slide-up cuando entra en pantalla
+// Helper: aplica Reveal individual a cada hijo, con delay progresivo
+function StaggerChildren({ children, className = '', baseDelay = 0, stagger = 120 }) {
+  return (
+    <div className={className}>
+      {Children.map(children, (child, i) => (
+        <Reveal key={i} delay={baseDelay + i * stagger}>
+          {child}
+        </Reveal>
+      ))}
+    </div>
+  );
+}
+
+// Componente: fade-in + slide-up + scale cuando entra en pantalla
 function Reveal({ children, delay = 0, className = '' }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -52,7 +65,8 @@ function Reveal({ children, delay = 0, className = '' }) {
           observer.disconnect();
         }
       },
-      { threshold: 0.05, rootMargin: '0px 0px -80px 0px' }
+      // Trigger más tarde para que la animación se vea claramente al hacer scroll
+      { threshold: 0.15, rootMargin: '0px 0px -140px 0px' }
     );
     observer.observe(ref.current);
     return () => observer.disconnect();
@@ -61,10 +75,18 @@ function Reveal({ children, delay = 0, className = '' }) {
   return (
     <div
       ref={ref}
-      style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-out ${
-        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-      } ${className}`}
+      style={{
+        transitionDelay: `${delay}ms`,
+        // Curva "premium" tipo Apple/Linear: arranque rápido, salida muy suave
+        transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        transitionDuration: '1100ms',
+        // Estado de partida muy claro: más movimiento + escala + ligero blur
+        transform: visible ? 'translateY(0) scale(1)' : 'translateY(60px) scale(0.94)',
+        filter: visible ? 'blur(0)' : 'blur(6px)',
+        opacity: visible ? 1 : 0,
+        transitionProperty: 'opacity, transform, filter',
+      }}
+      className={className}
     >
       {children}
     </div>
@@ -305,8 +327,8 @@ export default function PaginaLanding() {
       <div
         className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none"
         style={{
-          transform: `translateY(${-scrollY * 0.2}px)`,
-          opacity: Math.max(0, 1 - scrollY / 800)
+          transform: `translateY(${-scrollY * 0.5}px) scale(${Math.max(0.7, 1 - scrollY / 1200)})`,
+          opacity: Math.max(0, 1 - scrollY / 500)
         }}
       >
         <div
@@ -413,28 +435,26 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <Reveal delay={100}>
-          <div className="grid md:grid-cols-3 gap-5">
-            <PasoCard
-              numero="1"
-              icono={MessageSquare}
-              titulo="Tu cliente escribe por WhatsApp"
-              texto="Como siempre. Saluda, pide, pregunta — usa su WhatsApp normal. No descarga nada, no aprende ningún proceso nuevo."
-            />
-            <PasoCard
-              numero="2"
-              icono={Bot}
-              titulo="La IA entiende el pedido"
-              texto="Aunque escriba con faltas, mezcle productos en una frase o diga 'sin cebolla'. Pide los datos que faltan: dirección, pago, cambio."
-            />
-            <PasoCard
-              numero="3"
-              icono={LayoutDashboard}
-              titulo="Tú lo gestionas en tu panel"
-              texto="Un kanban claro con los pedidos del día. Imprimes comanda con un clic, marcas estados, editas si hace falta. El cliente recibe el aviso solo."
-            />
-          </div>
-        </Reveal>
+        <StaggerChildren className="grid md:grid-cols-3 gap-5" baseDelay={150} stagger={180}>
+          <PasoCard
+            numero="1"
+            icono={MessageSquare}
+            titulo="Tu cliente escribe por WhatsApp"
+            texto="Como siempre. Saluda, pide, pregunta — usa su WhatsApp normal. No descarga nada, no aprende ningún proceso nuevo."
+          />
+          <PasoCard
+            numero="2"
+            icono={Bot}
+            titulo="La IA entiende el pedido"
+            texto="Aunque escriba con faltas, mezcle productos en una frase o diga 'sin cebolla'. Pide los datos que faltan: dirección, pago, cambio."
+          />
+          <PasoCard
+            numero="3"
+            icono={LayoutDashboard}
+            titulo="Tú lo gestionas en tu panel"
+            texto="Un kanban claro con los pedidos del día. Imprimes comanda con un clic, marcas estados, editas si hace falta. El cliente recibe el aviso solo."
+          />
+        </StaggerChildren>
       </section>
 
       {/* POR QUÉ COMANDI */}
@@ -454,40 +474,38 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <Reveal delay={100}>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <FeatureCard
-              icono={Smartphone}
-              titulo="Sin app para tu cliente"
-              texto="WhatsApp ya lo tienen instalado. Cero fricción, cero curva de aprendizaje, cero quejas."
-            />
-            <FeatureCard
-              icono={Zap}
-              titulo="Sin comisión por pedido"
-              texto="Pagas una cuota fija al mes. No nos llevamos un porcentaje de cada venta. El margen es tuyo."
-            />
-            <FeatureCard
-              icono={Bot}
-              titulo="Entiende como sea que escriban"
-              texto="Faltas, abreviaturas, 'oye ponme también' en mitad de la conversación. La IA reinterpreta el pedido y suma lo nuevo."
-            />
-            <FeatureCard
-              icono={Star}
-              titulo="Reseñas automáticas"
-              texto="Tras entregar, el bot pide al cliente que valore el pedido. Recibes feedback real sin tener que pedirlo tú."
-            />
-            <FeatureCard
-              icono={Bell}
-              titulo="Avisos automáticos"
-              texto="Si editas un pedido, el cliente recibe el resumen actualizado en su WhatsApp. Sin llamadas confusas."
-            />
-            <FeatureCard
-              icono={ShieldCheck}
-              titulo="Datos seguros y RGPD"
-              texto="Cada restaurante ve solo sus pedidos y sus clientes. Hosteado en Europa. Cumplimos la normativa española."
-            />
-          </div>
-        </Reveal>
+        <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" baseDelay={100} stagger={100}>
+          <FeatureCard
+            icono={Smartphone}
+            titulo="Sin app para tu cliente"
+            texto="WhatsApp ya lo tienen instalado. Cero fricción, cero curva de aprendizaje, cero quejas."
+          />
+          <FeatureCard
+            icono={Zap}
+            titulo="Sin comisión por pedido"
+            texto="Pagas una cuota fija al mes. No nos llevamos un porcentaje de cada venta. El margen es tuyo."
+          />
+          <FeatureCard
+            icono={Bot}
+            titulo="Entiende como sea que escriban"
+            texto="Faltas, abreviaturas, 'oye ponme también' en mitad de la conversación. La IA reinterpreta el pedido y suma lo nuevo."
+          />
+          <FeatureCard
+            icono={Star}
+            titulo="Reseñas automáticas"
+            texto="Tras entregar, el bot pide al cliente que valore el pedido. Recibes feedback real sin tener que pedirlo tú."
+          />
+          <FeatureCard
+            icono={Bell}
+            titulo="Avisos automáticos"
+            texto="Si editas un pedido, el cliente recibe el resumen actualizado en su WhatsApp. Sin llamadas confusas."
+          />
+          <FeatureCard
+            icono={ShieldCheck}
+            titulo="Datos seguros y RGPD"
+            texto="Cada restaurante ve solo sus pedidos y sus clientes. Hosteado en Europa. Cumplimos la normativa española."
+          />
+        </StaggerChildren>
       </section>
 
       {/* PARA QUIÉN */}
@@ -536,8 +554,7 @@ export default function PaginaLanding() {
           </div>
         </Reveal>
 
-        <Reveal delay={100}>
-        <div className="grid md:grid-cols-3 gap-5 mt-6">
+        <StaggerChildren className="grid md:grid-cols-3 gap-5 mt-6" baseDelay={100} stagger={180}>
           <PlanCard
             nombre="Básico"
             precio="99"
@@ -580,8 +597,7 @@ export default function PaginaLanding() {
               'Soporte prioritario'
             ]}
           />
-        </div>
-        </Reveal>
+        </StaggerChildren>
 
         {/* Implementación */}
         <Reveal delay={200}>
@@ -631,8 +647,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <Reveal delay={100}>
-        <div className="grid md:grid-cols-3 gap-4">
+        <StaggerChildren className="grid md:grid-cols-3 gap-4" baseDelay={100} stagger={180}>
           <div className="relative card p-6 border-dashed">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
               <ImageIcon className="w-4 h-4 text-accent" />
@@ -664,8 +679,7 @@ export default function PaginaLanding() {
               Detecta tendencias y toma decisiones con datos reales de tu propio restaurante.
             </p>
           </div>
-        </div>
-        </Reveal>
+        </StaggerChildren>
       </section>
 
       {/* FAQ */}
@@ -680,8 +694,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <Reveal delay={100}>
-        <div className="space-y-3">
+        <StaggerChildren className="space-y-3" baseDelay={100} stagger={80}>
           <FAQItem
             pregunta="¿Necesito instalar algo en mi móvil o en el de mis clientes?"
             respuesta="No. El cliente usa el WhatsApp que ya tiene. Tú accedes al panel desde el navegador del móvil, tablet u ordenador. Sin apps, sin instalaciones, sin actualizaciones."
@@ -718,8 +731,7 @@ export default function PaginaLanding() {
             pregunta="¿Funciona con cualquier número de WhatsApp?"
             respuesta="Para empezar te asignamos un número español dedicado para tu restaurante. Si más adelante quieres usar el tuyo propio, también se puede (requiere un trámite con WhatsApp Business)."
           />
-        </div>
-        </Reveal>
+        </StaggerChildren>
       </section>
 
       {/* CTA FINAL */}
