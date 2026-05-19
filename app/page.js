@@ -122,8 +122,8 @@ function Reveal({ children, className = '', offset = 0 }) {
 function BurbujaUsuario({ children, hora }) {
   return (
     <div className="flex justify-end animate-slide-up">
-      <div className="bg-emerald-900/40 rounded-2xl rounded-br-md px-3.5 py-2 max-w-[85%] shadow-sm">
-        <div className="text-sm text-zinc-100">{children}</div>
+      <div className="bg-emerald-900/40 rounded-2xl rounded-br-md px-3 sm:px-3.5 py-1.5 sm:py-2 max-w-[85%] shadow-sm">
+        <div className="text-[13px] sm:text-sm text-zinc-100 leading-snug">{children}</div>
         <p className="text-[10px] text-zinc-400 text-right mt-1">{hora} ✓✓</p>
       </div>
     </div>
@@ -133,8 +133,8 @@ function BurbujaUsuario({ children, hora }) {
 function BurbujaBot({ children, hora }) {
   return (
     <div className="flex justify-start animate-slide-up">
-      <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-3.5 py-2 max-w-[88%] shadow-sm">
-        <div className="text-sm text-zinc-100">{children}</div>
+      <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-3 sm:px-3.5 py-1.5 sm:py-2 max-w-[88%] shadow-sm">
+        <div className="text-[13px] sm:text-sm text-zinc-100 leading-snug">{children}</div>
         <p className="text-[10px] text-zinc-400 text-right mt-1">{hora}</p>
       </div>
     </div>
@@ -185,9 +185,9 @@ function MockupChat() {
 
       <div className="relative bg-surface border border-border rounded-3xl shadow-lift overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-3">
+        <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-3">
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-sm font-bold shadow-soft">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-sm font-bold shadow-soft">
               BN
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-emerald-700 animate-pulse-soft" />
@@ -200,7 +200,7 @@ function MockupChat() {
         </div>
 
         {/* Chat area */}
-        <div className="bg-zinc-900 p-4 space-y-2.5 h-[540px]">
+        <div className="bg-zinc-900 p-3 sm:p-4 space-y-2 sm:space-y-2.5 h-[440px] sm:h-[540px]">
           {paso >= 1 && (
             <BurbujaUsuario hora="21:14" key="u1">
               Hola, quería pedir 2 hamburguesas BBQ y una Coca-Cola Zero
