@@ -73,7 +73,11 @@ function MockupChat() {
   return (
     <div className="relative">
       {/* Halo decorativo con respiración */}
-      <div className="absolute -inset-10 bg-gradient-to-br from-accent/25 via-accent/8 to-transparent blur-3xl -z-10 animate-pulse-soft" />
+      <div
+        aria-hidden
+        className="absolute -inset-24 -z-10 pointer-events-none animate-pulse-soft"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(16, 185, 129, 0.32) 0%, rgba(16, 185, 129, 0.10) 40%, transparent 75%)' }}
+      />
 
       <div className="bg-surface border border-border rounded-3xl shadow-lift overflow-hidden max-w-md mx-auto">
         {/* Header */}
