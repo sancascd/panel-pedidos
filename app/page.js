@@ -18,7 +18,7 @@ function urlWhatsApp() {
 function BurbujaUsuario({ children, hora }) {
   return (
     <div className="flex justify-end animate-slide-up">
-      <div className="bg-[#DCF8C6] dark:bg-emerald-900/40 rounded-2xl rounded-br-md px-3.5 py-2 max-w-[85%] shadow-sm">
+      <div className="bg-emerald-100 dark:bg-emerald-900/40 rounded-2xl rounded-br-md px-3.5 py-2 max-w-[85%] shadow-sm">
         <div className="text-sm text-zinc-900 dark:text-zinc-100">{children}</div>
         <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-right mt-1">{hora} ✓✓</p>
       </div>
@@ -77,12 +77,12 @@ function MockupChat() {
 
       <div className="bg-surface border border-border rounded-3xl shadow-lift overflow-hidden max-w-md mx-auto">
         {/* Header */}
-        <div className="px-4 py-3 bg-gradient-to-br from-[#075E54] to-[#064c44] flex items-center gap-3">
+        <div className="px-4 py-3 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-sm font-bold shadow-soft">
               BN
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full ring-2 ring-[#075E54] animate-pulse-soft" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-emerald-700 animate-pulse-soft" />
           </div>
           <div className="flex-1">
             <p className="text-white text-sm font-medium">Brasa Negra</p>
@@ -92,7 +92,7 @@ function MockupChat() {
         </div>
 
         {/* Chat area */}
-        <div className="bg-zinc-50 dark:bg-zinc-900 p-4 space-y-2.5 min-h-[420px]">
+        <div className="bg-zinc-50 dark:bg-zinc-900 p-4 space-y-2.5 h-[540px]">
           {paso >= 1 && (
             <BurbujaUsuario hora="21:14" key="u1">
               Hola, quería pedir 2 hamburguesas BBQ y una Coca-Cola Zero
