@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
@@ -84,6 +84,72 @@ function estrellas(puntuacion) {
   return llenas + vacias;
 }
 
+function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefonoLimpio }) {
+  if (!pedido) return null;
+  const pagoTexto = (() => {
+    if (pedido.metodo_pago === 'tarjeta') return 'TARJETA';
+    if (pedido.metodo_pago === 'pago_en_local') return 'AL RECOGER';
+    if (pedido.metodo_pago === 'efectivo') {
+      if (pedido.cambio && Number(pedido.cambio) > 0) {
+        return 'EFECTIVO (paga con ' + Number(pedido.paga_con).toFixed(2) +
+               'EUR, cambio ' + Number(pedido.cambio).toFixed(2) + 'EUR)';
+      }
+      return 'EFECTIVO (importe justo)';
+    }
+    return '-';
+  })();
+
+  return (
+    <div className="ticket">
+      <h1>PEDIDO #{pedido.id.slice(-4).toUpperCase()}</h1>
+      <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
+      {restaurante?.nombre && (
+        <p style={{ textAlign: 'center', margin: '0 0 3mm 0', fontSize: '18pt' }}>{restaurante.nombre}</p>
+      )}
+      <div className="separador"></div>
+      <p className="grande">{pedido.tipo_entrega === 'recogida' ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
+      <div className="separador"></div>
+      <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
+      <p><strong>Telefono:</strong> {telefonoLimpio(pedido.cliente_telefono)}</p>
+      {pedido.tipo_entrega !== 'recogida' && (
+        <p><strong>Direccion:</strong> {pedido.cliente_direccion || '-'}</p>
+      )}
+      <div className="separador"></div>
+      <table>
+        <thead>
+          <tr>
+            <th className="col-cant">Cant</th>
+            <th className="col-prod">Producto</th>
+            <th className="col-tot">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lineas.map(l => (
+            <Fragment key={l.id}>
+              <tr>
+                <td className="col-cant">{l.cantidad}x</td>
+                <td className="col-prod">{l.nombre_producto}</td>
+                <td className="col-tot">{(l.cantidad * Number(l.precio_unitario)).toFixed(2)}€</td>
+              </tr>
+              {l.notas && l.notas.trim() !== '' && (
+                <tr>
+                  <td colSpan="3" className="nota">→ {l.notas}</td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+      <div className="separador"></div>
+      <p className="total">TOTAL: {Number(pedido.total).toFixed(2)}€</p>
+      <div className="separador"></div>
+      <p><strong>Pago:</strong> {pagoTexto}</p>
+      <div className="separador"></div>
+      <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
+    </div>
+  );
+}
+
 function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) {
   let deltaContenido = null;
   let deltaClase = 'text-text-muted';
@@ -143,6 +209,10 @@ export default function PaginaPedidos() {
   const [statsAbiertas, setStatsAbiertas] = useState(true);
   // 'default' | 'granted' | 'denied' | 'unsupported'
   const [permisoNotif, setPermisoNotif] = useState('default');
+  // Estado para impresión en lote (varios pedidos a la vez)
+  const [imprimiendoLote, setImprimiendoLote] = useState(false);
+  const [pedidosLote, setPedidosLote] = useState([]);
+  const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
@@ -555,6 +625,38 @@ export default function PaginaPedidos() {
 
   function imprimirComanda() { window.print(); }
 
+  async function imprimirLotePendientes() {
+    const pendientes = pedidos
+      .filter(esDelDiaActual)
+      .filter(p => columnaDe(p) !== 'finalizados');
+    if (pendientes.length === 0) return;
+
+    const ids = pendientes.map(p => p.id);
+    const { data: lineas } = await supabase
+      .from('lineas_pedido').select('*').in('pedido_id', ids);
+
+    const porPedido = {};
+    (lineas || []).forEach(l => {
+      if (!porPedido[l.pedido_id]) porPedido[l.pedido_id] = [];
+      porPedido[l.pedido_id].push(l);
+    });
+
+    setPedidosLote(pendientes);
+    setLineasLote(porPedido);
+    setImprimiendoLote(true);
+
+    // Esperamos al render antes de lanzar la impresión
+    setTimeout(() => {
+      window.print();
+      // Después de cerrar el diálogo de impresión, limpiamos
+      setTimeout(() => {
+        setImprimiendoLote(false);
+        setPedidosLote([]);
+        setLineasLote({});
+      }, 500);
+    }, 100);
+  }
+
   async function cerrarSesion() {
     await supabase.auth.signOut();
     router.push('/login');
@@ -688,6 +790,8 @@ export default function PaginaPedidos() {
           .ticket table .col-tot { width: 28%; text-align: right; }
           .ticket .nota { font-size: 14pt; font-style: italic; padding-left: 4mm; }
           .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
+          /* Corte entre tickets cuando se imprimen varios en lote */
+          .ticket + .ticket { page-break-before: always; break-before: page; }
         }
         @media screen { .solo-imprimir { display: none; } }
       `}</style>
@@ -907,6 +1011,22 @@ export default function PaginaPedidos() {
             )}
           </div>
         )}
+
+        {pestana === 'hoy' && (() => {
+          const pendientesCount = pedidos.filter(esDelDiaActual).filter(p => columnaDe(p) !== 'finalizados').length;
+          return pendientesCount > 0 ? (
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={imprimirLotePendientes}
+                className="btn-secondary text-sm"
+                title="Imprimir todos los pedidos pendientes"
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir pendientes ({pendientesCount})
+              </button>
+            </div>
+          ) : null;
+        })()}
 
         {pestana === 'hoy' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1447,62 +1567,30 @@ export default function PaginaPedidos() {
         </div>
       )}
 
-      {/* Zona imprimible (ticket) - mantiene el mismo formato */}
-      {seleccionado && !editando && (
-        <div className="zona-imprimible solo-imprimir ticket">
-          <h1>PEDIDO #{seleccionado.id.slice(-4).toUpperCase()}</h1>
-          <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(seleccionado.creado_en)}</p>
-          {restaurante?.nombre && (
-            <p style={{ textAlign: 'center', margin: '0 0 3mm 0', fontSize: '18pt' }}>{restaurante.nombre}</p>
-          )}
-          <div className="separador"></div>
-          <p className="grande">{seleccionado.tipo_entrega === 'recogida' ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
-          <div className="separador"></div>
-          <p><strong>Cliente:</strong> {seleccionado.cliente_nombre || '-'}</p>
-          <p><strong>Telefono:</strong> {telefonoLimpio(seleccionado.cliente_telefono)}</p>
-          {seleccionado.tipo_entrega !== 'recogida' && (
-            <p><strong>Direccion:</strong> {seleccionado.cliente_direccion || '-'}</p>
-          )}
-          <div className="separador"></div>
-          <table>
-            <thead>
-              <tr>
-                <th className="col-cant">Cant</th>
-                <th className="col-prod">Producto</th>
-                <th className="col-tot">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineas.map(l => (
-                <>
-                  <tr key={l.id}>
-                    <td className="col-cant">{l.cantidad}x</td>
-                    <td className="col-prod">{l.nombre_producto}</td>
-                    <td className="col-tot">{(l.cantidad * l.precio_unitario).toFixed(2)}€</td>
-                  </tr>
-                  {l.notas && l.notas.trim() !== '' && (
-                    <tr key={l.id + '-notas'}>
-                      <td colSpan="3" className="nota">→ {l.notas}</td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
-          <div className="separador"></div>
-          <p className="total">TOTAL: {Number(seleccionado.total).toFixed(2)}€</p>
-          <div className="separador"></div>
-          <p><strong>Pago:</strong> {
-            seleccionado.metodo_pago === 'tarjeta' ? 'TARJETA' :
-            seleccionado.metodo_pago === 'pago_en_local' ? 'AL RECOGER' :
-            seleccionado.metodo_pago === 'efectivo' ?
-              (seleccionado.cambio && Number(seleccionado.cambio) > 0
-                ? 'EFECTIVO (paga con ' + Number(seleccionado.paga_con).toFixed(2) + 'EUR, cambio ' + Number(seleccionado.cambio).toFixed(2) + 'EUR)'
-                : 'EFECTIVO (importe justo)')
-            : '-'
-          }</p>
-          <div className="separador"></div>
-          <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
+      {/* Zona imprimible (ticket) — soporta tanto el pedido seleccionado
+          como el lote de pedidos pendientes */}
+      {((seleccionado && !editando) || imprimiendoLote) && (
+        <div className="zona-imprimible solo-imprimir">
+          {imprimiendoLote
+            ? pedidosLote.map(p => (
+                <TicketImprimible
+                  key={p.id}
+                  pedido={p}
+                  lineas={lineasLote[p.id] || []}
+                  restaurante={restaurante}
+                  formatearFecha={formatearFecha}
+                  telefonoLimpio={telefonoLimpio}
+                />
+              ))
+            : (
+              <TicketImprimible
+                pedido={seleccionado}
+                lineas={lineas}
+                restaurante={restaurante}
+                formatearFecha={formatearFecha}
+                telefonoLimpio={telefonoLimpio}
+              />
+            )}
         </div>
       )}
     </div>
