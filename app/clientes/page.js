@@ -10,6 +10,70 @@ import {
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
 
+// Plantillas de marketing predefinidas, diseñadas para cumplir las políticas
+// de Meta WhatsApp Business. {{nombre_cliente}} lo rellena el bot por cada
+// destinatario; el resto de variables las rellena el restaurante.
+const PLANTILLAS = [
+  {
+    id: 'oferta-del-dia',
+    nombre: 'Oferta del día',
+    descripcion: 'Para anunciar una promoción puntual de hoy',
+    cuerpo: 'Hola {{nombre_cliente}}, hoy en {{nombre_restaurante}} tenemos una oferta especial: {{descripcion_oferta}}. Si te interesa, escríbenos y la preparamos.',
+    variables: [
+      { key: 'descripcion_oferta', label: 'Qué ofreces', placeholder: 'Hamburguesa BBQ + bebida por 8,90€', maxLength: 200 }
+    ]
+  },
+  {
+    id: 'dia-evento',
+    nombre: 'Día especial / Evento',
+    descripcion: 'Días de partido, festivos, eventos locales',
+    cuerpo: 'Hola {{nombre_cliente}}, en {{nombre_restaurante}} celebramos {{nombre_evento}} con {{oferta}}. Te esperamos.',
+    variables: [
+      { key: 'nombre_evento', label: 'Nombre del evento o día', placeholder: 'el partido de mañana', maxLength: 100 },
+      { key: 'oferta', label: 'Qué ofreces ese día', placeholder: 'un menú especial con cerveza incluida', maxLength: 200 }
+    ]
+  },
+  {
+    id: 'producto-nuevo',
+    nombre: 'Nuevo producto en carta',
+    descripcion: 'Anuncio de algo nuevo que has añadido',
+    cuerpo: 'Hola {{nombre_cliente}}, novedad en {{nombre_restaurante}}: {{producto_nuevo}}. Si quieres probarlo, pídelo cuando quieras.',
+    variables: [
+      { key: 'producto_nuevo', label: 'Qué producto es nuevo', placeholder: 'la hamburguesa de la casa con queso curado', maxLength: 200 }
+    ]
+  },
+  {
+    id: 'descuento-limitado',
+    nombre: 'Descuento por tiempo limitado',
+    descripcion: 'Descuento o promoción con caducidad',
+    cuerpo: 'Hola {{nombre_cliente}}, esta semana en {{nombre_restaurante}} tienes {{descuento}} en {{en_que_aplica}}. Válido hasta {{fecha_fin}}.',
+    variables: [
+      { key: 'descuento', label: 'Descuento (ej: 20%, 5€...)', placeholder: '20% de descuento', maxLength: 50 },
+      { key: 'en_que_aplica', label: 'En qué aplica', placeholder: 'toda la carta', maxLength: 100 },
+      { key: 'fecha_fin', label: 'Hasta cuándo', placeholder: 'el domingo', maxLength: 50 }
+    ]
+  },
+  {
+    id: 'reapertura',
+    nombre: 'Reapertura / Vuelta tras cierre',
+    descripcion: 'Anuncio de que vuelves a estar abierto',
+    cuerpo: 'Hola {{nombre_cliente}}, en {{nombre_restaurante}} ya estamos de vuelta: abrimos {{fecha_apertura}}. Te esperamos.',
+    variables: [
+      { key: 'fecha_apertura', label: 'Cuándo abres', placeholder: 'mañana lunes', maxLength: 100 }
+    ]
+  }
+];
+
+function resolverPlantilla(plantilla, valores, nombreRestaurante) {
+  let texto = plantilla.cuerpo;
+  texto = texto.replace(/{{nombre_restaurante}}/g, nombreRestaurante || 'nosotros');
+  plantilla.variables.forEach(v => {
+    const valor = (valores[v.key] || '').trim();
+    texto = texto.replace(new RegExp('{{' + v.key + '}}', 'g'), valor);
+  });
+  return texto;
+}
+
 function telefonoLimpio(tel) {
   if (!tel) return '';
   return tel.replace('whatsapp:', '').replace(/\s/g, '').trim();
@@ -33,6 +97,7 @@ export default function PaginaClientes() {
 
   const [cargando, setCargando] = useState(true);
   const [restauranteId, setRestauranteId] = useState(null);
+  const [restauranteNombre, setRestauranteNombre] = useState('');
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [filtroOptin, setFiltroOptin] = useState('todos'); // 'todos' | 'optin' | 'no_optin'
@@ -41,7 +106,8 @@ export default function PaginaClientes() {
 
   // Estado del modal de campaña
   const [modalAbierto, setModalAbierto] = useState(false);
-  const [contenidoCampana, setContenidoCampana] = useState('');
+  const [plantillaSeleccionada, setPlantillaSeleccionada] = useState('');
+  const [valoresVariables, setValoresVariables] = useState({});
   const [enviandoCampana, setEnviandoCampana] = useState(false);
   const [resultadoCampana, setResultadoCampana] = useState(null);
 
@@ -54,6 +120,10 @@ export default function PaginaClientes() {
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
       if (!restId) { setCargando(false); return; }
       setRestauranteId(restId);
+      // Cargar nombre del restaurante para usarlo en las plantillas
+      const { data: rest } = await supabase
+        .from('restaurantes').select('nombre').eq('id', restId).maybeSingle();
+      if (rest?.nombre) setRestauranteNombre(rest.nombre);
       await cargarTodo(restId);
       setCargando(false);
     }
@@ -132,22 +202,45 @@ export default function PaginaClientes() {
   }
 
   function abrirModalCampana() {
-    setContenidoCampana('');
+    setPlantillaSeleccionada('');
+    setValoresVariables({});
     setResultadoCampana(null);
     setModalAbierto(true);
   }
 
+  function obtenerPlantilla() {
+    return PLANTILLAS.find(p => p.id === plantillaSeleccionada);
+  }
+
+  function plantillaCompleta() {
+    const plantilla = obtenerPlantilla();
+    if (!plantilla) return false;
+    return plantilla.variables.every(v => (valoresVariables[v.key] || '').trim() !== '');
+  }
+
+  function vistaPrevia(ejemploNombre = 'María') {
+    const plantilla = obtenerPlantilla();
+    if (!plantilla) return '';
+    let texto = resolverPlantilla(plantilla, valoresVariables, restauranteNombre);
+    texto = texto.replace(/{{nombre_cliente}}/g, ejemploNombre);
+    return texto;
+  }
+
   async function enviarCampana() {
-    if (!contenidoCampana.trim()) return;
+    const plantilla = obtenerPlantilla();
+    if (!plantilla || !plantillaCompleta()) return;
     setEnviandoCampana(true);
     setResultadoCampana(null);
+    // Texto con todo resuelto excepto {{nombre_cliente}} (lo rellena el bot por cliente)
+    const contenidoBase = resolverPlantilla(plantilla, valoresVariables, restauranteNombre);
     try {
       const resp = await fetch(BOT_URL + '/enviar-campana', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurante_id: restauranteId,
-          contenido: contenidoCampana.trim()
+          contenido: contenidoBase,
+          plantilla_id: plantilla.id
         })
       });
       const data = await resp.json();
@@ -383,33 +476,69 @@ export default function PaginaClientes() {
             <div className="p-6 space-y-4">
               {!resultadoCampana && (
                 <>
-                  <div>
-                    <label className="label">Mensaje</label>
-                    <textarea
-                      value={contenidoCampana}
-                      onChange={(e) => setContenidoCampana(e.target.value)}
-                      className="input"
-                      rows="5"
-                      maxLength={1000}
-                      placeholder={`Ej: ¡Hoy hay partido! Te esperamos con nuestra oferta especial: cualquier hamburguesa + bebida por 9,90€. Te lo guardamos. 🏈`}
-                      disabled={enviandoCampana}
-                    />
-                    <p className="text-xs text-text-muted mt-1.5 tabular-nums">
-                      {contenidoCampana.length}/1000
-                    </p>
-                  </div>
-
+                  {/* Aviso de cumplimiento de Meta */}
                   <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3 flex items-start gap-2 text-sm">
                     <ShieldAlert className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-yellow-700 dark:text-yellow-400">
-                      <p className="font-medium mb-1">Importante</p>
-                      <ul className="list-disc pl-4 space-y-0.5 text-xs">
-                        <li>Solo se enviará a clientes que hayan dado permiso.</li>
-                        <li>Te quedan {campanasRestantes} campaña{campanasRestantes !== 1 ? 's' : ''} este mes.</li>
-                        <li>Una vez enviada, no se puede cancelar.</li>
-                      </ul>
+                    <div className="text-yellow-700 dark:text-yellow-400 text-xs">
+                      <p className="font-medium mb-1 text-sm">Mensajes seguros por diseño</p>
+                      <p>
+                        Solo puedes elegir entre plantillas pre-diseñadas para cumplir las políticas de
+                        Meta WhatsApp Business. Te quedan <strong>{campanasRestantes}</strong> campaña{campanasRestantes !== 1 ? 's' : ''} este mes.
+                      </p>
                     </div>
                   </div>
+
+                  {/* Selector de plantilla */}
+                  <div>
+                    <label className="label">Tipo de mensaje</label>
+                    <select
+                      value={plantillaSeleccionada}
+                      onChange={(e) => {
+                        setPlantillaSeleccionada(e.target.value);
+                        setValoresVariables({});
+                      }}
+                      className="input"
+                      disabled={enviandoCampana}
+                    >
+                      <option value="">Elige una plantilla...</option>
+                      {PLANTILLAS.map(p => (
+                        <option key={p.id} value={p.id}>{p.nombre}</option>
+                      ))}
+                    </select>
+                    {plantillaSeleccionada && (
+                      <p className="text-xs text-text-muted mt-1.5">
+                        {obtenerPlantilla()?.descripcion}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Variables a rellenar */}
+                  {plantillaSeleccionada && obtenerPlantilla()?.variables.map(v => (
+                    <div key={v.key}>
+                      <label className="label">{v.label}</label>
+                      <input
+                        type="text"
+                        value={valoresVariables[v.key] || ''}
+                        onChange={(e) => setValoresVariables({ ...valoresVariables, [v.key]: e.target.value })}
+                        className="input"
+                        placeholder={v.placeholder}
+                        maxLength={v.maxLength}
+                        disabled={enviandoCampana}
+                      />
+                    </div>
+                  ))}
+
+                  {/* Vista previa */}
+                  {plantillaSeleccionada && plantillaCompleta() && (
+                    <div className="rounded-lg bg-surface-2 border border-border p-3">
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
+                        Vista previa (con un nombre de ejemplo)
+                      </p>
+                      <p className="text-sm text-text whitespace-pre-wrap leading-relaxed">
+                        {vistaPrevia()}
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -450,7 +579,7 @@ export default function PaginaClientes() {
                     </button>
                     <button
                       onClick={enviarCampana}
-                      disabled={enviandoCampana || !contenidoCampana.trim() || !puedeEnviarCampanas}
+                      disabled={enviandoCampana || !plantillaCompleta() || !puedeEnviarCampanas}
                       className="btn-primary flex-1"
                     >
                       {enviandoCampana ? (
