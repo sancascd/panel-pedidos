@@ -219,8 +219,11 @@ export default function PaginaPedidos() {
 
   const [historialPedidos, setHistorialPedidos] = useState([]);
   const [historialCargando, setHistorialCargando] = useState(false);
-  const [filtroTelefono, setFiltroTelefono] = useState('');
-  const [filtroFecha, setFiltroFecha] = useState('');
+  const [filtroBusqueda, setFiltroBusqueda] = useState('');
+  const [filtroProducto, setFiltroProducto] = useState('');
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
+  const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
 
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
@@ -410,21 +413,55 @@ export default function PaginaPedidos() {
 
   async function cargarHistorial() {
     setHistorialCargando(true);
-    let query = supabase.from('pedidos').select('*').order('creado_en', { ascending: false });
 
-    if (filtroTelefono.trim()) {
-      query = query.ilike('cliente_telefono', '%' + filtroTelefono.trim() + '%');
+    // Si hay filtro de producto, hacemos inner join con lineas_pedido
+    const usaProducto = filtroProducto.trim() !== '';
+    let query = supabase.from('pedidos');
+
+    if (usaProducto) {
+      query = query.select('*, lineas_pedido!inner(nombre_producto)');
+      query = query.ilike('lineas_pedido.nombre_producto', '%' + filtroProducto.trim() + '%');
+    } else {
+      query = query.select('*');
     }
-    if (filtroFecha) {
-      const inicio = new Date(filtroFecha + 'T00:00:00');
-      const fin = new Date(filtroFecha + 'T23:59:59');
-      query = query.gte('creado_en', inicio.toISOString()).lte('creado_en', fin.toISOString());
+
+    query = query.order('creado_en', { ascending: false });
+
+    // Búsqueda por nombre o teléfono (OR)
+    if (filtroBusqueda.trim()) {
+      const q = filtroBusqueda.trim().replace(/[,()]/g, '');
+      query = query.or(`cliente_nombre.ilike.%${q}%,cliente_telefono.ilike.%${q}%`);
     }
+
+    // Rango de fechas
+    if (filtroFechaDesde) {
+      const inicio = new Date(filtroFechaDesde + 'T00:00:00');
+      query = query.gte('creado_en', inicio.toISOString());
+    }
+    if (filtroFechaHasta) {
+      const fin = new Date(filtroFechaHasta + 'T23:59:59');
+      query = query.lte('creado_en', fin.toISOString());
+    }
+
+    // Estado concreto
+    if (filtroEstado) {
+      query = query.eq('estado', filtroEstado);
+    }
+
     query = query.limit(200);
 
     const { data } = await query;
     setHistorialPedidos(data || []);
     setHistorialCargando(false);
+  }
+
+  function limpiarFiltros() {
+    setFiltroBusqueda('');
+    setFiltroProducto('');
+    setFiltroFechaDesde('');
+    setFiltroFechaHasta('');
+    setFiltroEstado('');
+    setTimeout(cargarHistorial, 0);
   }
 
   useEffect(() => {
@@ -1120,38 +1157,81 @@ export default function PaginaPedidos() {
 
         {pestana === 'historial' && (
           <div>
-            <div className="card p-4 mb-4">
-              <div className="flex gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
+            <div className="card p-4 mb-4 space-y-3">
+              {/* Fila 1: búsquedas de texto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type="text"
-                    placeholder="Buscar por teléfono..."
-                    value={filtroTelefono}
-                    onChange={(e) => setFiltroTelefono(e.target.value)}
+                    placeholder="Nombre o teléfono..."
+                    value={filtroBusqueda}
+                    onChange={(e) => setFiltroBusqueda(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') cargarHistorial(); }}
                     className="input pl-9"
                   />
                 </div>
-                <input
-                  type="date"
-                  value={filtroFecha}
-                  onChange={(e) => setFiltroFecha(e.target.value)}
-                  className="input w-auto"
-                />
+                <div className="relative">
+                  <UtensilsCrossed className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Producto..."
+                    value={filtroProducto}
+                    onChange={(e) => setFiltroProducto(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') cargarHistorial(); }}
+                    className="input pl-9"
+                  />
+                </div>
+              </div>
+
+              {/* Fila 2: rango de fechas y estado */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1 ml-1">Desde</label>
+                  <input
+                    type="date"
+                    value={filtroFechaDesde}
+                    onChange={(e) => setFiltroFechaDesde(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1 ml-1">Hasta</label>
+                  <input
+                    type="date"
+                    value={filtroFechaHasta}
+                    onChange={(e) => setFiltroFechaHasta(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1 ml-1">Estado</label>
+                  <select
+                    value={filtroEstado}
+                    onChange={(e) => setFiltroEstado(e.target.value)}
+                    className="input"
+                  >
+                    <option value="">Todos los estados</option>
+                    <option value="recibido">Recibido</option>
+                    <option value="listo">Listo</option>
+                    <option value="en_reparto">En reparto</option>
+                    <option value="entregado">Entregado</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fila 3: botones */}
+              <div className="flex gap-2 pt-1">
                 <button onClick={cargarHistorial} className="btn-primary">
                   <Filter className="w-4 h-4" />
                   Buscar
                 </button>
-                <button
-                  onClick={() => {
-                    setFiltroTelefono('');
-                    setFiltroFecha('');
-                    setTimeout(cargarHistorial, 0);
-                  }}
-                  className="btn-secondary"
-                >
-                  Limpiar
+                <button onClick={limpiarFiltros} className="btn-secondary">
+                  Limpiar filtros
                 </button>
+                <span className="text-xs text-text-muted ml-auto self-center tabular-nums">
+                  {historialPedidos.length} {historialPedidos.length === 1 ? 'resultado' : 'resultados'}
+                </span>
               </div>
             </div>
 
