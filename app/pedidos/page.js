@@ -7,7 +7,8 @@ import {
   Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
-  MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star
+  MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
+  ShoppingBag, Euro, TrendingUp, TrendingDown
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -83,6 +84,48 @@ function estrellas(puntuacion) {
   return llenas + vacias;
 }
 
+function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) {
+  let deltaContenido = null;
+  let deltaClase = 'text-text-muted';
+  let DeltaIcono = null;
+
+  if (delta !== undefined && delta !== null && !isNaN(delta)) {
+    const positivo = delta > 0;
+    const cero = delta === 0;
+    if (cero) {
+      deltaClase = 'text-text-muted';
+    } else if (positivo) {
+      deltaClase = 'text-accent';
+      DeltaIcono = TrendingUp;
+    } else {
+      deltaClase = 'text-red-500';
+      DeltaIcono = TrendingDown;
+    }
+    deltaContenido = deltaFormat
+      ? deltaFormat(delta)
+      : (positivo ? '+' : '') + delta;
+  }
+
+  return (
+    <div className="card p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Icono className="w-4 h-4 text-text-muted" />
+        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-2xl font-bold text-text tabular-nums">{valor}</p>
+      {deltaContenido !== null ? (
+        <div className={`flex items-center gap-1 mt-1 text-xs ${deltaClase}`}>
+          {DeltaIcono && <DeltaIcono className="w-3 h-3" />}
+          <span className="tabular-nums">{deltaContenido}</span>
+          <span className="text-text-muted">vs ayer</span>
+        </div>
+      ) : sublabel ? (
+        <p className="text-xs mt-1 text-text-muted">{sublabel}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -96,6 +139,7 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
+  const [estadisticas, setEstadisticas] = useState(null);
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
@@ -153,6 +197,7 @@ export default function PaginaPedidos() {
       }
 
       await cargarPedidos();
+      await cargarEstadisticas();
       setCargando(false);
     }
     init();
@@ -163,8 +208,12 @@ export default function PaginaPedidos() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
         if (audioRef.current) audioRef.current.play().catch(() => {});
         cargarPedidos();
+        cargarEstadisticas();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => cargarPedidos())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => {
+        cargarPedidos();
+        cargarEstadisticas();
+      })
       .subscribe();
     return () => { supabase.removeChannel(canal); };
   }, []);
@@ -174,6 +223,55 @@ export default function PaginaPedidos() {
       .from('pedidos').select('*')
       .order('creado_en', { ascending: true }).limit(500);
     setPedidos(data || []);
+  }
+
+  async function cargarEstadisticas() {
+    const inicioHoy = inicioDiaTrabajo();
+    const inicioAyer = inicioHoy - 24 * 60 * 60 * 1000;
+    const inicioAyerISO = new Date(inicioAyer).toISOString();
+
+    const { data } = await supabase
+      .from('pedidos')
+      .select('total, creado_en, entregado_en, estado')
+      .gte('creado_en', inicioAyerISO);
+
+    if (!data) {
+      setEstadisticas({
+        pedidosHoy: 0, deltaPedidos: 0,
+        ingresosHoy: 0, deltaIngresos: 0,
+        ticketMedioHoy: 0, tiempoMedio: null
+      });
+      return;
+    }
+
+    const hoy = data.filter(p => new Date(p.creado_en).getTime() >= inicioHoy);
+    const ayer = data.filter(p => {
+      const t = new Date(p.creado_en).getTime();
+      return t >= inicioAyer && t < inicioHoy;
+    });
+
+    const sumar = arr => arr.reduce((s, p) => s + Number(p.total || 0), 0);
+    const ingresosHoy = sumar(hoy);
+    const ingresosAyer = sumar(ayer);
+
+    // Tiempo medio de preparación: entregado_en - creado_en (en minutos) de los entregados hoy
+    const entregadosHoy = hoy.filter(p => p.entregado_en);
+    let tiempoMedio = null;
+    if (entregadosHoy.length > 0) {
+      const totalMs = entregadosHoy.reduce((s, p) => {
+        return s + (new Date(p.entregado_en).getTime() - new Date(p.creado_en).getTime());
+      }, 0);
+      tiempoMedio = Math.round(totalMs / entregadosHoy.length / 1000 / 60);
+    }
+
+    setEstadisticas({
+      pedidosHoy: hoy.length,
+      deltaPedidos: hoy.length - ayer.length,
+      ingresosHoy: ingresosHoy,
+      deltaIngresos: ingresosHoy - ingresosAyer,
+      ticketMedioHoy: hoy.length > 0 ? ingresosHoy / hoy.length : 0,
+      tiempoMedio: tiempoMedio
+    });
   }
 
   async function cargarHistorial() {
@@ -657,6 +755,36 @@ export default function PaginaPedidos() {
           <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 text-accent text-sm animate-fade-in">
             <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{mensajeEdicion}</span>
+          </div>
+        )}
+
+        {pestana === 'hoy' && estadisticas && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <StatCard
+              icono={ShoppingBag}
+              label="Pedidos hoy"
+              valor={estadisticas.pedidosHoy}
+              delta={estadisticas.deltaPedidos}
+            />
+            <StatCard
+              icono={Euro}
+              label="Ingresos hoy"
+              valor={`${estadisticas.ingresosHoy.toFixed(2)}€`}
+              delta={estadisticas.deltaIngresos}
+              deltaFormat={(d) => `${d > 0 ? '+' : ''}${d.toFixed(2)}€`}
+            />
+            <StatCard
+              icono={Receipt}
+              label="Ticket medio"
+              valor={`${estadisticas.ticketMedioHoy.toFixed(2)}€`}
+              sublabel={estadisticas.pedidosHoy > 0 ? 'por pedido' : 'sin pedidos hoy'}
+            />
+            <StatCard
+              icono={Clock}
+              label="Tiempo medio"
+              valor={estadisticas.tiempoMedio !== null ? `${estadisticas.tiempoMedio} min` : '—'}
+              sublabel={estadisticas.tiempoMedio !== null ? 'de preparación' : 'sin entregas hoy'}
+            />
           </div>
         )}
 
