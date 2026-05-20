@@ -874,7 +874,15 @@ export default function PaginaPedidos() {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
     // Pedidos olvidados: +30 min en estado 'recibido'
-    const minutos = Math.floor((Date.now() - new Date(p.creado_en).getTime()) / 1000 / 60);
+    // Defensive: si la fecha viene rara (clock skew, formato inesperado), no disparamos el badge
+    let minutos = 0;
+    if (p.creado_en) {
+      const diff = Date.now() - new Date(p.creado_en).getTime();
+      // Solo contamos minutos si el diff es positivo y razonable (<7 días)
+      if (diff > 0 && diff < 7 * 24 * 60 * 60 * 1000) {
+        minutos = Math.floor(diff / 1000 / 60);
+      }
+    }
     const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
@@ -893,7 +901,9 @@ export default function PaginaPedidos() {
           <span className={`text-xs tabular-nums ${
             olvidado ? 'text-red-500 dark:text-red-400 font-medium' : 'text-text-muted'
           }`}>
-            {olvidado ? `Hace ${minutos} min` : formatearHora(p.creado_en)}
+            {olvidado
+              ? 'Hace ' + (minutos < 60 ? minutos + ' min' : Math.floor(minutos / 60) + 'h ' + (minutos % 60) + 'min')
+              : formatearHora(p.creado_en)}
           </span>
         </div>
 
@@ -908,7 +918,7 @@ export default function PaginaPedidos() {
           {olvidado && (
             <span className="badge bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
               <AlertCircle className="w-3 h-3" />
-              Lleva +30 min
+              Lleva {minutos < 60 ? minutos + ' min' : Math.floor(minutos / 60) + 'h ' + (minutos % 60) + 'min'}
             </span>
           )}
         </div>
