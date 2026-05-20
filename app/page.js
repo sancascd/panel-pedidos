@@ -802,24 +802,34 @@ export default function PaginaLanding() {
 
       {/* FOOTER */}
       <footer className="border-t border-border">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
-              <MessageSquare className="w-3.5 h-3.5 text-accent" strokeWidth={2.5} />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+          <div className="grid sm:grid-cols-2 gap-8">
+            <div>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" strokeWidth={2.5} style={{ color: ACCENT_HEX }} />
+                </div>
+                <span className="text-sm font-semibold text-text">Comandi</span>
+              </div>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Comandi — [NOMBRE COMPLETO]<br />
+                NIF [NIF/CIF]<br />
+                [DIRECCIÓN FISCAL]<br />
+                Córdoba, España
+              </p>
             </div>
-            <span className="text-sm font-semibold text-text">Comandi</span>
-            <span className="text-xs text-text-muted ml-2">Hecho en Córdoba, España</span>
+            <div className="flex flex-col sm:items-end gap-2 text-xs">
+              <Link href="/contacto" className="text-text-muted hover:text-text transition-colors">Contacto</Link>
+              <Link href="/aviso-legal" className="text-text-muted hover:text-text transition-colors">Aviso legal</Link>
+              <Link href="/privacidad" className="text-text-muted hover:text-text transition-colors">Política de privacidad</Link>
+              <Link href="/login" className="text-text-muted hover:text-text transition-colors">Acceso clientes</Link>
+            </div>
           </div>
-          <div className="flex items-center gap-5 text-xs text-text-muted">
-            <Link href="/login" className="hover:text-text transition-colors">Acceso clientes</Link>
-            <a
-              href={urlWhatsApp()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-text transition-colors"
-            >
-              Contacto
-            </a>
+          <div className="border-t border-border mt-8 pt-6 text-center text-xs text-text-muted">
+            © {new Date().getFullYear()} Comandi. Todos los derechos reservados.
           </div>
         </div>
       </footer>
