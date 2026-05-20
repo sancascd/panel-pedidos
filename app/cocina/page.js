@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 const HORA_INICIO_DIA = 6;
+const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
 
 function inicioDiaTrabajo() {
   const ahora = new Date();
@@ -131,6 +132,12 @@ export default function PaginaCocina() {
   async function marcarListo(pedido) {
     setMarcandoIds(prev => new Set(prev).add(pedido.id));
     await supabase.from('pedidos').update({ estado: 'listo' }).eq('id', pedido.id);
+    // Notificar al cliente (el bot decide: solo avisa si es recogida)
+    fetch(BOT_URL + '/notificar-estado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedido_id: pedido.id, nuevo_estado: 'listo' })
+    }).catch(() => {});
     // El realtime recargará automáticamente, pero también actualizamos local por si acaso
     setTimeout(() => {
       setMarcandoIds(prev => {

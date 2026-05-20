@@ -598,6 +598,12 @@ export default function PaginaPedidos() {
   async function cambiarEstado(pedido, nuevoEstado) {
     await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedido.id);
     setSeleccionado({ ...pedido, estado: nuevoEstado });
+    // Notificar al cliente (el bot decide si la transición es notificable o no)
+    fetch(BOT_URL + '/notificar-estado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pedido_id: pedido.id, nuevo_estado: nuevoEstado })
+    }).catch(() => {});
   }
 
   async function abrirEditor() {
