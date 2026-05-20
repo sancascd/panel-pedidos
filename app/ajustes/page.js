@@ -8,6 +8,66 @@ import {
   Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare
 } from 'lucide-react';
 
+// Helpers para construir los mensajes completos del bot
+function construirBienvenida(custom, nombreRest) {
+  const saludo = (custom || '').trim()
+    ? custom.trim()
+    : 'Hola, soy el asistente de ' + (nombreRest || 'tu restaurante') + '.';
+  return saludo + '\n\n' +
+    '¿Qué quieres hacer?\n\n' +
+    '1. Ver la carta\n' +
+    '2. Hacer un pedido\n' +
+    '3. Estado de mi pedido\n\n' +
+    'Responde 1, 2 o 3.';
+}
+
+function construirCerrado(custom) {
+  const cierre = (custom || '').trim() ? custom.trim() : '¡Te esperamos pronto!';
+  return 'Ahora mismo estamos cerrados. Abrimos hoy a las 21:00.\n\n' + cierre;
+}
+
+function construirDespedida(custom) {
+  const final = (custom || '').trim() ? custom.trim() : '¡Gracias por tu pedido!';
+  return '¡Pedido confirmado!\n\n' +
+    'Número: #A1B2\n' +
+    'Entrega: A DOMICILIO\n' +
+    'Pago: TARJETA\n' +
+    'Tiempo estimado: 35-45 minutos\n\n' +
+    final;
+}
+
+// Componente: vista previa del mensaje del bot estilo WhatsApp
+function PreviewMensajeBot({ nombreRestaurante, contenido, esDefault }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-border overflow-hidden">
+      {/* Cabecera estilo WhatsApp */}
+      <div className="px-4 py-2 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center">
+          <MessageSquare className="w-3.5 h-3.5 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-xs font-medium truncate">{nombreRestaurante || 'Tu restaurante'}</p>
+          <p className="text-white/70 text-[10px]">vista previa</p>
+        </div>
+        {esDefault && (
+          <span className="text-[10px] text-white/80 px-2 py-0.5 rounded-full bg-white/15">
+            por defecto
+          </span>
+        )}
+      </div>
+      {/* Burbuja del bot */}
+      <div className="bg-zinc-50 dark:bg-zinc-900 p-3">
+        <div className="bg-white dark:bg-zinc-800 rounded-2xl rounded-bl-md px-3.5 py-2.5 max-w-[90%] shadow-sm">
+          <p className="text-sm whitespace-pre-wrap text-zinc-900 dark:text-zinc-100 leading-relaxed">
+            {contenido}
+          </p>
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-right mt-1">12:34</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PaginaAjustes() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -384,7 +444,8 @@ export default function PaginaAjustes() {
             </div>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-6">
+            {/* Mensaje de bienvenida */}
             <div>
               <label className="label">Mensaje de bienvenida</label>
               <textarea
@@ -397,8 +458,14 @@ export default function PaginaAjustes() {
               <p className="text-xs text-text-muted mt-1.5">
                 Se muestra cuando el cliente saluda por primera vez, antes del menú de opciones.
               </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirBienvenida(datos.mensaje_bienvenida, datos.nombre)}
+                esDefault={!datos.mensaje_bienvenida.trim()}
+              />
             </div>
 
+            {/* Mensaje cerrado */}
             <div>
               <label className="label">Mensaje cuando estás cerrado</label>
               <textarea
@@ -411,8 +478,14 @@ export default function PaginaAjustes() {
               <p className="text-xs text-text-muted mt-1.5">
                 Se añade al final del mensaje de horario cuando un cliente escribe fuera de horario.
               </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirCerrado(datos.mensaje_cerrado)}
+                esDefault={!datos.mensaje_cerrado.trim()}
+              />
             </div>
 
+            {/* Mensaje despedida */}
             <div>
               <label className="label">Mensaje de despedida</label>
               <textarea
@@ -425,6 +498,11 @@ export default function PaginaAjustes() {
               <p className="text-xs text-text-muted mt-1.5">
                 Se muestra al final del resumen tras confirmar el pedido.
               </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirDespedida(datos.mensaje_despedida)}
+                esDefault={!datos.mensaje_despedida.trim()}
+              />
             </div>
           </div>
         </div>

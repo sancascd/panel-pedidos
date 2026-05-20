@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
   ArrowLeft, Users, Loader2, AlertCircle, CheckCircle2,
-  Send, Search, Sparkles, X, Megaphone, ShieldAlert
+  Send, Search, Sparkles, X, Megaphone, ShieldAlert,
+  MessageSquare as MessageSquareIcon
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -238,8 +239,17 @@ export default function PaginaClientes() {
   function vistaPrevia(ejemploNombre = 'María') {
     const plantilla = obtenerPlantilla();
     if (!plantilla) return '';
-    let texto = resolverPlantilla(plantilla, valoresVariables, restauranteNombre);
+    let texto = plantilla.cuerpo;
+    texto = texto.replace(/{{nombre_restaurante}}/g, restauranteNombre || 'tu restaurante');
     texto = texto.replace(/{{nombre_cliente}}/g, ejemploNombre);
+    // Las variables sin rellenar se muestran como [Label] para que el restaurante vea qué le falta
+    plantilla.variables.forEach(v => {
+      const valor = (valoresVariables[v.key] || '').trim();
+      texto = texto.replace(
+        new RegExp('{{' + v.key + '}}', 'g'),
+        valor || '[' + v.label + ']'
+      );
+    });
     return texto;
   }
 
@@ -573,15 +583,38 @@ export default function PaginaClientes() {
                     </div>
                   ))}
 
-                  {/* Vista previa */}
-                  {plantillaSeleccionada && plantillaCompleta() && (
-                    <div className="rounded-lg bg-surface-2 border border-border p-3">
+                  {/* Vista previa estilo WhatsApp en tiempo real */}
+                  {plantillaSeleccionada && (
+                    <div>
                       <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
-                        Vista previa (con un nombre de ejemplo)
+                        Vista previa (así lo recibirá el cliente)
                       </p>
-                      <p className="text-sm text-text whitespace-pre-wrap leading-relaxed">
-                        {vistaPrevia()}
-                      </p>
+                      <div className="rounded-2xl border border-border overflow-hidden">
+                        {/* Cabecera estilo WhatsApp */}
+                        <div className="px-4 py-2.5 bg-gradient-to-br from-emerald-700 to-emerald-800 flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center">
+                            <MessageSquareIcon className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-white text-xs font-medium">{restauranteNombre || 'Tu restaurante'}</p>
+                            <p className="text-white/70 text-[10px]">en línea</p>
+                          </div>
+                        </div>
+                        {/* Burbuja del bot */}
+                        <div className="bg-zinc-50 dark:bg-zinc-900 p-3">
+                          <div className="bg-white dark:bg-zinc-800 rounded-2xl rounded-bl-md px-3.5 py-2.5 max-w-[88%] shadow-sm">
+                            <p className="text-sm whitespace-pre-wrap text-zinc-900 dark:text-zinc-100 leading-relaxed">
+                              {vistaPrevia()}
+                            </p>
+                            <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-right mt-1">12:34</p>
+                          </div>
+                        </div>
+                      </div>
+                      {!plantillaCompleta() && (
+                        <p className="text-xs text-text-muted mt-2">
+                          Los campos entre [corchetes] se rellenan automáticamente con tus valores.
+                        </p>
+                      )}
                     </div>
                   )}
                 </>
