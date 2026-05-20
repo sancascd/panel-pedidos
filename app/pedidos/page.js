@@ -140,6 +140,7 @@ export default function PaginaPedidos() {
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
+  const [statsAbiertas, setStatsAbiertas] = useState(true);
   // 'default' | 'granted' | 'denied' | 'unsupported'
   const [permisoNotif, setPermisoNotif] = useState('default');
 
@@ -177,6 +178,21 @@ export default function PaginaPedidos() {
       setPermisoNotif(Notification.permission);
     }
   }, []);
+
+  // Leer preferencia de stats abiertas/cerradas de localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const guardado = localStorage.getItem('stats-abiertas');
+    if (guardado !== null) setStatsAbiertas(guardado === 'true');
+  }, []);
+
+  function alternarStats() {
+    const nuevo = !statsAbiertas;
+    setStatsAbiertas(nuevo);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stats-abiertas', String(nuevo));
+    }
+  }
 
   async function solicitarPermisoNotif() {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -831,32 +847,57 @@ export default function PaginaPedidos() {
         )}
 
         {pestana === 'hoy' && estadisticas && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <StatCard
-              icono={ShoppingBag}
-              label="Pedidos hoy"
-              valor={estadisticas.pedidosHoy}
-              delta={estadisticas.deltaPedidos}
-            />
-            <StatCard
-              icono={Euro}
-              label="Ingresos hoy"
-              valor={`${estadisticas.ingresosHoy.toFixed(2)}€`}
-              delta={estadisticas.deltaIngresos}
-              deltaFormat={(d) => `${d > 0 ? '+' : ''}${d.toFixed(2)}€`}
-            />
-            <StatCard
-              icono={Receipt}
-              label="Ticket medio"
-              valor={`${estadisticas.ticketMedioHoy.toFixed(2)}€`}
-              sublabel={estadisticas.pedidosHoy > 0 ? 'por pedido' : 'sin pedidos hoy'}
-            />
-            <StatCard
-              icono={Clock}
-              label="Tiempo medio"
-              valor={estadisticas.tiempoMedio !== null ? `${estadisticas.tiempoMedio} min` : '—'}
-              sublabel={estadisticas.tiempoMedio !== null ? 'de preparación' : 'sin entregas hoy'}
-            />
+          <div className="mb-6">
+            <button
+              onClick={alternarStats}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-surface-2/50 border border-border hover:border-accent/30 transition-colors"
+              aria-expanded={statsAbiertas}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
+                <span className="text-sm font-medium text-text">Estadísticas del día</span>
+                {!statsAbiertas && (
+                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate hidden sm:inline">
+                    {estadisticas.pedidosHoy} pedidos · {estadisticas.ingresosHoy.toFixed(2)}€
+                  </span>
+                )}
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform duration-200 ${
+                  statsAbiertas ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {statsAbiertas && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3 animate-fade-in">
+                <StatCard
+                  icono={ShoppingBag}
+                  label="Pedidos hoy"
+                  valor={estadisticas.pedidosHoy}
+                  delta={estadisticas.deltaPedidos}
+                />
+                <StatCard
+                  icono={Euro}
+                  label="Ingresos hoy"
+                  valor={`${estadisticas.ingresosHoy.toFixed(2)}€`}
+                  delta={estadisticas.deltaIngresos}
+                  deltaFormat={(d) => `${d > 0 ? '+' : ''}${d.toFixed(2)}€`}
+                />
+                <StatCard
+                  icono={Receipt}
+                  label="Ticket medio"
+                  valor={`${estadisticas.ticketMedioHoy.toFixed(2)}€`}
+                  sublabel={estadisticas.pedidosHoy > 0 ? 'por pedido' : 'sin pedidos hoy'}
+                />
+                <StatCard
+                  icono={Clock}
+                  label="Tiempo medio"
+                  valor={estadisticas.tiempoMedio !== null ? `${estadisticas.tiempoMedio} min` : '—'}
+                  sublabel={estadisticas.tiempoMedio !== null ? 'de preparación' : 'sin entregas hoy'}
+                />
+              </div>
+            )}
           </div>
         )}
 
