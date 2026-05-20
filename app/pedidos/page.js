@@ -225,6 +225,8 @@ export default function PaginaPedidos() {
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [exportandoCSV, setExportandoCSV] = useState(false);
+  // Tick para refrescar el cálculo de urgencia (pedidos olvidados +30 min)
+  const [, setTickAlertas] = useState(0);
 
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
@@ -258,6 +260,12 @@ export default function PaginaPedidos() {
     if (typeof window === 'undefined') return;
     const guardado = localStorage.getItem('stats-abiertas');
     if (guardado !== null) setStatsAbiertas(guardado === 'true');
+  }, []);
+
+  // Refrescar las alertas de pedidos olvidados cada minuto
+  useEffect(() => {
+    const intervalo = setInterval(() => setTickAlertas(t => t + 1), 60000);
+    return () => clearInterval(intervalo);
   }, []);
 
   function alternarStats() {
@@ -859,18 +867,27 @@ export default function PaginaPedidos() {
   function TarjetaPedido({ p }) {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
+    // Pedidos olvidados: +30 min en estado 'recibido'
+    const minutos = Math.floor((Date.now() - new Date(p.creado_en).getTime()) / 1000 / 60);
+    const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
       <button
         onClick={() => abrirPedido(p)}
-        className="group w-full text-left card p-3.5 hover:shadow-lift hover:border-accent/30 transition-all duration-200 animate-fade-in"
+        className={`group w-full text-left card p-3.5 hover:shadow-lift transition-all duration-200 animate-fade-in ${
+          olvidado
+            ? 'border-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
+            : 'hover:border-accent/30'
+        }`}
       >
         <div className="flex justify-between items-start mb-2">
           <span className="font-semibold text-sm text-text tabular-nums">
             #{p.id.slice(-4).toUpperCase()}
           </span>
-          <span className="text-xs text-text-muted tabular-nums">
-            {formatearHora(p.creado_en)}
+          <span className={`text-xs tabular-nums ${
+            olvidado ? 'text-red-500 dark:text-red-400 font-medium' : 'text-text-muted'
+          }`}>
+            {olvidado ? `Hace ${minutos} min` : formatearHora(p.creado_en)}
           </span>
         </div>
 
@@ -882,6 +899,12 @@ export default function PaginaPedidos() {
           <span className={`badge border ${TONE_CLASSES[est.tone]}`}>
             {est.label}
           </span>
+          {olvidado && (
+            <span className="badge bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+              <AlertCircle className="w-3 h-3" />
+              Lleva +30 min
+            </span>
+          )}
         </div>
 
         <div className="flex justify-between items-center pt-2 border-t border-border">
@@ -1404,6 +1427,35 @@ export default function PaginaPedidos() {
                 </table>
               </div>
             )}
+
+            {/* Mini-stats del histórico filtrado */}
+            {historialPedidos.length > 0 && (() => {
+              const totalIngresos = historialPedidos.reduce((s, p) => s + Number(p.total || 0), 0);
+              const ticketMedio = historialPedidos.length > 0 ? totalIngresos / historialPedidos.length : 0;
+              const entregados = historialPedidos.filter(p => p.estado === 'entregado').length;
+              return (
+                <div className="mt-4 card p-5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                    <div>
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Pedidos</p>
+                      <p className="text-2xl font-bold text-text tabular-nums">{historialPedidos.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Total ingresos</p>
+                      <p className="text-2xl font-bold text-text tabular-nums">{totalIngresos.toFixed(2)}€</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Ticket medio</p>
+                      <p className="text-2xl font-bold text-text tabular-nums">{ticketMedio.toFixed(2)}€</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-1">Entregados</p>
+                      <p className="text-2xl font-bold text-text tabular-nums">{entregados}/{historialPedidos.length}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </main>
