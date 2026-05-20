@@ -8,7 +8,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -224,6 +224,7 @@ export default function PaginaPedidos() {
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [exportandoCSV, setExportandoCSV] = useState(false);
 
   const [editando, setEditando] = useState(false);
   const [productosDisponibles, setProductosDisponibles] = useState([]);
@@ -462,6 +463,105 @@ export default function PaginaPedidos() {
     setFiltroFechaHasta('');
     setFiltroEstado('');
     setTimeout(cargarHistorial, 0);
+  }
+
+  function escaparCSV(valor) {
+    const s = String(valor == null ? '' : valor);
+    if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes(';')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  async function exportarCSV() {
+    if (historialPedidos.length === 0 || exportandoCSV) return;
+    setExportandoCSV(true);
+    try {
+      // Cargar líneas de TODOS los pedidos del historial en una sola consulta
+      const ids = historialPedidos.map(p => p.id);
+      const { data: lineas } = await supabase
+        .from('lineas_pedido').select('*').in('pedido_id', ids);
+
+      const porPedido = {};
+      (lineas || []).forEach(l => {
+        if (!porPedido[l.pedido_id]) porPedido[l.pedido_id] = [];
+        porPedido[l.pedido_id].push(l);
+      });
+
+      const cabeceras = [
+        'Numero pedido',
+        'Fecha',
+        'Hora',
+        'Cliente',
+        'Telefono',
+        'Direccion',
+        'Tipo entrega',
+        'Estado',
+        'Total (EUR)',
+        'Metodo pago',
+        'Paga con (EUR)',
+        'Cambio (EUR)',
+        'Productos'
+      ];
+
+      const labelMetodo = m => {
+        if (m === 'tarjeta') return 'Tarjeta';
+        if (m === 'pago_en_local') return 'Pago en local';
+        if (m === 'efectivo') return 'Efectivo';
+        return '';
+      };
+
+      const filas = historialPedidos.map(p => {
+        const d = new Date(p.creado_en);
+        const fecha = d.toLocaleDateString('es-ES');
+        const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const productosTxt = (porPedido[p.id] || [])
+          .map(l => {
+            const base = l.cantidad + 'x ' + l.nombre_producto;
+            return (l.notas && l.notas.trim() !== '')
+              ? base + ' (' + l.notas + ')'
+              : base;
+          })
+          .join(' + ');
+
+        return [
+          '#' + p.id.slice(-4).toUpperCase(),
+          fecha,
+          hora,
+          p.cliente_nombre || '',
+          telefonoLimpio(p.cliente_telefono),
+          p.cliente_direccion || '',
+          p.tipo_entrega === 'recogida' ? 'Recogida' : 'Domicilio',
+          p.estado || '',
+          Number(p.total || 0).toFixed(2),
+          labelMetodo(p.metodo_pago),
+          p.paga_con ? Number(p.paga_con).toFixed(2) : '',
+          p.cambio ? Number(p.cambio).toFixed(2) : '',
+          productosTxt
+        ];
+      });
+
+      const lineasCSV = [
+        cabeceras.map(escaparCSV).join(','),
+        ...filas.map(fila => fila.map(escaparCSV).join(','))
+      ];
+      // BOM al principio para que Excel detecte UTF-8 (caracteres con tilde, ñ, €)
+      const csv = '﻿' + lineasCSV.join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'comandi-pedidos-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.log('Error exportando CSV:', e);
+    } finally {
+      setExportandoCSV(false);
+    }
   }
 
   useEffect(() => {
@@ -1221,13 +1321,31 @@ export default function PaginaPedidos() {
               </div>
 
               {/* Fila 3: botones */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex flex-wrap gap-2 pt-1 items-center">
                 <button onClick={cargarHistorial} className="btn-primary">
                   <Filter className="w-4 h-4" />
                   Buscar
                 </button>
                 <button onClick={limpiarFiltros} className="btn-secondary">
                   Limpiar filtros
+                </button>
+                <button
+                  onClick={exportarCSV}
+                  disabled={historialPedidos.length === 0 || exportandoCSV}
+                  className="btn-secondary"
+                  title="Descargar los pedidos filtrados en CSV (Excel)"
+                >
+                  {exportandoCSV ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Exportando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Exportar CSV
+                    </>
+                  )}
                 </button>
                 <span className="text-xs text-text-muted ml-auto self-center tabular-nums">
                   {historialPedidos.length} {historialPedidos.length === 1 ? 'resultado' : 'resultados'}
