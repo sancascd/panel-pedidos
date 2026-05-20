@@ -8,7 +8,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -140,6 +140,8 @@ export default function PaginaPedidos() {
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
+  // 'default' | 'granted' | 'denied' | 'unsupported'
+  const [permisoNotif, setPermisoNotif] = useState('default');
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
@@ -165,6 +167,51 @@ export default function PaginaPedidos() {
     if (typeof window === 'undefined') return;
     setModoOscuro(localStorage.getItem('theme') === 'dark');
   }, []);
+
+  // Detectar el estado del permiso de notificaciones
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) {
+      setPermisoNotif('unsupported');
+    } else {
+      setPermisoNotif(Notification.permission);
+    }
+  }, []);
+
+  async function solicitarPermisoNotif() {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    try {
+      const permiso = await Notification.requestPermission();
+      setPermisoNotif(permiso);
+    } catch (e) {
+      console.log('Error solicitando permiso de notificaciones:', e);
+    }
+  }
+
+  function notificarPedido(pedido) {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (!pedido || !pedido.id) return;
+
+    const numero = '#' + pedido.id.slice(-4).toUpperCase();
+    const total = pedido.total ? Number(pedido.total).toFixed(2) + '€' : '';
+    const cliente = pedido.cliente_nombre || pedido.cliente_telefono?.replace('whatsapp:', '') || 'Cliente';
+    const tipoEntrega = pedido.tipo_entrega === 'recogida' ? 'Recogida' : 'Domicilio';
+
+    try {
+      const notif = new Notification('Comandi · Nuevo pedido ' + numero, {
+        body: cliente + ' · ' + total + ' · ' + tipoEntrega,
+        tag: 'pedido-' + pedido.id,
+        requireInteraction: false,
+      });
+      notif.onclick = () => {
+        window.focus();
+        notif.close();
+      };
+    } catch (e) {
+      console.log('Error mostrando notificación:', e);
+    }
+  }
 
   function alternarTema() {
     const nuevo = !modoOscuro;
@@ -205,8 +252,9 @@ export default function PaginaPedidos() {
 
   useEffect(() => {
     const canal = supabase.channel('pedidos-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
         if (audioRef.current) audioRef.current.play().catch(() => {});
+        if (payload?.new) notificarPedido(payload.new);
         cargarPedidos();
         cargarEstadisticas();
       })
@@ -755,6 +803,30 @@ export default function PaginaPedidos() {
           <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 text-accent text-sm animate-fade-in">
             <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{mensajeEdicion}</span>
+          </div>
+        )}
+
+        {permisoNotif === 'default' && (
+          <div className="mb-4 card p-4 flex items-center gap-3 bg-accent/5 border-accent/20 animate-fade-in">
+            <Bell className="w-5 h-5 text-accent flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text">Activa las notificaciones</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Te avisamos al instante cuando entre un pedido, incluso si tienes la pestaña en segundo plano.
+              </p>
+            </div>
+            <button onClick={solicitarPermisoNotif} className="btn-primary flex-shrink-0">
+              Activar
+            </button>
+          </div>
+        )}
+
+        {permisoNotif === 'denied' && (
+          <div className="mb-4 card p-3 flex items-center gap-3 bg-surface-2/50 border-border">
+            <BellOff className="w-4 h-4 text-text-muted flex-shrink-0" />
+            <p className="text-xs text-text-muted flex-1">
+              Tienes las notificaciones bloqueadas. Para activarlas, haz clic en el candado del navegador → Notificaciones → Permitir.
+            </p>
           </div>
         )}
 
