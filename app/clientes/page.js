@@ -178,13 +178,30 @@ export default function PaginaClientes() {
 
   async function toggleOptin(cliente) {
     const nuevoValor = !cliente.acepta_marketing;
+    // Si vamos a ACTIVAR marketing manualmente, pedir confirmación expresa al
+    // restaurante (RGPD: debe haber consentimiento real del cliente).
+    if (nuevoValor) {
+      const confirmar = confirm(
+        '¿Confirmas que ' + (cliente.nombre || 'este cliente') + ' te ha dado consentimiento expreso ' +
+        '(verbal, escrito, o por WhatsApp) para recibir mensajes promocionales?\n\n' +
+        'Activar esta opción sin consentimiento real del cliente viola el RGPD y las políticas de Meta. ' +
+        'El restaurante es legalmente responsable.\n\n' +
+        'Lo normal es que el cliente active el opt-in desde WhatsApp escribiendo MARKETING SI.'
+      );
+      if (!confirmar) return;
+    }
     // Optimistic update
     setClientes(prev => prev.map(c =>
-      c.telefono === cliente.telefono ? { ...c, acepta_marketing: nuevoValor } : c
+      c.telefono === cliente.telefono
+        ? { ...c, acepta_marketing: nuevoValor, marketing_consultado_en: new Date().toISOString() }
+        : c
     ));
     const { error } = await supabase
       .from('clientes')
-      .update({ acepta_marketing: nuevoValor })
+      .update({
+        acepta_marketing: nuevoValor,
+        marketing_consultado_en: new Date().toISOString()
+      })
       .eq('restaurante_id', restauranteId)
       .eq('telefono', cliente.telefono);
     if (error) {
@@ -331,6 +348,29 @@ export default function PaginaClientes() {
           </div>
         </div>
 
+        {/* Info sobre cómo funciona el opt-in (RGPD) */}
+        <details className="card p-4">
+          <summary className="cursor-pointer flex items-center gap-2 text-sm font-medium text-text">
+            <ShieldAlert className="w-4 h-4 text-accent" />
+            <span>Cómo funciona el permiso de marketing (RGPD)</span>
+          </summary>
+          <div className="mt-3 pl-6 text-sm text-text-muted space-y-2 leading-relaxed">
+            <p>
+              <strong className="text-text">Lo normal:</strong> el cliente activa el opt-in escribiéndote por WhatsApp
+              <span className="font-mono mx-1 px-1.5 py-0.5 rounded bg-surface-2 text-text">MARKETING SI</span>
+              (el bot lo registra automáticamente). El cliente puede darse de baja escribiendo
+              <span className="font-mono mx-1 px-1.5 py-0.5 rounded bg-surface-2 text-text">BAJA</span>.
+            </p>
+            <p>
+              <strong className="text-text">Excepción:</strong> si un cliente te da consentimiento expreso en persona o por escrito,
+              puedes activarlo aquí desde el toggle. Tú asumes la responsabilidad legal del consentimiento.
+            </p>
+            <p>
+              <strong className="text-text">Sin consentimiento, no se envían mensajes.</strong> Comandi solo enviará la campaña a los clientes que aparezcan como "Activo" en esta tabla.
+            </p>
+          </div>
+        </details>
+
         {/* Botón de campaña */}
         <div className="card p-5 flex items-start gap-4 bg-gradient-to-br from-surface to-accent/5 border-accent/20">
           <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
@@ -436,10 +476,15 @@ export default function PaginaClientes() {
                               ? 'bg-accent/10 text-accent border-accent/20 hover:bg-accent/20'
                               : 'bg-surface-2 text-text-muted border-border hover:border-accent/30'
                           }`}
-                          title={c.acepta_marketing ? 'Desactivar marketing' : 'Activar marketing'}
+                          title={c.acepta_marketing ? 'Dar de baja' : 'Activar (requiere consentimiento del cliente)'}
                         >
-                          {c.acepta_marketing ? 'Activo' : 'Desactivado'}
+                          {c.acepta_marketing ? 'Activo' : 'Sin permiso'}
                         </button>
+                        {c.marketing_consultado_en && (
+                          <p className="text-[10px] text-text-muted mt-1 tabular-nums">
+                            {formatearFecha(c.marketing_consultado_en)}
+                          </p>
+                        )}
                       </td>
                     </tr>
                   );
