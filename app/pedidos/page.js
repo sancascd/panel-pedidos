@@ -8,7 +8,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -718,6 +718,10 @@ export default function PaginaPedidos() {
 
           {/* Navegación */}
           <nav className="flex items-center gap-1">
+            <a href="/cocina" className="nav-link hidden md:inline-flex" title="Vista cocina">
+              <ChefHat className="w-4 h-4" />
+              <span className="hidden lg:inline">Cocina</span>
+            </a>
             <a href="/carta" className="nav-link hidden md:inline-flex" title="Carta">
               <UtensilsCrossed className="w-4 h-4" />
               <span className="hidden lg:inline">Carta</span>
@@ -763,6 +767,9 @@ export default function PaginaPedidos() {
 
         {/* Menú móvil compacto */}
         <div className="md:hidden border-t border-border px-4 py-2 flex gap-1 overflow-x-auto">
+          <a href="/cocina" className="nav-link whitespace-nowrap">
+            <ChefHat className="w-4 h-4" />Cocina
+          </a>
           <a href="/carta" className="nav-link whitespace-nowrap">
             <UtensilsCrossed className="w-4 h-4" />Carta
           </a>
