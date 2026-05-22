@@ -1,5 +1,5 @@
-// Sentry config para el navegador (panel del restaurante).
-// Captura errores del lado cliente: clicks, fetches fallidos, exceptions JS.
+// Instrumentation del cliente (navegador).
+// Reemplaza a sentry.client.config.js. Next.js lo carga automaticamente.
 
 import * as Sentry from '@sentry/nextjs';
 
@@ -9,18 +9,17 @@ if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: process.env.NODE_ENV,
-    // Solo el 10% de transacciones para no quemar la cuota free
     tracesSampleRate: 0.1,
-    // Solo registrar sesiones de replay con error (no todas)
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     ignoreErrors: [
-      // Errores conocidos que no queremos rastrear
       'ResizeObserver loop limit exceeded',
       'Non-Error promise rejection captured',
-      // Errores de extensiones del navegador
       /^chrome-extension:/,
       /^moz-extension:/
     ]
   });
 }
+
+// Hook que Next.js llama cuando hay un error de navegacion
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
