@@ -1,3 +1,5 @@
+const { withSentryConfig } = require('@sentry/nextjs');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -38,4 +40,13 @@ const nextConfig = {
   }
 };
 
-module.exports = nextConfig;
+// Envolver con Sentry. Las opciones aqui solo afectan al build, no al runtime
+// (la config de runtime esta en sentry.*.config.js).
+// Si en el futuro quieres subir source maps a Sentry (para stacktraces mas
+// legibles), añade un SENTRY_AUTH_TOKEN en Vercel y descomenta org/project.
+module.exports = withSentryConfig(nextConfig, {
+  silent: true,
+  widenClientFileUpload: true,
+  hideSourceMaps: true,
+  disableLogger: true,
+});
