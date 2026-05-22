@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
+const API_KEY = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
 
 // Plantillas de marketing predefinidas, diseñadas para cumplir las políticas
 // de Meta WhatsApp Business. {{nombre_cliente}} lo rellena el bot por cada
@@ -263,7 +264,7 @@ export default function PaginaClientes() {
     try {
       const resp = await fetch(BOT_URL + '/enviar-campana', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
         body: JSON.stringify({
           restaurante_id: restauranteId,
           contenido: contenidoBase,

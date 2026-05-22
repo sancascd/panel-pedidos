@@ -10,6 +10,7 @@ import {
 
 const HORA_INICIO_DIA = 6;
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
+const API_KEY = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
 
 function inicioDiaTrabajo() {
   const ahora = new Date();
@@ -135,7 +136,7 @@ export default function PaginaCocina() {
     // Notificar al cliente (el bot decide: solo avisa si es recogida)
     fetch(BOT_URL + '/notificar-estado', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
       body: JSON.stringify({ pedido_id: pedido.id, nuevo_estado: 'listo' })
     }).catch(() => {});
     // El realtime recargará automáticamente, pero también actualizamos local por si acaso
