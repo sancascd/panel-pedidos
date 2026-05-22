@@ -21,7 +21,7 @@ export default function Privacidad() {
             <li><strong className="text-text">Responsable:</strong> [NOMBRE COMPLETO]</li>
             <li><strong className="text-text">NIF/CIF:</strong> [NIF]</li>
             <li><strong className="text-text">Domicilio:</strong> [DIRECCIÓN FISCAL]</li>
-            <li><strong className="text-text">Email:</strong> [EMAIL]</li>
+            <li><strong className="text-text">Email:</strong> info@comandi.es</li>
           </ul>
         </section>
 
@@ -117,7 +117,7 @@ export default function Privacidad() {
             <li><strong className="text-text">Revocación del consentimiento</strong> cuando el tratamiento se base en él.</li>
           </ul>
           <p className="text-text-muted mt-3">
-            Para ejercer cualquiera de estos derechos, escribe a <strong className="text-text">[EMAIL]</strong>
+            Para ejercer cualquiera de estos derechos, escribe a <strong className="text-text">info@comandi.es</strong>
             indicando el derecho que deseas ejercer. Responderemos en el plazo máximo de un mes.
           </p>
           <p className="text-text-muted mt-3">

@@ -1,8 +1,36 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Comandi',
-  description: 'Recibe pedidos por WhatsApp en tu restaurante',
+  metadataBase: new URL('https://comandi.es'),
+  title: {
+    default: 'Comandi — Pedidos por WhatsApp con IA para restaurantes',
+    template: '%s · Comandi'
+  },
+  description: 'Asistente de WhatsApp con IA que toma los pedidos por ti. Pensado para restaurantes pequeños y medianos en España.',
+  keywords: ['pedidos whatsapp', 'restaurante', 'IA', 'bot whatsapp', 'comandi', 'pedidos online'],
+  authors: [{ name: 'Comandi' }],
+  creator: 'Comandi',
+  publisher: 'Comandi',
+  openGraph: {
+    type: 'website',
+    locale: 'es_ES',
+    url: 'https://comandi.es',
+    siteName: 'Comandi',
+    title: 'Comandi — Pedidos por WhatsApp con IA para restaurantes',
+    description: 'Asistente de WhatsApp con IA que toma los pedidos por ti. Pensado para restaurantes pequeños y medianos en España.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Comandi — Pedidos por WhatsApp con IA',
+    description: 'Asistente de WhatsApp con IA que toma los pedidos por ti.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: 'https://comandi.es',
+  },
 };
 
 export default function RootLayout({ children }) {

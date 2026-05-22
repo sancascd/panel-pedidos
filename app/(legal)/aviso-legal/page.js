@@ -20,8 +20,8 @@ export default function AvisoLegal() {
             <li><strong className="text-text">Titular:</strong> [NOMBRE COMPLETO]</li>
             <li><strong className="text-text">NIF/CIF:</strong> [NIF]</li>
             <li><strong className="text-text">Domicilio:</strong> [DIRECCIÓN FISCAL]</li>
-            <li><strong className="text-text">Email de contacto:</strong> [EMAIL]</li>
-            <li><strong className="text-text">Sitio web:</strong> https://panel-pedidos-coral.vercel.app</li>
+            <li><strong className="text-text">Email de contacto:</strong> info@comandi.es</li>
+            <li><strong className="text-text">Sitio web:</strong> https://comandi.es</li>
           </ul>
         </section>
 

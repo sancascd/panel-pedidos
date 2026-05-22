@@ -62,11 +62,11 @@ export default function Contacto() {
               Para cuestiones que requieran adjuntos o más detalle.
             </p>
             <a
-              href="mailto:[EMAIL]"
+              href="mailto:info@comandi.es"
               className="text-sm font-medium mt-2 inline-block hover:underline"
               style={{ color: ACCENT_HEX }}
             >
-              [EMAIL]
+              info@comandi.es
             </a>
           </div>
         </div>
