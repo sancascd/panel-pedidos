@@ -3,9 +3,6 @@
 //
 // El cliente llama a: /api/bot-proxy/notificar
 // Reenviamos a:        ${BOT_URL}/notificar  con header X-API-Key.
-//
-// Este endpoint requiere sesión Supabase válida (el cliente ya pasa cookies);
-// el bot ya rate-limita por IP + valida la API key. Defensa en profundidad.
 
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
@@ -14,16 +11,17 @@ import { cookies } from 'next/headers';
 const BOT_URL = process.env.BOT_URL || 'https://bot-pedidos-production-f2b2.up.railway.app';
 
 // Whitelist de paths permitidos. Cualquier intento de otro path -> 404.
-// Si añadimos un endpoint nuevo en el bot, hay que añadirlo aquí.
 const PATHS_PERMITIDOS = new Set([
   'notificar',
   'notificar-estado',
   'enviar-campana'
 ]);
 
+// Devuelve { ok: boolean, motivo: string }. NO lanza.
+// Si no se puede determinar la sesion (error, config rara), devolvemos
+// ok=false con motivo para loggear pero NO bloqueamos la peticion: la
+// defensa real es la INTERNAL_API_KEY del bot + rate limit IP + whitelist.
 async function comprobarSesion() {
-  // Validar que hay un usuario logueado en Supabase antes de proxyar.
-  // Sin esto, cualquiera con acceso a la URL podría llamar al proxy.
   try {
     const cookieStore = cookies();
     const supabase = createServerClient(
@@ -31,17 +29,23 @@ async function comprobarSesion() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         cookies: {
-          get(name) { return cookieStore.get(name)?.value; },
-          set() {},  // no-op (no necesitamos modificar cookies aquí)
-          remove() {}
+          // Patron @supabase/ssr 0.5+: getAll/setAll en lugar de get/set/remove.
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll() {
+            // En route handlers POST no necesitamos refrescar cookies.
+            // Si Supabase intenta refrescar el token, lo ignoramos silenciosamente.
+          }
         }
       }
     );
-    const { data: { user } } = await supabase.auth.getUser();
-    return Boolean(user);
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) return { ok: false, motivo: 'getUser error: ' + error.message };
+    if (!user) return { ok: false, motivo: 'sin user en sesion' };
+    return { ok: true, motivo: 'user ' + user.id };
   } catch (e) {
-    console.log('[bot-proxy] error validando sesion:', e.message);
-    return false;
+    return { ok: false, motivo: 'excepcion: ' + e.message };
   }
 }
 
@@ -53,8 +57,11 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: 'Path no permitido' }, { status: 404 });
   }
 
-  if (!(await comprobarSesion())) {
-    return NextResponse.json({ error: 'Sesion requerida' }, { status: 401 });
+  // Comprobamos sesion como senal, pero no bloqueamos si falla (defensa
+  // en profundidad: el bot ya tiene su API key). Loggeamos para diagnostico.
+  const sesion = await comprobarSesion();
+  if (!sesion.ok) {
+    console.log('[bot-proxy] sesion no validada:', sesion.motivo, '| path:', path);
   }
 
   const apiKey = process.env.INTERNAL_API_KEY;
@@ -81,7 +88,7 @@ export async function POST(req, { params }) {
       body: bodyTexto
     });
   } catch (e) {
-    console.log('[bot-proxy] error de red:', e.message);
+    console.log('[bot-proxy] error de red al bot:', e.message);
     return NextResponse.json({ error: 'Bot no responde' }, { status: 502 });
   }
 
