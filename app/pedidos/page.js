@@ -342,17 +342,23 @@ export default function PaginaPedidos() {
       setEsAdmin(admin === true);
 
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
+      let restCargado = null;
       if (restId) {
         const { data: rest } = await supabase
           .from('restaurantes')
           .select('id, nombre, logo_url')
           .eq('id', restId)
           .maybeSingle();
-        if (rest) setRestaurante(rest);
+        if (rest) {
+          setRestaurante(rest);
+          restCargado = rest;
+        }
       }
 
-      await cargarPedidos();
-      await cargarEstadisticas();
+      // Pasamos el id directo: setRestaurante no actualiza el state sincronamente,
+      // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
+      await cargarPedidos(restCargado?.id);
+      await cargarEstadisticas(restCargado?.id);
       setCargando(false);
     }
     init();
@@ -386,15 +392,15 @@ export default function PaginaPedidos() {
     return () => { clearTimeout(timeout); supabase.removeChannel(canal); };
   }, [restaurante?.id]);
 
-  async function cargarPedidos() {
-    if (!restaurante?.id) return;
-    // Query simple: todos los pedidos del restaurante, ordenados. RLS garantiza
-    // que solo veamos los nuestros. El filtro por "dia actual" se hace en JS
-    // (esDelDiaActual) para evitar problemas de timezone con TIMESTAMP sin tz.
+  async function cargarPedidos(idForzado) {
+    // Acepta un id forzado para no depender del state restaurante en el primer
+    // render (cuando setRestaurante aun no ha actualizado el closure).
+    const id = idForzado || restaurante?.id;
+    if (!id) return;
     const { data } = await supabase
       .from('pedidos')
       .select('*')
-      .eq('restaurante_id', restaurante.id)
+      .eq('restaurante_id', id)
       .order('creado_en', { ascending: true });
     setPedidos(data || []);
   }
