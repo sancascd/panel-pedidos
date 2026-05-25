@@ -89,7 +89,15 @@ export default function PaginaLogin() {
               </div>
 
               <div>
-                <label className="label">Contraseña</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="label mb-0">Contraseña</label>
+                  <Link
+                    href="/recuperar-contrasena"
+                    className="text-xs font-medium text-accent hover:text-accent-hover transition-colors"
+                  >
+                    ¿La olvidaste?
+                  </Link>
+                </div>
                 <input
                   type="password"
                   required

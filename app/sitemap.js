@@ -25,6 +25,12 @@ export default function sitemap() {
       priority: 0.6,
     },
     {
+      url: base + '/recuperar-contrasena',
+      lastModified: lastMod,
+      changeFrequency: 'yearly',
+      priority: 0.3,
+    },
+    {
       url: base + '/aviso-legal',
       lastModified: lastMod,
       changeFrequency: 'yearly',
