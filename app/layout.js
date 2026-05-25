@@ -18,11 +18,20 @@ export const metadata = {
     siteName: 'Comandi',
     title: 'Comandi — Pedidos por WhatsApp con IA para restaurantes',
     description: 'Asistente de WhatsApp con IA que toma los pedidos por ti. Pensado para restaurantes pequeños y medianos en España.',
+    images: [
+      {
+        url: '/og-image.png',  // 1200x630, generar despues
+        width: 1200,
+        height: 630,
+        alt: 'Comandi — Pedidos por WhatsApp con IA'
+      }
+    ]
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Comandi — Pedidos por WhatsApp con IA',
     description: 'Asistente de WhatsApp con IA que toma los pedidos por ti.',
+    images: ['/og-image.png']
   },
   robots: {
     index: true,
@@ -33,11 +42,41 @@ export const metadata = {
   },
 };
 
+// Schema.org JSON-LD para que Google entienda que esto es un SaaS B2B.
+// Mejora apariencia en resultados de busqueda (rich snippets) y SEO general.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Comandi',
+  applicationCategory: 'BusinessApplication',
+  applicationSubCategory: 'Order Management',
+  operatingSystem: 'Web',
+  description: 'Asistente de WhatsApp con IA que toma pedidos para restaurantes españoles.',
+  url: 'https://comandi.es',
+  inLanguage: 'es-ES',
+  offers: {
+    '@type': 'Offer',
+    priceCurrency: 'EUR',
+    availability: 'https://schema.org/PreOrder'
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Comandi',
+    url: 'https://comandi.es',
+    email: 'info@comandi.es',
+    areaServed: { '@type': 'Country', name: 'Spain' }
+  }
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
         <meta name="color-scheme" content="light dark" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         {/*
           CSS crítico INLINE en HTML — parseado por el navegador antes que
           cualquier script o stylesheet externo. Garantiza que body siempre
