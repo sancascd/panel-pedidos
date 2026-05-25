@@ -9,7 +9,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3
 } from 'lucide-react';
 
 const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
@@ -1019,6 +1019,10 @@ export default function PaginaPedidos() {
               <Users className="w-4 h-4" />
               <span className="hidden lg:inline">Clientes</span>
             </a>
+            <a href="/analiticas" className="nav-link hidden md:inline-flex" title="Analíticas">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden lg:inline">Analíticas</span>
+            </a>
             <a href="/resenas" className="nav-link hidden md:inline-flex" title="Reseñas">
               <Star className="w-4 h-4" />
               <span className="hidden lg:inline">Reseñas</span>
@@ -1067,6 +1071,9 @@ export default function PaginaPedidos() {
           </a>
           <a href="/clientes" className="nav-link whitespace-nowrap">
             <Users className="w-4 h-4" />Clientes
+          </a>
+          <a href="/analiticas" className="nav-link whitespace-nowrap">
+            <BarChart3 className="w-4 h-4" />Analíticas
           </a>
           <a href="/resenas" className="nav-link whitespace-nowrap">
             <Star className="w-4 h-4" />Reseñas
