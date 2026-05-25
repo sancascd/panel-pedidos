@@ -607,8 +607,35 @@ export default function PaginaPedidos() {
   }
 
   async function cambiarEstado(pedido, nuevoEstado) {
-    await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedido.id);
-    setSeleccionado({ ...pedido, estado: nuevoEstado });
+    // Optimistic update: actualizamos UI local INMEDIATAMENTE (sin esperar a la BD)
+    // Asi el cambio se ve al instante aunque Realtime no este habilitado.
+    setPedidos(prev => prev.map(p =>
+      p.id === pedido.id ? { ...p, estado: nuevoEstado } : p
+    ));
+    setSeleccionado(prev =>
+      prev && prev.id === pedido.id ? { ...prev, estado: nuevoEstado } : prev
+    );
+
+    // Persistir en BD
+    const { error } = await supabase.from('pedidos')
+      .update({ estado: nuevoEstado }).eq('id', pedido.id);
+
+    if (error) {
+      // Si fallo, revertimos el cambio local
+      console.log('Error cambiando estado:', error);
+      setPedidos(prev => prev.map(p =>
+        p.id === pedido.id ? { ...p, estado: pedido.estado } : p
+      ));
+      setSeleccionado(prev =>
+        prev && prev.id === pedido.id ? { ...prev, estado: pedido.estado } : prev
+      );
+      alert('No se pudo cambiar el estado. Intentalo de nuevo.');
+      return;
+    }
+
+    // Refrescar estadisticas (no recargamos pedidos: el optimistic ya esta)
+    cargarEstadisticas().catch(() => {});
+
     // Notificar al cliente (el bot decide si la transición es notificable o no)
     fetch(BOT_URL + '/notificar-estado', {
       method: 'POST',
