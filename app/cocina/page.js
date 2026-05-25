@@ -84,18 +84,22 @@ export default function PaginaCocina() {
 
   useEffect(() => {
     if (!restaurante?.id) return;
-    // Filtramos por restaurante_id para no recibir eventos de otros restaurantes
-    // (consumo de bandwidth Realtime). Debounce 300ms agrupa eventos en rafaga.
+    // Sin filtro server-side WebSocket. RLS ya filtra; el JS guard refuerza.
     let timeout;
     function refrescar(haySonido) {
       if (haySonido && sonidoActivo && audioRef.current) audioRef.current.play().catch(() => {});
       clearTimeout(timeout);
       timeout = setTimeout(() => cargarPedidos(), 300);
     }
-    const filtro = 'restaurante_id=eq.' + restaurante.id;
     const canal = supabase.channel('cocina-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: filtro }, () => refrescar(true))
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: filtro }, () => refrescar(false))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
+        if (payload?.new && payload.new.restaurante_id !== restaurante.id) return;
+        refrescar(true);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, (payload) => {
+        if (payload?.new && payload.new.restaurante_id !== restaurante.id) return;
+        refrescar(false);
+      })
       .subscribe();
     return () => { clearTimeout(timeout); supabase.removeChannel(canal); };
   }, [restaurante?.id, sonidoActivo]);
@@ -108,17 +112,14 @@ export default function PaginaCocina() {
 
   async function cargarPedidos() {
     if (!restaurante?.id) return;
-    // Filtro server-side con margen 36h para evitar problemas de timezone entre
-    // el browser (Madrid) y el TIMESTAMP sin tz de Supabase. Como en cocina solo
-    // mostramos estado='recibido', el volumen siempre es bajisimo.
-    const margenMs = inicioDiaTrabajo() - 36 * 60 * 60 * 1000;
-    const desdeISO = new Date(margenMs).toISOString();
+    // Query simple: todos los pedidos recibidos del restaurante. RLS filtra,
+    // estado='recibido' garantiza volumen bajo. Sin filtro de fecha para evitar
+    // bugs de timezone con TIMESTAMP sin tz.
     const { data } = await supabase
       .from('pedidos')
-      .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
+      .select('*')
       .eq('restaurante_id', restaurante.id)
       .eq('estado', 'recibido')
-      .gte('creado_en', desdeISO)
       .order('creado_en', { ascending: true });
 
     const filtrados = data || [];
@@ -128,7 +129,7 @@ export default function PaginaCocina() {
       const ids = filtrados.map(p => p.id);
       const { data: lineas } = await supabase
         .from('lineas_pedido')
-        .select('id, pedido_id, nombre_producto, cantidad, notas')
+        .select('*')
         .in('pedido_id', ids);
       const porPedido = {};
       (lineas || []).forEach(l => {

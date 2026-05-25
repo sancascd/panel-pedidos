@@ -78,13 +78,13 @@ function inicioDiaTrabajo() {
 function esDelDiaActual(pedido) {
   if (!pedido.creado_en) return false;
   const d = parsearFechaUTC(pedido.creado_en);
-  if (!d) return false;
-  // Robustez: si el pedido tiene <12h de antiguedad respecto a "ahora",
-  // siempre cuenta como "del dia actual" sin importar timezone del servidor
-  // ni el corte de inicioDiaTrabajo. Esto evita que pedidos recien creados
-  // se vayan al historial por discrepancia UTC vs local.
+  if (!d) {
+    // Si no podemos parsear, asumimos del dia actual (mejor mostrar que ocultar).
+    return true;
+  }
   const diffMs = Date.now() - d.getTime();
-  if (diffMs >= -60 * 1000 && diffMs < 12 * 60 * 60 * 1000) return true;
+  // Si tiene <24h respecto a ahora, es del dia actual (robusto ante timezone).
+  if (diffMs >= -60 * 60 * 1000 && diffMs < 24 * 60 * 60 * 1000) return true;
   return d.getTime() >= inicioDiaTrabajo();
 }
 
@@ -359,11 +359,10 @@ export default function PaginaPedidos() {
   }, []);
 
   useEffect(() => {
-    // Realtime: solo eventos de NUESTRO restaurante (evita bandwidth y procesado innecesario)
-    if (!restaurante?.id) return;  // esperamos a que se cargue el restaurante
-
-    // Debounce: si llegan varios eventos seguidos (ej. cliente avanza el pedido por varios
-    // estados rapido), agrupamos en una sola refetch.
+    if (!restaurante?.id) return;
+    // Sin filtro server-side en el realtime: RLS ya restringe a nuestro restaurante.
+    // El filtro server-side WebSocket habia introducido regresion (eventos UPDATE
+    // perdidos en algunos cambios). Filtramos en JS por restaurante_id como guarda.
     let timeout;
     function refrescar(haySonido) {
       if (haySonido && audioRef.current) audioRef.current.play().catch(() => {});
@@ -373,14 +372,14 @@ export default function PaginaPedidos() {
         cargarEstadisticas();
       }, 300);
     }
-
-    const filtro = 'restaurante_id=eq.' + restaurante.id;
     const canal = supabase.channel('pedidos-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: filtro }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
+        if (payload?.new && payload.new.restaurante_id !== restaurante.id) return;
         if (payload?.new) notificarPedido(payload.new);
         refrescar(true);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: filtro }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, (payload) => {
+        if (payload?.new && payload.new.restaurante_id !== restaurante.id) return;
         refrescar(false);
       })
       .subscribe();
@@ -389,17 +388,13 @@ export default function PaginaPedidos() {
 
   async function cargarPedidos() {
     if (!restaurante?.id) return;
-    // El filtro fino (dia de trabajo) se hace en JS con esDelDiaActual + parsearFechaUTC.
-    // Aqui solo aplicamos un margen de 36h para acotar volumen sin depender del
-    // timezone del servidor Supabase (que comparaba mal contra TIMESTAMP sin tz y
-    // hacia que pedidos nuevos no aparecieran en Pendientes).
-    const margenMs = inicioDiaTrabajo() - 36 * 60 * 60 * 1000;
-    const desdeISO = new Date(margenMs).toISOString();
+    // Query simple: todos los pedidos del restaurante, ordenados. RLS garantiza
+    // que solo veamos los nuestros. El filtro por "dia actual" se hace en JS
+    // (esDelDiaActual) para evitar problemas de timezone con TIMESTAMP sin tz.
     const { data } = await supabase
       .from('pedidos')
-      .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
+      .select('*')
       .eq('restaurante_id', restaurante.id)
-      .gte('creado_en', desdeISO)
       .order('creado_en', { ascending: true });
     setPedidos(data || []);
   }
@@ -829,7 +824,12 @@ export default function PaginaPedidos() {
 
       const { data: pedidoFresco } = await supabase
         .from('pedidos').select('*').eq('id', seleccionado.id).maybeSingle();
-      if (pedidoFresco) setSeleccionado(pedidoFresco);
+      if (pedidoFresco) {
+        setSeleccionado(pedidoFresco);
+        // Actualizacion optimista del array `pedidos`: no esperamos al realtime.
+        // Si el realtime tarda o falla, el cambio igualmente se ve YA en la lista.
+        setPedidos(prev => prev.map(p => p.id === pedidoFresco.id ? pedidoFresco : p));
+      }
 
       setGuardandoEdicion(false);
       setEditando(false);
