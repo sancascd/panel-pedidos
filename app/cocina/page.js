@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import { minutosDesde } from '@/lib/fechas';
 import {
   ChefHat, Home, Store, ArrowLeft, Volume2, VolumeX,
   Check, Loader2, Clock, Flame
@@ -22,10 +23,7 @@ function inicioDiaTrabajo() {
   return inicio.getTime();
 }
 
-function minutosDesde(iso) {
-  if (!iso) return 0;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 1000 / 60);
-}
+// minutosDesde importado de lib/fechas (parseo robusto contra timezone Postgres)
 
 // Devuelve clases visuales según cuánto lleva esperando el pedido
 function estilosUrgencia(min) {

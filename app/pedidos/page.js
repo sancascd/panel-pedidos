@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import {
   Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
@@ -76,7 +77,8 @@ function inicioDiaTrabajo() {
 
 function esDelDiaActual(pedido) {
   if (!pedido.creado_en) return false;
-  return new Date(pedido.creado_en).getTime() >= inicioDiaTrabajo();
+  const d = parsearFechaUTC(pedido.creado_en);
+  return d && d.getTime() >= inicioDiaTrabajo();
 }
 
 function estrellas(puntuacion) {
@@ -391,9 +393,14 @@ export default function PaginaPedidos() {
       return;
     }
 
-    const hoy = data.filter(p => new Date(p.creado_en).getTime() >= inicioHoy);
+    const hoy = data.filter(p => {
+      const d = parsearFechaUTC(p.creado_en);
+      return d && d.getTime() >= inicioHoy;
+    });
     const ayer = data.filter(p => {
-      const t = new Date(p.creado_en).getTime();
+      const d = parsearFechaUTC(p.creado_en);
+      if (!d) return false;
+      const t = d.getTime();
       return t >= inicioAyer && t < inicioHoy;
     });
 
@@ -406,7 +413,10 @@ export default function PaginaPedidos() {
     let tiempoMedio = null;
     if (entregadosHoy.length > 0) {
       const totalMs = entregadosHoy.reduce((s, p) => {
-        return s + (new Date(p.entregado_en).getTime() - new Date(p.creado_en).getTime());
+        const dEntregado = parsearFechaUTC(p.entregado_en);
+        const dCreado = parsearFechaUTC(p.creado_en);
+        if (!dEntregado || !dCreado) return s;
+        return s + (dEntregado.getTime() - dCreado.getTime());
       }, 0);
       tiempoMedio = Math.round(totalMs / entregadosHoy.length / 1000 / 60);
     }
@@ -521,7 +531,7 @@ export default function PaginaPedidos() {
       };
 
       const filas = historialPedidos.map(p => {
-        const d = new Date(p.creado_en);
+        const d = parsearFechaUTC(p.creado_en) || new Date(p.creado_en);
         const fecha = d.toLocaleDateString('es-ES');
         const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
         const productosTxt = (porPedido[p.id] || [])
@@ -875,15 +885,9 @@ export default function PaginaPedidos() {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
     // Pedidos olvidados: +30 min en estado 'recibido'
-    // Defensive: si la fecha viene rara (clock skew, formato inesperado), no disparamos el badge
-    let minutos = 0;
-    if (p.creado_en) {
-      const diff = Date.now() - new Date(p.creado_en).getTime();
-      // Solo contamos minutos si el diff es positivo y razonable (<7 días)
-      if (diff > 0 && diff < 7 * 24 * 60 * 60 * 1000) {
-        minutos = Math.floor(diff / 1000 / 60);
-      }
-    }
+    // Usamos parseo robusto (lib/fechas.js) que normaliza el formato de Postgres
+    // y evita el bug de timezone que daba +2h al instante.
+    const minutos = minutosDesde(p.creado_en);
     const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
