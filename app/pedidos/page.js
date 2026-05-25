@@ -12,8 +12,8 @@ import {
   ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3
 } from 'lucide-react';
 
-const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
-const API_KEY = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
+// Llamadas al bot van por /api/bot-proxy/* (server-side).
+// La INTERNAL_API_KEY vive solo en el server, nunca en el bundle del navegador.
 const HORAS_LIMITE_AVISO = 24;
 const HORA_INICIO_DIA = 6;
 
@@ -669,9 +669,9 @@ export default function PaginaPedidos() {
     cargarEstadisticas().catch(() => {});
 
     // Notificar al cliente (el bot decide si la transición es notificable o no)
-    fetch(BOT_URL + '/notificar-estado', {
+    fetch('/api/bot-proxy/notificar-estado', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pedido_id: pedido.id, nuevo_estado: nuevoEstado })
     }).catch(() => {});
   }
@@ -805,9 +805,9 @@ export default function PaginaPedidos() {
 
       if (avisarCliente && dentroDeVentana) {
         try {
-          const resp = await fetch(BOT_URL + '/notificar', {
+          const resp = await fetch('/api/bot-proxy/notificar', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pedido_id: seleccionado.id })
           });
           if (!resp.ok) {
