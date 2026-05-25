@@ -249,10 +249,11 @@ export default function PaginaPedidos() {
 
   const audioRef = useRef(null);
 
-  // Inicializar modo oscuro según localStorage (sin depender del modo del sistema)
+  // Inicializar modo oscuro segun localStorage. Clave 'comandi-tema-v2' nueva
+  // para evitar cualquier valor viejo de 'theme'. Default = claro.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setModoOscuro(localStorage.getItem('theme') === 'dark');
+    setModoOscuro(localStorage.getItem('comandi-tema-v2') === 'dark');
   }, []);
 
   // Detectar el estado del permiso de notificaciones
@@ -326,10 +327,10 @@ export default function PaginaPedidos() {
     setModoOscuro(nuevo);
     if (nuevo) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('comandi-tema-v2', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('comandi-tema-v2', 'light');
     }
   }
 

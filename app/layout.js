@@ -112,8 +112,12 @@ export default function RootLayout({ children }) {
             __html: `
               (function() {
                 try {
-                  if (localStorage.getItem('theme') === 'dark') {
+                  // Clave nueva 'comandi-tema-v2' para invalidar el viejo 'theme'
+                  // que pudiera haber quedado a 'dark' en localStorage. Default = light.
+                  if (localStorage.getItem('comandi-tema-v2') === 'dark') {
                     document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
                   }
                 } catch (e) {}
               })();
