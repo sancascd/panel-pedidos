@@ -72,7 +72,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <meta name="color-scheme" content="light dark" />
+        {/*
+          color-scheme: SOLO light. Antes ponia "light dark" y el navegador,
+          al detectar que el sistema esta en modo oscuro, pre-pintaba elementos
+          nativos (fondo, scrollbars, controls) en gris/oscuro durante el FOUC
+          antes de aplicar nuestro CSS. Eso causaba el "destello grisaceo" al
+          refrescar. Con "light", el navegador siempre asume claro y no hay
+          flash. El toggle manual sigue funcionando (cambia clases + CSS vars).
+        */}
+        <meta name="color-scheme" content="light" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
