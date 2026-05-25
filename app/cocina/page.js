@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 
 const HORA_INICIO_DIA = 6;
-// Llamadas al bot van por /api/bot-proxy/* (server-side). La INTERNAL_API_KEY
-// vive solo en el server, nunca en el bundle del navegador.
+const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
+const API_KEY = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
 
 function inicioDiaTrabajo() {
   const ahora = new Date();
@@ -146,9 +146,9 @@ export default function PaginaCocina() {
     setMarcandoIds(prev => new Set(prev).add(pedido.id));
     await supabase.from('pedidos').update({ estado: 'listo' }).eq('id', pedido.id);
     // Notificar al cliente (el bot decide: solo avisa si es recogida)
-    fetch('/api/bot-proxy/notificar-estado', {
+    fetch(BOT_URL + '/notificar-estado', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
       body: JSON.stringify({ pedido_id: pedido.id, nuevo_estado: 'listo' })
     }).catch(() => {});
     // El realtime recargará automáticamente, pero también actualizamos local por si acaso
