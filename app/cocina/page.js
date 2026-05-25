@@ -83,15 +83,22 @@ export default function PaginaCocina() {
   }, []);
 
   useEffect(() => {
+    if (!restaurante?.id) return;
+    // Filtramos por restaurante_id para no recibir eventos de otros restaurantes
+    // (consumo de bandwidth Realtime). Debounce 300ms agrupa eventos en rafaga.
+    let timeout;
+    function refrescar(haySonido) {
+      if (haySonido && sonidoActivo && audioRef.current) audioRef.current.play().catch(() => {});
+      clearTimeout(timeout);
+      timeout = setTimeout(() => cargarPedidos(), 300);
+    }
+    const filtro = 'restaurante_id=eq.' + restaurante.id;
     const canal = supabase.channel('cocina-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
-        if (sonidoActivo && audioRef.current) audioRef.current.play().catch(() => {});
-        cargarPedidos();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => cargarPedidos())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: filtro }, () => refrescar(true))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: filtro }, () => refrescar(false))
       .subscribe();
-    return () => { supabase.removeChannel(canal); };
-  }, [sonidoActivo]);
+    return () => { clearTimeout(timeout); supabase.removeChannel(canal); };
+  }, [restaurante?.id, sonidoActivo]);
 
   // Refresca tiempos cada 30 segundos
   useEffect(() => {
@@ -100,10 +107,14 @@ export default function PaginaCocina() {
   }, []);
 
   async function cargarPedidos() {
+    if (!restaurante?.id) return;
     const inicioHoy = inicioDiaTrabajo();
+    // Filtramos por restaurante_id + columnas necesarias (no select('*')) para
+    // reducir bandwidth Supabase. RLS ya filtra, pero la explicitud ayuda.
     const { data } = await supabase
       .from('pedidos')
-      .select('*')
+      .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
+      .eq('restaurante_id', restaurante.id)
       .eq('estado', 'recibido')
       .gte('creado_en', new Date(inicioHoy).toISOString())
       .order('creado_en', { ascending: true });
@@ -115,7 +126,7 @@ export default function PaginaCocina() {
       const ids = filtrados.map(p => p.id);
       const { data: lineas } = await supabase
         .from('lineas_pedido')
-        .select('*')
+        .select('id, pedido_id, nombre_producto, cantidad, notas')
         .in('pedido_id', ids);
       const porPedido = {};
       (lineas || []).forEach(l => {
