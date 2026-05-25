@@ -78,7 +78,14 @@ function inicioDiaTrabajo() {
 function esDelDiaActual(pedido) {
   if (!pedido.creado_en) return false;
   const d = parsearFechaUTC(pedido.creado_en);
-  return d && d.getTime() >= inicioDiaTrabajo();
+  if (!d) return false;
+  // Robustez: si el pedido tiene <12h de antiguedad respecto a "ahora",
+  // siempre cuenta como "del dia actual" sin importar timezone del servidor
+  // ni el corte de inicioDiaTrabajo. Esto evita que pedidos recien creados
+  // se vayan al historial por discrepancia UTC vs local.
+  const diffMs = Date.now() - d.getTime();
+  if (diffMs >= -60 * 1000 && diffMs < 12 * 60 * 60 * 1000) return true;
+  return d.getTime() >= inicioDiaTrabajo();
 }
 
 function estrellas(puntuacion) {
@@ -382,14 +389,17 @@ export default function PaginaPedidos() {
 
   async function cargarPedidos() {
     if (!restaurante?.id) return;
-    // Cargamos solo los del DIA actual + columnas necesarias.
-    // Los antiguos viven en la pestaña Historial (que tiene su propia query).
-    const inicioHoy = new Date(inicioDiaTrabajo()).toISOString();
+    // El filtro fino (dia de trabajo) se hace en JS con esDelDiaActual + parsearFechaUTC.
+    // Aqui solo aplicamos un margen de 36h para acotar volumen sin depender del
+    // timezone del servidor Supabase (que comparaba mal contra TIMESTAMP sin tz y
+    // hacia que pedidos nuevos no aparecieran en Pendientes).
+    const margenMs = inicioDiaTrabajo() - 36 * 60 * 60 * 1000;
+    const desdeISO = new Date(margenMs).toISOString();
     const { data } = await supabase
       .from('pedidos')
       .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
       .eq('restaurante_id', restaurante.id)
-      .gte('creado_en', inicioHoy)
+      .gte('creado_en', desdeISO)
       .order('creado_en', { ascending: true });
     setPedidos(data || []);
   }

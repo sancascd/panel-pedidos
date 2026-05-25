@@ -108,15 +108,17 @@ export default function PaginaCocina() {
 
   async function cargarPedidos() {
     if (!restaurante?.id) return;
-    const inicioHoy = inicioDiaTrabajo();
-    // Filtramos por restaurante_id + columnas necesarias (no select('*')) para
-    // reducir bandwidth Supabase. RLS ya filtra, pero la explicitud ayuda.
+    // Filtro server-side con margen 36h para evitar problemas de timezone entre
+    // el browser (Madrid) y el TIMESTAMP sin tz de Supabase. Como en cocina solo
+    // mostramos estado='recibido', el volumen siempre es bajisimo.
+    const margenMs = inicioDiaTrabajo() - 36 * 60 * 60 * 1000;
+    const desdeISO = new Date(margenMs).toISOString();
     const { data } = await supabase
       .from('pedidos')
       .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
       .eq('restaurante_id', restaurante.id)
       .eq('estado', 'recibido')
-      .gte('creado_en', new Date(inicioHoy).toISOString())
+      .gte('creado_en', desdeISO)
       .order('creado_en', { ascending: true });
 
     const filtrados = data || [];
