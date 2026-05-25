@@ -48,10 +48,10 @@ export default function PaginaAnaliticas() {
     desde.setDate(desde.getDate() - rango);
     desde.setHours(0, 0, 0, 0);
 
-    // Pedidos del rango (excluimos cancelados)
+    // Pedidos del rango (solo columnas necesarias para analiticas)
     const { data: pedidos } = await supabase
       .from('pedidos')
-      .select('*')
+      .select('id, total, creado_en, entregado_en, estado, tipo_entrega, metodo_pago, cliente_telefono')
       .eq('restaurante_id', restaurante.id)
       .gte('creado_en', desde.toISOString())
       .neq('estado', 'cancelado');

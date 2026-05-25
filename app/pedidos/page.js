@@ -352,25 +352,45 @@ export default function PaginaPedidos() {
   }, []);
 
   useEffect(() => {
+    // Realtime: solo eventos de NUESTRO restaurante (evita bandwidth y procesado innecesario)
+    if (!restaurante?.id) return;  // esperamos a que se cargue el restaurante
+
+    // Debounce: si llegan varios eventos seguidos (ej. cliente avanza el pedido por varios
+    // estados rapido), agrupamos en una sola refetch.
+    let timeout;
+    function refrescar(haySonido) {
+      if (haySonido && audioRef.current) audioRef.current.play().catch(() => {});
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        cargarPedidos();
+        cargarEstadisticas();
+      }, 300);
+    }
+
+    const filtro = 'restaurante_id=eq.' + restaurante.id;
     const canal = supabase.channel('pedidos-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, (payload) => {
-        if (audioRef.current) audioRef.current.play().catch(() => {});
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos', filter: filtro }, (payload) => {
         if (payload?.new) notificarPedido(payload.new);
-        cargarPedidos();
-        cargarEstadisticas();
+        refrescar(true);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => {
-        cargarPedidos();
-        cargarEstadisticas();
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: filtro }, () => {
+        refrescar(false);
       })
       .subscribe();
-    return () => { supabase.removeChannel(canal); };
-  }, []);
+    return () => { clearTimeout(timeout); supabase.removeChannel(canal); };
+  }, [restaurante?.id]);
 
   async function cargarPedidos() {
+    if (!restaurante?.id) return;
+    // Cargamos solo los del DIA actual + columnas necesarias.
+    // Los antiguos viven en la pestaña Historial (que tiene su propia query).
+    const inicioHoy = new Date(inicioDiaTrabajo()).toISOString();
     const { data } = await supabase
-      .from('pedidos').select('*')
-      .order('creado_en', { ascending: true }).limit(500);
+      .from('pedidos')
+      .select('id, restaurante_id, cliente_telefono, cliente_nombre, cliente_direccion, total, estado, tipo_entrega, metodo_pago, paga_con, cambio, creado_en, entregado_en, notas')
+      .eq('restaurante_id', restaurante.id)
+      .gte('creado_en', inicioHoy)
+      .order('creado_en', { ascending: true });
     setPedidos(data || []);
   }
 
