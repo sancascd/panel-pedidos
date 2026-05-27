@@ -16,8 +16,8 @@ jobs:
       # En produccion las pone Vercel desde su panel.
       NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
-      NEXT_PUBLIC_INTERNAL_API_KEY: ci-fake-key
       NEXT_PUBLIC_SENTRY_DSN: ''
+      # INTERNAL_API_KEY (server-side, sin NEXT_PUBLIC_) la usa /api/bot-proxy en runtime.
 
     steps:
       - name: Checkout code

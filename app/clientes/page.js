@@ -9,8 +9,8 @@ import {
   MessageSquare as MessageSquareIcon
 } from 'lucide-react';
 
-const BOT_URL = 'https://bot-pedidos-production-f2b2.up.railway.app';
-const API_KEY = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '';
+// Llamadas al bot van por /api/bot-proxy/* (server-side).
+// La INTERNAL_API_KEY vive solo en el server, nunca en el bundle del navegador.
 
 // Plantillas de marketing predefinidas, diseñadas para cumplir las políticas
 // de Meta WhatsApp Business. {{nombre_cliente}} lo rellena el bot por cada
@@ -262,9 +262,9 @@ export default function PaginaClientes() {
     // Texto con todo resuelto excepto {{nombre_cliente}} (lo rellena el bot por cliente)
     const contenidoBase = resolverPlantilla(plantilla, valoresVariables, restauranteNombre);
     try {
-      const resp = await fetch(BOT_URL + '/enviar-campana', {
+      const resp = await fetch('/api/bot-proxy/enviar-campana', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           restaurante_id: restauranteId,
           contenido: contenidoBase,
