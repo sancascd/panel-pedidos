@@ -17,9 +17,13 @@ import {
 const HORAS_LIMITE_AVISO = 24;
 const HORA_INICIO_DIA = 6;
 
+// Nota: el estado interno sigue siendo 'listo' (lo usa el bot para notificar),
+// pero en domicilio lo mostramos como "En preparación" y el primer botón dice
+// "Empezar preparación" para no confundir (en domicilio 'listo' = comida en
+// cocina, todavía quedan pasos; no es el final como en recogida).
 const FLUJO_DOMICILIO = {
-  recibido:   { label: 'Pedido recibido', tone: 'red',    siguiente: 'listo',      siguienteLabel: 'Marcar como listo' },
-  listo:      { label: 'Listo',           tone: 'yellow', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
+  recibido:   { label: 'Pedido recibido', tone: 'red',    siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
+  listo:      { label: 'En preparación',  tone: 'yellow', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
   en_reparto: { label: 'En reparto',      tone: 'blue',   siguiente: 'entregado',  siguienteLabel: 'Marcar como entregado' },
   entregado:  { label: 'Entregado',       tone: 'green',  siguiente: null,         siguienteLabel: null },
 };
