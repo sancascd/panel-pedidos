@@ -890,7 +890,10 @@ export default function PaginaPedidos() {
 
   function formatearFecha(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
+    // parsearFechaUTC normaliza el TIMESTAMP sin zona de Postgres a UTC; luego
+    // toLocaleString lo convierte a la hora local (Madrid). Sin esto, la hora
+    // sale 2h por debajo (se pinta el valor UTC crudo como si fuera local).
+    const d = parsearFechaUTC(iso) || new Date(iso);
     return d.toLocaleString('es-ES', {
       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
     });
@@ -898,7 +901,7 @@ export default function PaginaPedidos() {
 
   function formatearHora(iso) {
     if (!iso) return '';
-    const d = new Date(iso);
+    const d = parsearFechaUTC(iso) || new Date(iso);
     return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   }
 
