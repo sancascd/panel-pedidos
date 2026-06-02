@@ -7,8 +7,11 @@ import { parsearFechaUTC } from '@/lib/fechas';
 import {
   ArrowLeft, Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle
 } from 'lucide-react';
+import {
+  infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade
+} from '@/lib/planes';
 
 const DIAS_INACTIVIDAD = 7;
 
@@ -22,6 +25,8 @@ export default function PaginaAdmin() {
   const [procesando, setProcesando] = useState(null);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
   const [statsGlobales, setStatsGlobales] = useState(null);
+  const [planesData, setPlanesData] = useState(null);
+  const [solicitudes, setSolicitudes] = useState([]);
 
   useEffect(() => {
     async function init() {
@@ -32,11 +37,95 @@ export default function PaginaAdmin() {
         router.push('/pedidos');
         return;
       }
-      await Promise.all([cargarRestaurantes(), cargarStatsGlobales()]);
+      await Promise.all([cargarRestaurantes(), cargarStatsGlobales(), cargarPlanes()]);
       setCargando(false);
     }
     init();
   }, []);
+
+  async function cargarPlanes() {
+    // Restaurantes aprobados con su plan + ancla de periodo
+    const { data: rests } = await supabase
+      .from('restaurantes')
+      .select('id, nombre, plan, plan_iniciado_en, estado')
+      .eq('estado', 'aprobado');
+
+    // Pedidos de los ultimos 32 dias (cubre el periodo de cualquier restaurante)
+    const desde = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: peds } = await supabase
+      .from('pedidos')
+      .select('restaurante_id, creado_en')
+      .gte('creado_en', desde);
+
+    // Solicitudes de upgrade pendientes
+    const { data: sols } = await supabase
+      .from('solicitudes_upgrade')
+      .select('*')
+      .eq('estado', 'pendiente')
+      .order('solicitado_en', { ascending: true });
+
+    // Agrupar pedidos por restaurante
+    const pedidosPorRest = new Map();
+    for (const p of (peds || [])) {
+      const arr = pedidosPorRest.get(p.restaurante_id) || [];
+      arr.push(p.creado_en);
+      pedidosPorRest.set(p.restaurante_id, arr);
+    }
+
+    // Calcular consumo por restaurante en SU periodo
+    const filas = (rests || []).map(r => {
+      const per = periodoActual(r.plan_iniciado_en);
+      const fechas = pedidosPorRest.get(r.id) || [];
+      const pedidosPeriodo = fechas.filter(f => {
+        const d = parsearFechaUTC(f);
+        return d && d.getTime() >= per.inicio.getTime();
+      }).length;
+      const consumo = calcularConsumo({
+        planId: r.plan,
+        pedidosPeriodo,
+        diasTranscurridos: per.diasTranscurridos,
+        diasTotales: per.diasTotales,
+      });
+      const reco = recomendacionUpgrade({ planId: r.plan, proyeccion: consumo.proyeccion });
+      return { id: r.id, nombre: r.nombre, plan: r.plan, consumo, reco };
+    }).sort((a, b) => b.consumo.porcentaje - a.consumo.porcentaje);
+
+    // Nombres para las solicitudes
+    const nombrePorId = new Map((rests || []).map(r => [r.id, r.nombre]));
+    const solsConNombre = (sols || []).map(s => ({
+      ...s,
+      nombreRestaurante: nombrePorId.get(s.restaurante_id) || s.restaurante_id
+    }));
+
+    setPlanesData(filas);
+    setSolicitudes(solsConNombre);
+  }
+
+  async function aprobarUpgrade(sol) {
+    setProcesando(sol.id);
+    const { error: e1 } = await supabase
+      .from('restaurantes').update({ plan: sol.plan_solicitado }).eq('id', sol.restaurante_id);
+    const { error: e2 } = await supabase
+      .from('solicitudes_upgrade')
+      .update({ estado: 'aprobada', resuelto_en: new Date().toISOString() })
+      .eq('id', sol.id);
+    setProcesando(null);
+    if (e1 || e2) { avisar('Error al aprobar: ' + ((e1 || e2).message), 'error'); return; }
+    avisar('Plan de ' + sol.nombreRestaurante + ' cambiado a ' + infoPlan(sol.plan_solicitado).nombre + '.');
+    await cargarPlanes();
+  }
+
+  async function rechazarUpgrade(sol) {
+    setProcesando(sol.id);
+    const { error } = await supabase
+      .from('solicitudes_upgrade')
+      .update({ estado: 'rechazada', resuelto_en: new Date().toISOString() })
+      .eq('id', sol.id);
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar('Solicitud rechazada.');
+    await cargarPlanes();
+  }
 
   async function cargarRestaurantes() {
     const { data, error } = await supabase.rpc('listar_restaurantes_admin');
@@ -223,6 +312,7 @@ export default function PaginaAdmin() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+            { id: 'planes', label: 'Planes', count: solicitudes.length, icon: Gauge },
             { id: 'pendientes', label: 'Pendientes', count: pendientes.length, icon: Clock },
             { id: 'aprobados', label: 'Aprobados', count: aprobados.length, icon: Check },
             { id: 'rechazados', label: 'Rechazados', count: rechazados.length, icon: X },
@@ -268,7 +358,17 @@ export default function PaginaAdmin() {
 
         {pestana === 'dashboard' && <Dashboard stats={statsGlobales} />}
 
-        {pestana !== 'dashboard' && (
+        {pestana === 'planes' && (
+          <PlanesPanel
+            filas={planesData}
+            solicitudes={solicitudes}
+            procesando={procesando}
+            onAprobar={aprobarUpgrade}
+            onRechazar={rechazarUpgrade}
+          />
+        )}
+
+        {pestana !== 'dashboard' && pestana !== 'planes' && (
           listaActual().length === 0 ? (
             <div className="card p-12 text-center">
               <Store className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
@@ -351,6 +451,117 @@ export default function PaginaAdmin() {
           )
         )}
       </main>
+    </div>
+  );
+}
+
+// ============== PANEL DE PLANES Y CONSUMO ==============
+
+function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar }) {
+  if (!filas) {
+    return (
+      <div className="card p-12 text-center">
+        <Loader2 className="w-6 h-6 animate-spin text-accent mx-auto" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Solicitudes de upgrade pendientes */}
+      {solicitudes.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+            <ArrowUpCircle className="w-4 h-4 text-accent" />
+            Solicitudes de cambio de plan ({solicitudes.length})
+          </h2>
+          <div className="space-y-3">
+            {solicitudes.map(s => (
+              <div key={s.id} className="card p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-medium text-text">{s.nombreRestaurante}</p>
+                  <p className="text-sm text-text-muted">
+                    {infoPlan(s.plan_actual).nombre} → <strong className="text-text">{infoPlan(s.plan_solicitado).nombre}</strong>
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => onAprobar(s)} disabled={procesando === s.id} className="btn-primary">
+                    {procesando === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" />Aprobar</>}
+                  </button>
+                  <button onClick={() => onRechazar(s)} disabled={procesando === s.id} className="btn-danger">
+                    <X className="w-4 h-4" />Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tabla de consumo por restaurante */}
+      <div>
+        <h2 className="text-sm font-semibold text-text mb-3">Consumo por restaurante (periodo actual)</h2>
+        {filas.length === 0 ? (
+          <div className="card p-12 text-center">
+            <Gauge className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
+            <p className="text-text-muted">No hay restaurantes aprobados todavía.</p>
+          </div>
+        ) : (
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-text-muted text-left">
+                    <th className="px-4 py-3 font-medium">Restaurante</th>
+                    <th className="px-4 py-3 font-medium">Plan</th>
+                    <th className="px-4 py-3 font-medium">Consumo</th>
+                    <th className="px-4 py-3 font-medium">Proyección</th>
+                    <th className="px-4 py-3 font-medium">Overage</th>
+                    <th className="px-4 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filas.map(f => {
+                    const c = f.consumo;
+                    const colorTexto =
+                      c.nivelAviso === 'exceso' || c.nivelAviso === 'limite' ? 'text-red-500'
+                      : c.nivelAviso === 'aviso' ? 'text-yellow-600 dark:text-yellow-400' : 'text-text';
+                    return (
+                      <tr key={f.id} className="border-b border-border last:border-0">
+                        <td className="px-4 py-3 text-text font-medium">{f.nombre}</td>
+                        <td className="px-4 py-3 text-text-muted">{infoPlan(f.plan).nombre}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`tabular-nums font-medium ${colorTexto}`}>
+                              {c.consumidos}/{c.incluidos}
+                            </span>
+                            <span className="text-xs text-text-muted tabular-nums">
+                              ({Math.round(c.porcentaje * 100)}%)
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-text-muted tabular-nums">~{c.proyeccion}</td>
+                        <td className="px-4 py-3 tabular-nums">
+                          {c.overageCoste > 0
+                            ? <span className="text-red-500">+{c.overageCoste.toFixed(2)}€</span>
+                            : <span className="text-text-muted">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          {f.reco && f.reco.recomendar && (
+                            <span className="badge bg-accent/10 text-accent border border-accent/20 whitespace-nowrap">
+                              <ArrowUpCircle className="w-3 h-3" /> Sugerir {infoPlan(f.reco.siguienteId).nombre}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
