@@ -598,7 +598,7 @@ export default function PaginaLanding() {
               'Panel completo de gestión',
               'Reseñas automáticas',
               'Aviso al cliente al editar pedido',
-              '+0,12€ por pedido extra',
+              '+0,20€ por pedido extra',
               'Soporte por WhatsApp'
             ]}
           />
@@ -626,7 +626,7 @@ export default function PaginaLanding() {
               'Volumen alto sin sorpresas',
               'Coste por pedido mínimo',
               'Sesión de optimización trimestral',
-              '+0,12€ por pedido extra',
+              '+0,08€ por pedido extra',
               'Soporte prioritario'
             ]}
           />
@@ -641,7 +641,7 @@ export default function PaginaLanding() {
             </div>
             <div>
               <h3 className="font-semibold text-text mb-1">
-                Implementación: 99€ una sola vez
+                Implementación: 119€ una sola vez
               </h3>
               <p className="text-sm text-text-muted leading-relaxed">
                 Antes de arrancar, hacemos juntos la puesta en marcha: reuniones contigo
@@ -655,7 +655,8 @@ export default function PaginaLanding() {
         </Reveal>
 
         <p className="text-xs text-text-muted text-center mt-6">
-          Sin permanencia. Cambia de plan o date de baja cuando quieras.
+          Precios con IVA incluido. Paga al año y ahorra un 10%.
+          Sin permanencia: cambia de plan o date de baja cuando quieras.
         </p>
       </section>
 

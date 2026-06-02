@@ -9,7 +9,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -1091,6 +1091,10 @@ export default function PaginaPedidos() {
               <Star className="w-4 h-4" />
               <span className="hidden lg:inline">Reseñas</span>
             </a>
+            <a href="/plan" className="nav-link hidden md:inline-flex" title="Tu plan">
+              <Gauge className="w-4 h-4" />
+              <span className="hidden lg:inline">Plan</span>
+            </a>
             <a href="/ajustes" className="nav-link hidden md:inline-flex" title="Ajustes">
               <Settings className="w-4 h-4" />
               <span className="hidden lg:inline">Ajustes</span>
@@ -1141,6 +1145,9 @@ export default function PaginaPedidos() {
           </a>
           <a href="/resenas" className="nav-link whitespace-nowrap">
             <Star className="w-4 h-4" />Reseñas
+          </a>
+          <a href="/plan" className="nav-link whitespace-nowrap">
+            <Gauge className="w-4 h-4" />Plan
           </a>
           <a href="/ajustes" className="nav-link whitespace-nowrap">
             <Settings className="w-4 h-4" />Ajustes
