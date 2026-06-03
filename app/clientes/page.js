@@ -6,7 +6,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   ArrowLeft, Users, Loader2, AlertCircle, CheckCircle2,
   Send, Search, Sparkles, X, Megaphone, ShieldAlert,
-  MessageSquare as MessageSquareIcon
+  MessageSquare as MessageSquareIcon, Trash2
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -218,6 +218,28 @@ export default function PaginaClientes() {
   function avisar(texto) {
     setMensaje(texto);
     setTimeout(() => setMensaje(''), 4000);
+  }
+
+  // Derecho al olvido (RGPD): borra los datos personales del cliente.
+  // Anonimiza pedidos y reseñas (conserva ventas/puntuación sin PII) y elimina
+  // ficha, conversaciones, campañas y límites. Atómico vía función de BD.
+  async function borrarClienteRGPD(cliente) {
+    const nombre = cliente.nombre || telefonoLimpio(cliente.telefono);
+    const ok = confirm(
+      'DERECHO AL OLVIDO (RGPD)\n\n' +
+      'Vas a eliminar los datos personales de "' + nombre + '".\n\n' +
+      '• Se borran: su ficha, conversaciones, reseñas y consentimiento de marketing.\n' +
+      '• Sus pedidos se ANONIMIZAN: se conserva la venta (importe, productos, fecha) sin datos personales.\n\n' +
+      'Esta acción es IRREVERSIBLE. ¿Continuar?'
+    );
+    if (!ok) return;
+    const { error } = await supabase.rpc('borrar_cliente_rgpd', {
+      p_restaurante_id: restauranteId,
+      p_telefono: cliente.telefono,
+    });
+    if (error) { avisar('Error al borrar: ' + error.message); return; }
+    setClientes(prev => prev.filter(c => c.telefono !== cliente.telefono));
+    avisar('Datos de "' + nombre + '" eliminados (derecho al olvido).');
   }
 
   function abrirModalCampana() {
@@ -461,6 +483,7 @@ export default function PaginaClientes() {
                   <th className="py-3 px-4 font-semibold text-right">Ticket medio</th>
                   <th className="py-3 px-4 font-semibold">Último pedido</th>
                   <th className="py-3 px-4 font-semibold text-center">Marketing</th>
+                  <th className="py-3 px-4 font-semibold text-center">RGPD</th>
                 </tr>
               </thead>
               <tbody>
@@ -496,6 +519,15 @@ export default function PaginaClientes() {
                             {formatearFecha(c.marketing_consultado_en)}
                           </p>
                         )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => borrarClienteRGPD(c)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-md text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                          title="Eliminar datos del cliente (derecho al olvido)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
