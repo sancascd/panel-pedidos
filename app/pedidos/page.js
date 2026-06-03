@@ -294,6 +294,22 @@ export default function PaginaPedidos() {
     let cancelado = false;
     (async () => {
       try {
+        // ===== DEMO TEMPORAL (quitar antes de merge): forzar banner via URL =====
+        // ?demo_aviso=aviso | limite | exceso  -> muestra cada nivel para revisarlo.
+        try {
+          const demo = new URLSearchParams(window.location.search).get('demo_aviso');
+          if (demo && ['aviso', 'limite', 'exceso'].includes(demo)) {
+            const muestras = {
+              aviso:  { nivelAviso: 'aviso',  porcentaje: 0.85, incluidos: 600, consumidos: 510, overagePedidos: 0, overageCoste: 0 },
+              limite: { nivelAviso: 'limite', porcentaje: 1.0,  incluidos: 600, consumidos: 600, overagePedidos: 0, overageCoste: 0 },
+              exceso: { nivelAviso: 'exceso', porcentaje: 1.25, incluidos: 600, consumidos: 750, overagePedidos: 150, overageCoste: 30 },
+            };
+            setAvisoPlan({ consumo: muestras[demo], plan: infoPlan('basico'), firma: 'demo-' + demo });
+            return;
+          }
+        } catch (e) {}
+        // ===== FIN DEMO TEMPORAL =====
+
         const { data: rest } = await supabase
           .from('restaurantes')
           .select('plan, plan_iniciado_en')
