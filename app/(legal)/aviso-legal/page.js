@@ -17,7 +17,7 @@ export default function AvisoLegal() {
             y de comercio electrónico (LSSI-CE), se informa que el titular de este sitio web es:
           </p>
           <ul className="mt-3 space-y-1 text-text-muted">
-            <li><strong className="text-text">Titular:</strong> [NOMBRE COMPLETO]</li>
+            <li><strong className="text-text">Titular:</strong> SCD TECH SL</li>
             <li><strong className="text-text">NIF/CIF:</strong> [NIF]</li>
             <li><strong className="text-text">Domicilio:</strong> [DIRECCIÓN FISCAL]</li>
             <li><strong className="text-text">Email de contacto:</strong> info@comandi.es</li>

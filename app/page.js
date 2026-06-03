@@ -816,7 +816,7 @@ export default function PaginaLanding() {
                 <span className="text-sm font-semibold text-text">Comandi</span>
               </div>
               <p className="text-xs text-text-muted leading-relaxed">
-                Comandi — [NOMBRE COMPLETO]<br />
+                Comandi — SCD TECH SL<br />
                 NIF [NIF/CIF]<br />
                 [DIRECCIÓN FISCAL]<br />
                 Córdoba, España

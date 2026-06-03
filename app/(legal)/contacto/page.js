@@ -82,7 +82,7 @@ export default function Contacto() {
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-text mb-1">Dirección</h2>
             <p className="text-sm text-text-muted">
-              Comandi — [NOMBRE COMPLETO]<br />
+              Comandi — SCD TECH SL<br />
               NIF [NIF]<br />
               [DIRECCIÓN FISCAL]<br />
               Córdoba, España

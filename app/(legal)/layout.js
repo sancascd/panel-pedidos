@@ -72,7 +72,7 @@ export default function LegalLayout({ children }) {
                 <span className="text-sm font-semibold text-text">Comandi</span>
               </div>
               <p className="text-xs text-text-muted leading-relaxed">
-                [NOMBRE COMPLETO]<br />
+                SCD TECH SL<br />
                 NIF [NIF/CIF]<br />
                 [DIRECCIÓN FISCAL]<br />
                 Córdoba, España
