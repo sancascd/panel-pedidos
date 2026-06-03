@@ -503,7 +503,7 @@ export default function PaginaLanding() {
               Por qué Comandi
             </h2>
             <p className="mt-3 text-text-muted">
-              Pensado para restaurantes españoles, no copiado de un SaaS de Silicon Valley.
+              Todo lo que necesitas para vender más por WhatsApp, sin complicaciones ni letra pequeña.
             </p>
           </div>
         </Reveal>
