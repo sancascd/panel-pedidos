@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
   Smartphone, Zap, ShieldCheck, Sparkles, ArrowRight,
-  ChevronDown, QrCode, Image as ImageIcon, BarChart3
+  ChevronDown, QrCode, Image as ImageIcon, BarChart3, Gauge
 } from 'lucide-react';
 
 const WHATSAPP_VENTAS = '34685246694';
@@ -536,7 +536,17 @@ export default function PaginaLanding() {
           <FeatureCard
             icono={ShieldCheck}
             titulo="Datos seguros y RGPD"
-            texto="Cada restaurante ve solo sus pedidos y sus clientes. Hosteado en Europa. Cumplimos la normativa española."
+            texto="Cada restaurante ve solo sus pedidos y sus clientes. Datos alojados en Europa. Cumplimos la normativa española y puedes exportar o borrar datos cuando quieras."
+          />
+          <FeatureCard
+            icono={BarChart3}
+            titulo="Analíticas de tu negocio"
+            texto="Productos más vendidos y los que más facturan, ingresos por día, tendencias frente al periodo anterior y valoración media. Decisiones con datos reales de tu restaurante."
+          />
+          <FeatureCard
+            icono={Gauge}
+            titulo="Tu plan, sin sorpresas"
+            texto="Ves tu consumo de pedidos en todo momento y te avisamos antes de pasarte del plan. Cuando te conviene subir, te lo decimos para que cada pedido te salga más barato."
           />
         </StaggerChildren>
       </section>
@@ -681,7 +691,7 @@ export default function PaginaLanding() {
             </p>
           </div>
         </Reveal>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 max-w-3xl mx-auto">
           <Reveal offset={0}>
             <div className="relative card p-5 md:p-6 border-dashed h-full">
               <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
@@ -704,18 +714,6 @@ export default function PaginaLanding() {
               <p className="text-sm text-text-muted leading-relaxed">
                 La misma carta web vale para tus mesas. Cada mesa con su QR, el cliente pide desde su móvil,
                 llega directo a tu panel. Sin pasar por WhatsApp, sin esperar al camarero.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal offset={0.12} className="col-span-2 md:col-span-1">
-            <div className="relative card p-5 md:p-6 border-dashed h-full">
-              <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
-                <BarChart3 className="w-4 h-4 text-accent" />
-              </div>
-              <h3 className="text-sm font-semibold text-text mb-1.5">Análisis de tu negocio</h3>
-              <p className="text-sm text-text-muted leading-relaxed">
-                Productos más y menos vendidos, ingresos por día, semana y mes, comparativas entre periodos.
-                Detecta tendencias y toma decisiones con datos reales de tu propio restaurante.
               </p>
             </div>
           </Reveal>
@@ -749,7 +747,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué pasa si paso de los pedidos incluidos en mi plan?"
-            respuesta="Cada pedido adicional cuesta 0,12€. Por ejemplo, en el plan Básico (99€/mes hasta 600 pedidos), si haces 700 pedidos en un mes serían 99€ + (100 × 0,12€) = 111€. Si vemos que mes a mes te excedes, te avisamos para que pases al plan Pro o Premium y cada pedido te salga más barato."
+            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 600 pedidos), si haces 700 pedidos serían 99€ + (100 × 0,20€) = 119€. En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
           />
           <FAQItem
             pregunta="¿Puedo subir o bajar de plan cuando quiera?"
@@ -757,7 +755,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué incluye la implementación y cuándo se paga?"
-            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 99€ que pagas al inicio, antes de empezar. A partir de ahí solo pagas la mensualidad del plan elegido."
+            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 119€ que pagas al inicio, antes de empezar. A partir de ahí solo pagas la mensualidad del plan elegido."
           />
           <FAQItem
             pregunta="¿Cómo se contrata y cómo se paga?"
