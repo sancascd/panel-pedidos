@@ -7,7 +7,7 @@ export default function Privacidad() {
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-text mb-2">Política de privacidad</h1>
-      <p className="text-sm text-text-muted mb-10">Última actualización: 20 de mayo de 2026</p>
+      <p className="text-sm text-text-muted mb-10">Última actualización: 3 de junio de 2026</p>
 
       <div className="space-y-8 text-sm text-text leading-relaxed">
         <section>
@@ -63,7 +63,7 @@ export default function Privacidad() {
               <ul className="list-disc pl-5 text-text-muted space-y-1 mt-3">
                 <li><strong className="text-text">Finalidad:</strong> gestionar el pedido (interpretarlo, mostrarlo al restaurante, avisar al cliente de cambios y solicitar reseña).</li>
                 <li><strong className="text-text">Base legal:</strong> ejecución de un contrato entre el cliente y el restaurante (art. 6.1.b RGPD) o consentimiento del cliente al iniciar la conversación.</li>
-                <li><strong className="text-text">Conservación:</strong> los datos de pedido se conservan durante la relación con el restaurante y por los plazos fiscales/contables legalmente exigibles. Las conversaciones inactivas se borran transcurridos 30 minutos.</li>
+                <li><strong className="text-text">Conservación:</strong> los datos de pedido se conservan durante la relación con el restaurante y por los plazos fiscales/contables legalmente exigibles. Las conversaciones en curso caducan tras 30 minutos de inactividad y sus registros se eliminan automáticamente a los 7 días.</li>
               </ul>
             </div>
           </div>
@@ -77,16 +77,21 @@ export default function Privacidad() {
             adecuadas conforme al RGPD:
           </p>
           <ul className="list-disc pl-5 text-text-muted space-y-1 mt-3">
-            <li><strong className="text-text">Supabase</strong> (Estados Unidos / Unión Europea) — alojamiento de base de datos.</li>
-            <li><strong className="text-text">Anthropic, PBC</strong> (Estados Unidos) — procesamiento por IA de los mensajes para entender pedidos.</li>
-            <li><strong className="text-text">Twilio Inc.</strong> (Estados Unidos / Unión Europea) — pasarela de WhatsApp.</li>
+            <li><strong className="text-text">Supabase</strong> — alojamiento de la base de datos. Datos almacenados en la <strong className="text-text">Unión Europea (Irlanda)</strong>.</li>
+            <li><strong className="text-text">Postmark</strong> (ActiveCampaign LLC) — envío de correos electrónicos transaccionales. Servidores en la <strong className="text-text">Unión Europea (Irlanda)</strong>.</li>
+            <li><strong className="text-text">Anthropic, PBC</strong> (Estados Unidos) — procesamiento por IA de los mensajes para entender pedidos. No utiliza los datos para entrenar sus modelos.</li>
+            <li><strong className="text-text">Twilio Inc.</strong> (Estados Unidos) — pasarela de mensajería de WhatsApp.</li>
             <li><strong className="text-text">Vercel Inc.</strong> (Estados Unidos / Unión Europea) — alojamiento del panel web.</li>
-            <li><strong className="text-text">Railway Corp.</strong> (Estados Unidos) — alojamiento del bot.</li>
+            <li><strong className="text-text">Railway Corp.</strong> (Estados Unidos) — alojamiento del servicio del bot.</li>
           </ul>
           <p className="text-text-muted mt-3">
-            En los casos en que se realicen transferencias internacionales fuera del Espacio
-            Económico Europeo, se utilizan Cláusulas Contractuales Tipo aprobadas por la Comisión
-            Europea u otros mecanismos válidos.
+            Los datos personales se <strong className="text-text">almacenan en reposo dentro de la
+            Unión Europea</strong> (base de datos y correo en Irlanda). Algunos proveedores procesan
+            datos en tránsito desde Estados Unidos (la inteligencia artificial y la pasarela de
+            WhatsApp). En esos casos, las transferencias internacionales fuera del Espacio Económico
+            Europeo se amparan en las <strong className="text-text">Cláusulas Contractuales Tipo</strong>
+            aprobadas por la Comisión Europea y los acuerdos de tratamiento de datos (DPA) suscritos
+            con cada proveedor.
           </p>
         </section>
 
