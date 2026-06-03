@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
+import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import {
   Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
@@ -231,6 +232,9 @@ export default function PaginaPedidos() {
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
+  // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
+  const [avisoPlan, setAvisoPlan] = useState(null);
+
   const [historialPedidos, setHistorialPedidos] = useState([]);
   const [historialCargando, setHistorialCargando] = useState(false);
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
@@ -282,6 +286,54 @@ export default function PaginaPedidos() {
     const intervalo = setInterval(() => setTickAlertas(t => t + 1), 60000);
     return () => clearInterval(intervalo);
   }, []);
+
+  // Aviso de plan: calcula el consumo del periodo y muestra banner si cruza
+  // 80/100/120%. Aislado y defensivo: cualquier fallo deja avisoPlan en null.
+  useEffect(() => {
+    if (!restaurante?.id) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const { data: rest } = await supabase
+          .from('restaurantes')
+          .select('plan, plan_iniciado_en')
+          .eq('id', restaurante.id)
+          .maybeSingle();
+        if (!rest || cancelado) return;
+        const per = periodoActual(rest.plan_iniciado_en);
+        const { count } = await supabase
+          .from('pedidos')
+          .select('*', { count: 'exact', head: true })
+          .eq('restaurante_id', restaurante.id)
+          .gte('creado_en', per.inicio.toISOString());
+        if (cancelado) return;
+        const consumo = calcularConsumo({
+          planId: rest.plan,
+          pedidosPeriodo: count || 0,
+          diasTranscurridos: per.diasTranscurridos,
+          diasTotales: per.diasTotales,
+        });
+        if (!consumo.nivelAviso) { setAvisoPlan(null); return; }
+        // Firma del aviso: periodo + nivel. Si el restaurante lo descartó,
+        // no reaparece hasta que sube de nivel o empieza un periodo nuevo.
+        const firma = per.inicio.toISOString().slice(0, 10) + '-' + consumo.nivelAviso;
+        let descartado = null;
+        try { descartado = localStorage.getItem('comandi-aviso-plan'); } catch (e) {}
+        if (descartado === firma) { setAvisoPlan(null); return; }
+        setAvisoPlan({ consumo, plan: infoPlan(rest.plan), firma });
+      } catch (e) {
+        if (!cancelado) setAvisoPlan(null);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [restaurante?.id]);
+
+  function descartarAvisoPlan() {
+    if (avisoPlan) {
+      try { localStorage.setItem('comandi-aviso-plan', avisoPlan.firma); } catch (e) {}
+    }
+    setAvisoPlan(null);
+  }
 
   function alternarStats() {
     const nuevo = !statsAbiertas;
@@ -1166,6 +1218,35 @@ export default function PaginaPedidos() {
           )}
         </div>
       </header>
+
+      {/* Banner de aviso de plan (80/100/120%) */}
+      {avisoPlan && (() => {
+        const c = avisoPlan.consumo;
+        const nombre = avisoPlan.plan.nombre;
+        const esRojo = c.nivelAviso === 'limite' || c.nivelAviso === 'exceso';
+        const texto =
+          c.nivelAviso === 'exceso'
+            ? `Llevas ${c.overagePedidos} pedidos por encima de tu plan ${nombre} este periodo (+${c.overageCoste.toFixed(2)}€). Quizá te convenga subir de plan.`
+            : c.nivelAviso === 'limite'
+            ? `Has alcanzado los ${c.incluidos} pedidos de tu plan ${nombre}. Los siguientes se facturan a ${avisoPlan.plan.overage.toFixed(2)}€ cada uno.`
+            : `Vas por el ${Math.round(c.porcentaje * 100)}% de los ${c.incluidos} pedidos de tu plan ${nombre}.`;
+        return (
+          <div className={`no-imprimir border-b ${
+            esRojo
+              ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+              : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400'
+          }`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center gap-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <p className="text-sm flex-1">{texto}</p>
+              <a href="/plan" className="text-sm font-semibold underline whitespace-nowrap">Ver plan</a>
+              <button onClick={descartarAvisoPlan} className="p-1 hover:opacity-70" title="Descartar">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Tabs */}
       <div className="border-b border-border bg-bg no-imprimir">
