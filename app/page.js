@@ -679,6 +679,16 @@ export default function PaginaLanding() {
     return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
+  // Desactiva el "modo oscuro automático" de Chrome SOLO en la landing (se
+  // restaura al salir). Así el destello verde del título se ve bien aunque el
+  // sistema operativo esté en modo oscuro, sin afectar al resto de páginas.
+  useEffect(() => {
+    const html = document.documentElement;
+    const previo = html.style.colorScheme;
+    html.style.colorScheme = 'dark';
+    return () => { html.style.colorScheme = previo; };
+  }, []);
+
   return (
     <div className="min-h-screen overflow-x-hidden isolate" style={TEMA_LANDING}>
       {/* Capas de brillo de fondo (fijas, detrás de todo) */}
@@ -751,11 +761,16 @@ export default function PaginaLanding() {
               <Sparkles className="w-3 h-3" />
               Asistente con IA · solo por WhatsApp
             </div>
-            <h1 className="text-5xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
-              <span className="lp-shine">
+            <h1 className="relative text-5xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
+              {/* Capa base: texto blanco sólido (verde en "Cero"), SIEMPRE visible */}
+              <span>
                 <span style={{ color: ACCENT_HEX }}>Cero</span> apps.<br />
                 <span style={{ color: ACCENT_HEX }}>Cero</span> comisiones.<br />
                 <span style={{ color: ACCENT_HEX }}>Cero</span> esperas.
+              </span>
+              {/* Capa de destello: barrido verde recortado a las letras (solo realza) */}
+              <span className="lp-shine" aria-hidden>
+                Cero apps.<br />Cero comisiones.<br />Cero esperas.
               </span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-text-muted leading-relaxed max-w-lg">

@@ -198,33 +198,28 @@ input:focus, textarea:focus, select:focus {
 .lp-lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lp-lift:hover { transform: translateY(-3px); border-color: rgba(16, 185, 129, 0.35); }
 
-/* 4 · Titular con DESTELLO verde SEGURO: el texto SIEMPRE mantiene su color
-   (blanco / acento). El brillo es una banda de luz verde que recorre el título
-   por encima (mezcla "screen"), nunca pinta el texto en transparente → no puede
-   quedar invisible, ni siquiera con el modo oscuro del sistema activado. */
+/* 4 · Destello del titular: CAPA superior recortada a las letras que hace un
+   barrido verde a través del texto. Va encima de un texto base BLANCO SÓLIDO
+   (siempre visible): esta capa solo realza. Si el navegador no la pinta, no
+   pasa nada — el título sigue blanco. Combinado con color-scheme:dark en la
+   landing, el verde también se ve con el modo oscuro del sistema activado. */
 .lp-shine {
-  position: relative;
-  display: inline-block;
-  color: inherit;
-  overflow: hidden;
-  padding-bottom: 0.06em;
-}
-.lp-shine::after {
-  content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -35%;
-  width: 35%;
+  inset: 0;
   pointer-events: none;
-  background: linear-gradient(100deg, transparent, rgba(52, 211, 153, 0.7), transparent);
-  filter: blur(10px);
-  mix-blend-mode: screen;
-  animation: lpShine 4.8s ease-in-out infinite;
+  background-image: linear-gradient(100deg, transparent 38%, rgba(52, 211, 153, 0.95) 50%, transparent 62%);
+  background-size: 250% 100%;
+  background-position: 150% 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: lpShine 5s ease-in-out infinite;
 }
 @keyframes lpShine {
-  0% { left: -35%; }
-  60%, 100% { left: 135%; }
+  0% { background-position: 150% 0; }
+  55%, 100% { background-position: -50% 0; }
 }
 
 /* 5 · Marquee: cinta de tipos de restaurante en movimiento continuo */
@@ -244,7 +239,7 @@ input:focus, textarea:focus, select:focus {
 /* Accesibilidad: si el usuario pide menos movimiento, paramos las animaciones decorativas */
 @media (prefers-reduced-motion: reduce) {
   .lp-aurora > span,
-  .lp-shine::after,
+  .lp-shine,
   .lp-marquee,
   .animate-travel { animation: none !important; }
 }
