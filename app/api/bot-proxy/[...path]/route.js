@@ -24,8 +24,10 @@ const PATHS_PERMITIDOS = new Set([
   'enviar-campana'
 ]);
 
-// Devuelve { ok, motivo }. NO lanza. NO bloquea por si solo.
-async function comprobarSesion() {
+// Devuelve el contexto de autorización del usuario autenticado:
+// { ok, userId, restauranteId, esSuperadmin }. Deriva el restaurante del
+// servidor (sesión), NO del body → base para que el bot autorice por recurso.
+async function obtenerContexto() {
   try {
     const cookieStore = cookies();
     const supabase = createServerClient(
@@ -33,22 +35,18 @@ async function comprobarSesion() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
         cookies: {
-          // Patron @supabase/ssr 0.5+ correcto: getAll/setAll.
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {
-            // En route handlers POST no necesitamos refrescar cookies.
-          }
+          getAll() { return cookieStore.getAll(); },
+          setAll() {}
         }
       }
     );
     const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) return { ok: false, motivo: 'getUser error: ' + error.message };
-    if (!user) return { ok: false, motivo: 'sin user en sesion' };
-    return { ok: true, motivo: 'user ' + user.id };
+    if (error || !user) return { ok: false };
+    const { data: restId } = await supabase.rpc('mi_restaurante_id');
+    const { data: admin } = await supabase.rpc('soy_superadmin');
+    return { ok: true, userId: user.id, restauranteId: restId || null, esSuperadmin: admin === true };
   } catch (e) {
-    return { ok: false, motivo: 'excepcion: ' + e.message };
+    return { ok: false, error: e.message };
   }
 }
 
@@ -60,10 +58,14 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: 'Path no permitido' }, { status: 404 });
   }
 
-  // Senal, no barrera: la proteccion real es la API key del bot.
-  const sesion = await comprobarSesion();
-  if (!sesion.ok) {
-    console.log('[bot-proxy] sesion no validada:', sesion.motivo, '| path:', path);
+  // Autenticación + autorización: el usuario debe estar logueado y tener un
+  // restaurante (o ser superadmin). Derivamos su restaurante_id del servidor.
+  const ctx = await obtenerContexto();
+  if (!ctx.ok) {
+    return NextResponse.json({ error: 'Sesión requerida' }, { status: 401 });
+  }
+  if (!ctx.restauranteId && !ctx.esSuperadmin) {
+    return NextResponse.json({ error: 'Sin restaurante asociado' }, { status: 403 });
   }
 
   const apiKey = process.env.INTERNAL_API_KEY;
@@ -85,7 +87,11 @@ export async function POST(req, { params }) {
       method: 'POST',
       headers: {
         'Content-Type': req.headers.get('content-type') || 'application/json',
-        'X-API-Key': apiKey
+        'X-API-Key': apiKey,
+        // Contexto de autorización inyectado de forma fiable (server-side).
+        // El bot confía en estos headers porque vienen con la INTERNAL_API_KEY.
+        'X-Restaurante-Id': ctx.restauranteId || '',
+        'X-Es-Superadmin': ctx.esSuperadmin ? 'true' : 'false'
       },
       body: bodyTexto
     });
