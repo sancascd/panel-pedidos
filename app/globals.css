@@ -202,7 +202,8 @@ input:focus, textarea:focus, select:focus {
 .lp-shine { color: inherit; }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .lp-shine {
-    background: linear-gradient(110deg, rgb(var(--text)) 35%, #34d399 50%, rgb(var(--text)) 65%);
+    display: inline-block;
+    background: linear-gradient(110deg, #fafafa 35%, #34d399 50%, #fafafa 65%);
     background-size: 220% 100%;
     -webkit-background-clip: text;
             background-clip: text;

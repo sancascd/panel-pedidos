@@ -680,7 +680,7 @@ export default function PaginaLanding() {
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={TEMA_LANDING}>
+    <div className="min-h-screen overflow-x-hidden isolate" style={TEMA_LANDING}>
       {/* Capas de brillo de fondo (fijas, detrás de todo) */}
       <div className="lp-dots" aria-hidden />
       <div className="lp-aurora" aria-hidden>
