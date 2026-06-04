@@ -32,6 +32,7 @@ module.exports = {
         'fade-in': 'fadeIn 0.3s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',
         'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'travel': 'travel 5s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -45,6 +46,12 @@ module.exports = {
         pulseSoft: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.6' },
+        },
+        travel: {
+          '0%': { left: '0%', opacity: '0' },
+          '10%': { opacity: '1' },
+          '90%': { opacity: '1' },
+          '100%': { left: '100%', opacity: '0' },
         },
       },
     },
