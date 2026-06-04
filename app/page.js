@@ -6,7 +6,7 @@ import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
   Smartphone, Zap, ShieldCheck, Sparkles, ArrowRight,
   ChevronDown, QrCode, Image as ImageIcon, BarChart3, Gauge,
-  TrendingUp, BellRing
+  TrendingUp, BellRing, BookOpen
 } from 'lucide-react';
 
 const WHATSAPP_VENTAS = '34685246694';
@@ -878,6 +878,11 @@ export default function PaginaLanding() {
             icono={Gauge}
             titulo="Tu plan, sin sorpresas"
             texto="Ves tu consumo de pedidos en todo momento y te avisamos antes de pasarte del plan. Cuando te conviene subir, te lo decimos para que cada pedido te salga más barato."
+          />
+          <FeatureCard
+            icono={BookOpen}
+            titulo="Carta siempre actualizada"
+            texto="Cambias productos, precios y disponibilidad desde tu panel y se aplica al instante. ¿Se acabó un plato? Lo marcas y el bot deja de ofrecerlo automáticamente."
           />
         </StaggerChildren>
       </section>

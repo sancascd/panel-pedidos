@@ -198,20 +198,17 @@ input:focus, textarea:focus, select:focus {
 .lp-lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lp-lift:hover { transform: translateY(-3px); border-color: rgba(16, 185, 129, 0.35); }
 
-/* 4 · Titular con brillo: destello que recorre el texto (con fallback seguro) */
-.lp-shine { color: inherit; }
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .lp-shine {
-    display: inline-block;
-    background: linear-gradient(110deg, #fafafa 35%, #34d399 50%, #fafafa 65%);
-    background-size: 220% 100%;
-    -webkit-background-clip: text;
-            background-clip: text;
-    color: transparent;
-    animation: lpShine 5.5s ease-in-out infinite;
-  }
+/* 4 · Titular con brillo SEGURO: el texto mantiene SIEMPRE su color (blanco /
+   acento), solo añadimos un halo verde suave. Nunca puede quedar invisible,
+   ni con el modo oscuro del sistema activado. */
+.lp-shine {
+  color: inherit;
+  animation: lpShine 5.5s ease-in-out infinite;
 }
-@keyframes lpShine { 0% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
+@keyframes lpShine {
+  0%, 100% { text-shadow: 0 0 0 rgba(16, 185, 129, 0); }
+  50% { text-shadow: 0 0 18px rgba(16, 185, 129, 0.22); }
+}
 
 /* 5 · Marquee: cinta de tipos de restaurante en movimiento continuo */
 .lp-marquee-mask {
