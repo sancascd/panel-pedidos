@@ -263,7 +263,7 @@ function PasoCard({ numero, icono: Icono, titulo, texto }) {
 
 function FeatureCard({ icono: Icono, titulo, texto }) {
   return (
-    <div className="relative card p-4 sm:p-5 h-full">
+    <div className="relative card lp-glow lp-lift p-4 sm:p-5 h-full">
       <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center mb-3">
         <Icono className="w-4 h-4 text-accent" />
       </div>
@@ -287,7 +287,7 @@ function FAQItem({ pregunta, respuesta }) {
 
 function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
   return (
-    <div className={`relative card p-5 md:p-6 flex flex-col h-full ${
+    <div className={`relative card lp-glow lp-lift p-5 md:p-6 flex flex-col h-full ${
       recomendado ? 'border-accent ring-1 ring-accent shadow-lift' : ''
     }`}>
       {recomendado && (
@@ -380,7 +380,7 @@ function BandaImpacto() {
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-10">
       <Reveal>
-        <div ref={ref} className="card overflow-hidden">
+        <div ref={ref} className="card lp-glow overflow-hidden">
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
             <ContadorImpacto valor={3} sufijo=" h" etiqueta="ahorradas a la semana" activo={activo} />
             <ContadorImpacto valor={0} sufijo="%" etiqueta="de comisión por pedido" activo={activo} />
@@ -608,12 +608,40 @@ function MiraPorDentro() {
             })}
           </div>
           {/* Escenario */}
-          <div className="card p-5 sm:p-7 min-h-[300px] sm:min-h-[320px]">
+          <div className="card lp-glow p-5 sm:p-7 min-h-[300px] sm:min-h-[320px]">
             <Activa />
           </div>
         </div>
       </Reveal>
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPCIÓN 5 (brillo) — Cinta de tipos de restaurante en movimiento
+// ─────────────────────────────────────────────────────────────
+const TIPOS_RESTAURANTE = [
+  '🍕 Pizzerías', '🥡 Restaurantes chinos', '🌯 Kebabs', '🍣 Sushi',
+  '🍔 Hamburgueserías', '🍺 Bares con cocina', '🥘 Comida casera', '🛵 Para llevar',
+  '☕ Cafeterías', '🔥 Asadores', '🥗 Vegetarianos', '🍜 Cocina fusión',
+];
+
+function MarqueeTipos() {
+  // Se duplica la lista para que el bucle sea continuo (translateX -50%)
+  const items = [...TIPOS_RESTAURANTE, ...TIPOS_RESTAURANTE];
+  return (
+    <div className="mt-8 -mx-8 sm:-mx-12 overflow-hidden lp-marquee-mask">
+      <div className="lp-marquee py-1">
+        {items.map((t, i) => (
+          <span
+            key={i}
+            className="badge bg-surface text-text border border-border px-3.5 py-1.5 whitespace-nowrap"
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -637,8 +665,30 @@ export default function PaginaLanding() {
   const scrollY = useScrollPosition();
   const scrolled = scrollY > 20;
 
+  // Spotlight que sigue al cursor dentro de las tarjetas con .lp-glow
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onMove = (e) => {
+      const card = e.target?.closest?.('.lp-glow');
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => window.removeEventListener('mousemove', onMove);
+  }, []);
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={TEMA_LANDING}>
+      {/* Capas de brillo de fondo (fijas, detrás de todo) */}
+      <div className="lp-dots" aria-hidden />
+      <div className="lp-aurora" aria-hidden>
+        <span className="a1" />
+        <span className="a2" />
+        <span className="a3" />
+      </div>
+
       {/* Fondo decorativo del hero — con parallax y fade */}
       <div
         className="fixed inset-x-0 top-0 h-[700px] -z-10 pointer-events-none"
@@ -702,9 +752,11 @@ export default function PaginaLanding() {
               Asistente con IA · solo por WhatsApp
             </div>
             <h1 className="text-5xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-text leading-[1.05]">
-              <span style={{ color: ACCENT_HEX }}>Cero</span> apps.<br />
-              <span style={{ color: ACCENT_HEX }}>Cero</span> comisiones.<br />
-              <span style={{ color: ACCENT_HEX }}>Cero</span> esperas.
+              <span className="lp-shine">
+                <span style={{ color: ACCENT_HEX }}>Cero</span> apps.<br />
+                <span style={{ color: ACCENT_HEX }}>Cero</span> comisiones.<br />
+                <span style={{ color: ACCENT_HEX }}>Cero</span> esperas.
+              </span>
             </h1>
             <p className="mt-6 text-base sm:text-lg text-text-muted leading-relaxed max-w-lg">
               Tus clientes piden por WhatsApp. Comandi entiende lo que escriben,
@@ -833,7 +885,7 @@ export default function PaginaLanding() {
       {/* PARA QUIÉN */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <Reveal>
-        <div className="card p-8 sm:p-12 bg-gradient-to-br from-surface to-surface-2 border-border">
+        <div className="card p-8 sm:p-12 bg-gradient-to-br from-surface to-surface-2 border-border overflow-hidden">
           <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-text">
               Hecho para cualquier restaurante con pedidos por teléfono
@@ -841,18 +893,8 @@ export default function PaginaLanding() {
             <p className="mt-3 text-text-muted">
               Si ya recibes pedidos por WhatsApp o llamada, Comandi te ahorra horas a la semana.
             </p>
-            <div className="mt-7 flex flex-wrap gap-2 justify-center">
-              {[
-                'Pizzerías', 'Restaurantes chinos', 'Kebabs', 'Sushi',
-                'Hamburgueserías', 'Bares con cocina', 'Comida casera', 'Para llevar',
-                'Cafeterías', 'Asadores', 'Vegetarianos', 'Cocina fusión'
-              ].map(tipo => (
-                <span key={tipo} className="badge bg-surface text-text border border-border px-3 py-1">
-                  {tipo}
-                </span>
-              ))}
-            </div>
           </div>
+          <MarqueeTipos />
         </div>
         </Reveal>
       </section>

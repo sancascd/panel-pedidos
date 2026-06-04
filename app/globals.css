@@ -136,3 +136,100 @@ input:focus, textarea:focus, select:focus {
 @media print {
   body { background: white !important; color: black !important; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   LANDING — capas de "brillo" (prefijo .lp-, SOLO se usan en la landing)
+   No afectan al panel ni a otras páginas: son clases nuevas e independientes.
+   ════════════════════════════════════════════════════════════════ */
+
+/* 1 · Malla de puntos: textura sutil que da profundidad al fondo */
+.lp-dots {
+  position: fixed;
+  inset: 0;
+  z-index: -11;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(ellipse 95% 62% at 50% 0%, #000 38%, transparent 80%);
+          mask-image: radial-gradient(ellipse 95% 62% at 50% 0%, #000 38%, transparent 80%);
+}
+
+/* 2 · Aurora animada: manchas de luz verde que respiran de fondo */
+.lp-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -12;
+  overflow: hidden;
+  pointer-events: none;
+}
+.lp-aurora > span {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+}
+.lp-aurora .a1 { width: 520px; height: 520px; background: rgba(16, 185, 129, 0.20); top: -160px; left: 8%;  animation: lpFloatA 18s ease-in-out infinite; }
+.lp-aurora .a2 { width: 440px; height: 440px; background: rgba(16, 185, 129, 0.14); top: 140px;  right: 6%; animation: lpFloatB 22s ease-in-out infinite; }
+.lp-aurora .a3 { width: 380px; height: 380px; background: rgba(52, 211, 153, 0.12); top: 560px;  left: 36%; animation: lpFloatA 26s ease-in-out infinite reverse; }
+@keyframes lpFloatA { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(40px, 30px) scale(1.12); } }
+@keyframes lpFloatB { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-50px, 20px) scale(0.9); } }
+
+/* 3 · Tarjetas con brillo: borde superior iluminado + spotlight que sigue el cursor */
+.lp-glow { position: relative; }
+.lp-glow::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.6), transparent);
+  pointer-events: none;
+}
+.lp-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(16, 185, 129, 0.13), transparent 45%);
+}
+.lp-glow:hover::after { opacity: 1; }
+.lp-lift { transition: transform 0.25s ease, border-color 0.25s ease; }
+.lp-lift:hover { transform: translateY(-3px); border-color: rgba(16, 185, 129, 0.35); }
+
+/* 4 · Titular con brillo: destello que recorre el texto (con fallback seguro) */
+.lp-shine { color: inherit; }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lp-shine {
+    background: linear-gradient(110deg, rgb(var(--text)) 35%, #34d399 50%, rgb(var(--text)) 65%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+            background-clip: text;
+    color: transparent;
+    animation: lpShine 5.5s ease-in-out infinite;
+  }
+}
+@keyframes lpShine { 0% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
+
+/* 5 · Marquee: cinta de tipos de restaurante en movimiento continuo */
+.lp-marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.lp-marquee {
+  display: flex;
+  gap: 0.6rem;
+  width: max-content;
+  animation: lpMarquee 32s linear infinite;
+}
+.lp-marquee:hover { animation-play-state: paused; }
+@keyframes lpMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* Accesibilidad: si el usuario pide menos movimiento, paramos las animaciones decorativas */
+@media (prefers-reduced-motion: reduce) {
+  .lp-aurora > span,
+  .lp-shine,
+  .lp-marquee,
+  .animate-travel { animation: none !important; }
+}
