@@ -6,7 +6,7 @@ import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
   Smartphone, Zap, ShieldCheck, Sparkles, ArrowRight,
   ChevronDown, QrCode, Image as ImageIcon, BarChart3, Gauge,
-  TrendingUp, BellRing, BookOpen
+  TrendingUp, BellRing, BookOpen, MapPin, Megaphone, Clock
 } from 'lucide-react';
 
 const WHATSAPP_VENTAS = '34685246694';
@@ -883,6 +883,21 @@ export default function PaginaLanding() {
             icono={BookOpen}
             titulo="Carta siempre actualizada"
             texto="Cambias productos, precios y disponibilidad desde tu panel y se aplica al instante. ¿Se acabó un plato? Lo marcas y el bot deja de ofrecerlo automáticamente."
+          />
+          <FeatureCard
+            icono={MapPin}
+            titulo="Domicilio y recogida"
+            texto="El bot gestiona los dos. Pide la dirección si es a domicilio y avisa cuando está listo para recoger. Tú lo ves diferenciado y ordenado en el panel."
+          />
+          <FeatureCard
+            icono={Megaphone}
+            titulo="Marketing por WhatsApp"
+            texto="Envía ofertas y novedades a los clientes que aceptaron recibirlas. Tu propia base de clientes para que vuelvan, siempre cumpliendo el RGPD."
+          />
+          <FeatureCard
+            icono={Clock}
+            titulo="Horario inteligente"
+            texto="El bot abre y cierra solo según tu horario. Fuera de hora, avisa al cliente de cuándo volvéis a estar disponibles. Sin pedidos a deshora."
           />
         </StaggerChildren>
       </section>

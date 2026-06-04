@@ -198,16 +198,33 @@ input:focus, textarea:focus, select:focus {
 .lp-lift { transition: transform 0.25s ease, border-color 0.25s ease; }
 .lp-lift:hover { transform: translateY(-3px); border-color: rgba(16, 185, 129, 0.35); }
 
-/* 4 · Titular con brillo SEGURO: el texto mantiene SIEMPRE su color (blanco /
-   acento), solo añadimos un halo verde suave. Nunca puede quedar invisible,
-   ni con el modo oscuro del sistema activado. */
+/* 4 · Titular con DESTELLO verde SEGURO: el texto SIEMPRE mantiene su color
+   (blanco / acento). El brillo es una banda de luz verde que recorre el título
+   por encima (mezcla "screen"), nunca pinta el texto en transparente → no puede
+   quedar invisible, ni siquiera con el modo oscuro del sistema activado. */
 .lp-shine {
+  position: relative;
+  display: inline-block;
   color: inherit;
-  animation: lpShine 5.5s ease-in-out infinite;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+.lp-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -35%;
+  width: 35%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(52, 211, 153, 0.7), transparent);
+  filter: blur(10px);
+  mix-blend-mode: screen;
+  animation: lpShine 4.8s ease-in-out infinite;
 }
 @keyframes lpShine {
-  0%, 100% { text-shadow: 0 0 0 rgba(16, 185, 129, 0); }
-  50% { text-shadow: 0 0 18px rgba(16, 185, 129, 0.22); }
+  0% { left: -35%; }
+  60%, 100% { left: 135%; }
 }
 
 /* 5 · Marquee: cinta de tipos de restaurante en movimiento continuo */
@@ -227,7 +244,7 @@ input:focus, textarea:focus, select:focus {
 /* Accesibilidad: si el usuario pide menos movimiento, paramos las animaciones decorativas */
 @media (prefers-reduced-motion: reduce) {
   .lp-aurora > span,
-  .lp-shine,
+  .lp-shine::after,
   .lp-marquee,
   .animate-travel { animation: none !important; }
 }
