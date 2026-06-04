@@ -5,7 +5,8 @@ import Link from 'next/link';
 import {
   MessageSquare, Bot, LayoutDashboard, Check, Star, Bell,
   Smartphone, Zap, ShieldCheck, Sparkles, ArrowRight,
-  ChevronDown, QrCode, Image as ImageIcon, BarChart3, Gauge
+  ChevronDown, QrCode, Image as ImageIcon, BarChart3, Gauge,
+  TrendingUp, BellRing
 } from 'lucide-react';
 
 const WHATSAPP_VENTAS = '34685246694';
@@ -327,6 +328,295 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// OPCIÓN 4 — Banda de impacto (números que se animan al aparecer)
+// ─────────────────────────────────────────────────────────────
+function ContadorImpacto({ valor, sufijo, etiqueta, activo }) {
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    if (!activo) return;
+    let raf;
+    const dur = 1200;
+    const inicio = performance.now();
+    const tick = (ahora) => {
+      const p = Math.min(1, (ahora - inicio) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setN(Math.round(valor * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [activo, valor]);
+
+  return (
+    <div className="p-6 sm:p-7 text-center">
+      <div className="text-4xl sm:text-5xl font-bold tabular-nums" style={{ color: ACCENT_HEX }}>
+        {n}{sufijo}
+      </div>
+      <p className="mt-2 text-sm text-text-muted">{etiqueta}</p>
+    </div>
+  );
+}
+
+function BandaImpacto() {
+  const ref = useRef(null);
+  const [activo, setActivo] = useState(false);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const io = new IntersectionObserver(
+      (entradas) => {
+        entradas.forEach((e) => {
+          if (e.isIntersecting) { setActivo(true); io.disconnect(); }
+        });
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-10">
+      <Reveal>
+        <div ref={ref} className="card overflow-hidden">
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
+            <ContadorImpacto valor={3} sufijo=" h" etiqueta="ahorradas a la semana" activo={activo} />
+            <ContadorImpacto valor={0} sufijo="%" etiqueta="de comisión por pedido" activo={activo} />
+            <ContadorImpacto valor={24} sufijo=" h" etiqueta="para tenerlo funcionando" activo={activo} />
+            <ContadorImpacto valor={100} sufijo="%" etiqueta="de pedidos por escrito" activo={activo} />
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPCIÓN 3 — El viaje de un pedido (flujo animado)
+// ─────────────────────────────────────────────────────────────
+function PasoViaje({ icono: Icono, paso, titulo, texto }) {
+  return (
+    <div className="text-center">
+      <div className="mx-auto w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-3">
+        <Icono className="w-6 h-6 text-accent" />
+      </div>
+      <p className="text-xs font-semibold text-accent mb-1">{paso}</p>
+      <h3 className="text-sm font-semibold text-text">{titulo}</h3>
+      <p className="text-xs text-text-muted mt-1 leading-relaxed">{texto}</p>
+    </div>
+  );
+}
+
+function ViajePedido() {
+  return (
+    <div className="card p-6 sm:p-10 bg-gradient-to-br from-surface to-surface-2">
+      {/* Pista con el punto que viaja de paso a paso */}
+      <div className="relative mb-10">
+        <div className="h-0.5 bg-border rounded-full" />
+        <div
+          className="absolute -top-1.5 h-3.5 w-3.5 rounded-full animate-travel"
+          style={{ backgroundColor: ACCENT_HEX, boxShadow: '0 0 16px 3px rgba(16,185,129,0.7)' }}
+          aria-hidden
+        />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-5">
+        <PasoViaje
+          icono={MessageSquare}
+          paso="Paso 1"
+          titulo="El cliente escribe"
+          texto="Por su WhatsApp de siempre. Sin descargar nada."
+        />
+        <PasoViaje
+          icono={Bot}
+          paso="Paso 2"
+          titulo="La IA lo entiende"
+          texto="Aunque escriba con faltas o cambie el pedido a medias."
+        />
+        <PasoViaje
+          icono={LayoutDashboard}
+          paso="Paso 3"
+          titulo="Llega a tu panel"
+          texto="Ordenado, listo para imprimir y cocinar."
+        />
+        <PasoViaje
+          icono={BellRing}
+          paso="Paso 4"
+          titulo="El cliente, avisado"
+          texto="Recibe el aviso de 'listo' solo. Sin que tengas que llamar."
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// OPCIÓN 5 — Mira Comandi por dentro (showcase interactivo)
+// ─────────────────────────────────────────────────────────────
+function DemoKanban() {
+  return (
+    <div>
+      <h3 className="text-base font-semibold text-text mb-1">Tus pedidos del día, en columnas</h3>
+      <p className="text-sm text-text-muted mb-5">De &ldquo;Recibido&rdquo; a &ldquo;Listo&rdquo; con un clic. El cliente recibe el aviso solo.</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div>
+          <p className="text-[11px] font-semibold text-text-muted mb-2">Recibidos</p>
+          <div className="rounded-lg bg-accent/10 border border-accent/30 p-2.5 mb-2">
+            <p className="text-[11px] font-bold text-text">#0148</p>
+            <p className="text-[10px] text-text-muted">2× BBQ · Zero · 18,50€</p>
+          </div>
+          <div className="rounded-lg bg-surface-2 border border-border p-2.5">
+            <p className="text-[11px] font-bold text-text">#0149</p>
+            <p className="text-[10px] text-text-muted">Pizza · 12,00€</p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold text-text-muted mb-2">Preparación</p>
+          <div className="rounded-lg bg-surface-2 border border-border p-2.5">
+            <p className="text-[11px] font-bold text-text">#0147</p>
+            <p className="text-[10px] text-text-muted">Kebab × 2</p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold text-text-muted mb-2">Listos</p>
+          <div className="rounded-lg bg-surface-2 border border-border p-2.5 opacity-70">
+            <p className="text-[11px] font-bold text-text">#0146</p>
+            <p className="text-[10px] text-accent">Avisado ✓</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoAnalitica() {
+  const barras = [40, 62, 50, 78, 68, 95, 85];
+  return (
+    <div>
+      <h3 className="text-base font-semibold text-text mb-1">Sabe qué se vende y cuándo</h3>
+      <p className="text-sm text-text-muted mb-5">Ingresos por día, productos top y tendencia frente al mes pasado.</p>
+      <div className="flex items-end gap-2 h-32 mb-3">
+        {barras.map((h, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-t-md bg-accent"
+            style={{ height: `${h}%`, opacity: 0.35 + (i / (barras.length - 1)) * 0.65 }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-xs text-accent font-medium">
+        <TrendingUp className="w-4 h-4" /> +18% frente al mes anterior
+      </div>
+    </div>
+  );
+}
+
+function DemoResenas() {
+  return (
+    <div>
+      <h3 className="text-base font-semibold text-text mb-1">Feedback sin tener que pedirlo</h3>
+      <p className="text-sm text-text-muted mb-5">Tras entregar, el bot pregunta. Tú recibes la valoración real.</p>
+      <div className="space-y-2.5 max-w-md">
+        <div className="rounded-xl border border-border bg-surface-2 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-text">Pedido #0146</p>
+            <p className="text-[11px] text-text-muted">&ldquo;Todo perfecto y rápido 👌&rdquo;</p>
+          </div>
+          <div className="text-accent text-sm">★★★★★</div>
+        </div>
+        <div className="rounded-xl border border-border bg-surface-2 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-text">Pedido #0142</p>
+            <p className="text-[11px] text-text-muted">&ldquo;Muy bueno, repetiré&rdquo;</p>
+          </div>
+          <div className="text-sm"><span className="text-accent">★★★★</span><span className="text-text-muted">★</span></div>
+        </div>
+        <div className="text-xs text-text-muted flex items-center gap-1.5">
+          <Star className="w-3.5 h-3.5 text-accent" /> Media: <strong className="text-text">4,8</strong> / 5
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoPlan() {
+  return (
+    <div>
+      <h3 className="text-base font-semibold text-text mb-1">Tu consumo, siempre a la vista</h3>
+      <p className="text-sm text-text-muted mb-5">Sabes cuántos pedidos llevas y te avisamos antes de pasarte.</p>
+      <div className="max-w-md rounded-xl border border-border bg-surface-2 p-4">
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="font-semibold text-text">Plan Básico</span>
+          <span className="text-text-muted tabular-nums">438 / 600 pedidos</span>
+        </div>
+        <div className="h-3 rounded-full bg-border overflow-hidden">
+          <div className="h-full rounded-full bg-accent" style={{ width: '73%' }} />
+        </div>
+        <p className="mt-3 text-[11px] text-text-muted leading-relaxed">
+          Vas al 73% del plan. A este ritmo llegarás a ~600. Te avisaremos si te conviene subir a Pro.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const FEATURES_DEMO = [
+  { key: 'kanban', icono: LayoutDashboard, label: 'Panel de pedidos', Comp: DemoKanban },
+  { key: 'analitica', icono: BarChart3, label: 'Analíticas', Comp: DemoAnalitica },
+  { key: 'resenas', icono: Star, label: 'Reseñas automáticas', Comp: DemoResenas },
+  { key: 'plan', icono: Gauge, label: 'Tu plan sin sorpresas', Comp: DemoPlan },
+];
+
+function MiraPorDentro() {
+  const [activa, setActiva] = useState('kanban');
+  const Activa = FEATURES_DEMO.find((f) => f.key === activa)?.Comp || DemoKanban;
+
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+      <Reveal>
+        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-text">Mira Comandi por dentro</h2>
+          <p className="mt-3 text-text-muted">
+            Toca cada función y verás cómo es de verdad. Sin registrarte, sin instalar nada.
+          </p>
+        </div>
+      </Reveal>
+      <Reveal>
+        <div className="grid lg:grid-cols-[260px_1fr] gap-4 sm:gap-5">
+          {/* Selector */}
+          <div className="flex lg:flex-col gap-2 overflow-x-auto pb-2 lg:pb-0 -mx-4 px-4 lg:mx-0 lg:px-0">
+            {FEATURES_DEMO.map((f) => {
+              const on = activa === f.key;
+              const Icono = f.icono;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setActiva(f.key)}
+                  aria-pressed={on}
+                  className={`shrink-0 text-left px-4 py-3 rounded-xl border flex items-center gap-3 transition-colors ${
+                    on ? 'border-accent/40 bg-accent/10' : 'border-border hover:bg-surface-2'
+                  }`}
+                >
+                  <Icono className={`w-4 h-4 ${on ? 'text-accent' : 'text-text-muted'}`} />
+                  <span className={`text-sm font-medium whitespace-nowrap ${on ? 'text-text' : 'text-text-muted'}`}>
+                    {f.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Escenario */}
+          <div className="card p-5 sm:p-7 min-h-[300px] sm:min-h-[320px]">
+            <Activa />
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
 // Colores fijos para la landing (los del modo oscuro de Comandi).
 // Se aplican inline para que no haya ningún flash gris mientras carga el CSS.
 const TEMA_LANDING = {
@@ -456,6 +746,9 @@ export default function PaginaLanding() {
         </div>
       </section>
 
+      {/* BANDA DE IMPACTO */}
+      <BandaImpacto />
+
       {/* CÓMO FUNCIONA */}
       <section id="como-funciona" className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <Reveal>
@@ -464,31 +757,17 @@ export default function PaginaLanding() {
               Cómo funciona
             </h2>
             <p className="mt-3 text-text-muted">
-              Tres pasos. Sin instalar nada en el móvil del cliente, sin formar a nadie.
+              Del primer mensaje a tu cocina, en cuatro pasos automáticos. Sin instalar nada, sin formar a nadie.
             </p>
           </div>
         </Reveal>
-        <StaggerChildren className="grid md:grid-cols-3 gap-5" stagger={0.06}>
-          <PasoCard
-            numero="1"
-            icono={MessageSquare}
-            titulo="Tu cliente escribe por WhatsApp"
-            texto="Como siempre. Saluda, pide, pregunta — usa su WhatsApp normal. No descarga nada, no aprende ningún proceso nuevo."
-          />
-          <PasoCard
-            numero="2"
-            icono={Bot}
-            titulo="La IA entiende el pedido"
-            texto="Aunque escriba con faltas, mezcle productos en una frase o diga 'sin cebolla'. Pide los datos que faltan: dirección, pago, cambio."
-          />
-          <PasoCard
-            numero="3"
-            icono={LayoutDashboard}
-            titulo="Tú lo gestionas en tu panel"
-            texto="Un kanban claro con los pedidos del día. Imprimes comanda con un clic, marcas estados, editas si hace falta. El cliente recibe el aviso solo."
-          />
-        </StaggerChildren>
+        <Reveal>
+          <ViajePedido />
+        </Reveal>
       </section>
+
+      {/* MIRA COMANDI POR DENTRO */}
+      <MiraPorDentro />
 
       {/* POR QUÉ COMANDI */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-20 relative">
