@@ -1179,16 +1179,18 @@ export default function PaginaPedidos() {
               <LogOut className="w-4 h-4" />
             </button>
 
+            {/* Separador entre acciones rápidas y el menú */}
+            <div className="h-6 w-px bg-border mx-1" />
+
             <div className="relative">
               <button
                 onClick={() => setMenuAbierto(v => !v)}
-                className="btn-secondary"
+                className="btn-ghost p-2.5"
                 aria-haspopup="menu"
                 aria-expanded={menuAbierto}
                 title="Menú de navegación"
               >
-                {menuAbierto ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-                <span className="hidden sm:inline">Menú</span>
+                {menuAbierto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
 
               {menuAbierto && (
