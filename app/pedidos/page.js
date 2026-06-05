@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
@@ -11,7 +11,8 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge,
+  LayoutDashboard, Menu
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -24,24 +25,49 @@ const HORA_INICIO_DIA = 6;
 // "Empezar preparación" para no confundir (en domicilio 'listo' = comida en
 // cocina, todavía quedan pasos; no es el final como en recogida).
 const FLUJO_DOMICILIO = {
-  recibido:   { label: 'Pedido recibido', tone: 'red',    siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
+  recibido:   { label: 'Pedido recibido', tone: 'amber',  siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
   listo:      { label: 'En preparación',  tone: 'yellow', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
   en_reparto: { label: 'En reparto',      tone: 'blue',   siguiente: 'entregado',  siguienteLabel: 'Marcar como entregado' },
   entregado:  { label: 'Entregado',       tone: 'green',  siguiente: null,         siguienteLabel: null },
 };
 
 const FLUJO_RECOGIDA = {
-  recibido:   { label: 'Pedido recibido',     tone: 'red',   siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
+  recibido:   { label: 'Pedido recibido',     tone: 'amber', siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
   listo:      { label: 'Listo para recoger',  tone: 'green', siguiente: null,    siguienteLabel: null },
 };
 
 const TONE_CLASSES = {
   red:    'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+  amber:  'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
   yellow: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
   blue:   'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
   green:  'bg-accent/10 text-accent border-accent/20',
   gray:   'bg-surface-2 text-text-muted border-border',
 };
+
+// Color de la franja izquierda de la tarjeta según el estado (tablero color-codificado)
+const TONE_STRIPE = {
+  red:    'border-l-red-500',
+  amber:  'border-l-amber-500',
+  yellow: 'border-l-yellow-500',
+  blue:   'border-l-blue-500',
+  green:  'border-l-accent',
+  gray:   'border-l-border',
+};
+
+// Enlaces de navegación del panel (se muestran en el menú desplegable)
+const LINKS_NAV = [
+  { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
+  { href: '/cocina',     icono: ChefHat,         label: 'Cocina' },
+  { href: '/carta',      icono: UtensilsCrossed, label: 'Carta' },
+  { href: '/horarios',   icono: Clock,           label: 'Horarios' },
+  { href: '/clientes',   icono: Users,           label: 'Clientes' },
+  { href: '/analiticas', icono: BarChart3,       label: 'Analíticas' },
+  { href: '/resenas',    icono: Star,            label: 'Reseñas' },
+  { href: '/plan',       icono: Gauge,           label: 'Plan' },
+  { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
+  { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
+];
 
 function flujoDe(pedido) {
   return pedido.tipo_entrega === 'recogida' ? FLUJO_RECOGIDA : FLUJO_DOMICILIO;
@@ -190,11 +216,13 @@ function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) 
 
   return (
     <div className="card p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Icono className="w-4 h-4 text-text-muted" />
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+          <Icono className="w-5 h-5 text-accent" />
+        </div>
         <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-text tabular-nums">{valor}</p>
+      <p className="text-3xl font-bold text-text tabular-nums">{valor}</p>
       {deltaContenido !== null ? (
         <div className={`flex items-center gap-1 mt-1 text-xs ${deltaClase}`}>
           {DeltaIcono && <DeltaIcono className="w-3 h-3" />}
@@ -210,6 +238,7 @@ function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) 
 
 export default function PaginaPedidos() {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = crearClienteSupabase();
 
   const [usuario, setUsuario] = useState(null);
@@ -231,6 +260,7 @@ export default function PaginaPedidos() {
   const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
 
   const [pestana, setPestana] = useState('hoy');
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
@@ -1021,10 +1051,10 @@ export default function PaginaPedidos() {
     return (
       <button
         onClick={() => abrirPedido(p)}
-        className={`group w-full text-left card p-3.5 hover:shadow-lift transition-all duration-200 animate-fade-in ${
+        className={`group w-full text-left card p-4 border-l-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
           olvidado
-            ? 'border-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
-            : 'hover:border-accent/30'
+            ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
+            : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30`
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -1056,9 +1086,11 @@ export default function PaginaPedidos() {
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-xs text-text-muted tabular-nums">{telefonoLimpio(p.cliente_telefono)}</span>
-          <span className="text-base font-semibold text-text tabular-nums">
+        <div className="flex justify-between items-center gap-2 pt-2 border-t border-border">
+          <span className="text-sm font-medium text-text truncate">
+            {p.cliente_nombre || telefonoLimpio(p.cliente_telefono)}
+          </span>
+          <span className="text-lg font-bold text-text tabular-nums flex-shrink-0">
             {Number(p.total).toFixed(2)}€
           </span>
         </div>
@@ -1129,52 +1161,11 @@ export default function PaginaPedidos() {
             </div>
           </div>
 
-          {/* Navegación */}
-          <nav className="flex items-center gap-1">
-            <a href="/cocina" className="nav-link hidden md:inline-flex" title="Vista cocina">
-              <ChefHat className="w-4 h-4" />
-              <span className="hidden lg:inline">Cocina</span>
-            </a>
-            <a href="/carta" className="nav-link hidden md:inline-flex" title="Carta">
-              <UtensilsCrossed className="w-4 h-4" />
-              <span className="hidden lg:inline">Carta</span>
-            </a>
-            <a href="/horarios" className="nav-link hidden md:inline-flex" title="Horarios">
-              <Clock className="w-4 h-4" />
-              <span className="hidden lg:inline">Horarios</span>
-            </a>
-            <a href="/clientes" className="nav-link hidden md:inline-flex" title="Clientes">
-              <Users className="w-4 h-4" />
-              <span className="hidden lg:inline">Clientes</span>
-            </a>
-            <a href="/analiticas" className="nav-link hidden md:inline-flex" title="Analíticas">
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden lg:inline">Analíticas</span>
-            </a>
-            <a href="/resenas" className="nav-link hidden md:inline-flex" title="Reseñas">
-              <Star className="w-4 h-4" />
-              <span className="hidden lg:inline">Reseñas</span>
-            </a>
-            <a href="/plan" className="nav-link hidden md:inline-flex" title="Tu plan">
-              <Gauge className="w-4 h-4" />
-              <span className="hidden lg:inline">Plan</span>
-            </a>
-            <a href="/ajustes" className="nav-link hidden md:inline-flex" title="Ajustes">
-              <Settings className="w-4 h-4" />
-              <span className="hidden lg:inline">Ajustes</span>
-            </a>
-            {esAdmin && (
-              <a href="/admin" className="nav-link hidden md:inline-flex" title="Admin">
-                <Shield className="w-4 h-4" />
-                <span className="hidden lg:inline">Admin</span>
-              </a>
-            )}
-
-            <div className="h-6 w-px bg-border mx-1 hidden md:block" />
-
+          {/* Acciones: tema, salir y menú desplegable */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={alternarTema}
-              className="btn-ghost p-2"
+              className="btn-ghost p-2.5"
               title={modoOscuro ? 'Modo claro' : 'Modo oscuro'}
             >
               {modoOscuro ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -1182,45 +1173,58 @@ export default function PaginaPedidos() {
 
             <button
               onClick={cerrarSesion}
-              className="btn-ghost p-2"
+              className="btn-ghost p-2.5"
               title="Cerrar sesión"
             >
               <LogOut className="w-4 h-4" />
             </button>
-          </nav>
-        </div>
 
-        {/* Menú móvil compacto */}
-        <div className="md:hidden border-t border-border px-4 py-2 flex gap-1 overflow-x-auto">
-          <a href="/cocina" className="nav-link whitespace-nowrap">
-            <ChefHat className="w-4 h-4" />Cocina
-          </a>
-          <a href="/carta" className="nav-link whitespace-nowrap">
-            <UtensilsCrossed className="w-4 h-4" />Carta
-          </a>
-          <a href="/horarios" className="nav-link whitespace-nowrap">
-            <Clock className="w-4 h-4" />Horarios
-          </a>
-          <a href="/clientes" className="nav-link whitespace-nowrap">
-            <Users className="w-4 h-4" />Clientes
-          </a>
-          <a href="/analiticas" className="nav-link whitespace-nowrap">
-            <BarChart3 className="w-4 h-4" />Analíticas
-          </a>
-          <a href="/resenas" className="nav-link whitespace-nowrap">
-            <Star className="w-4 h-4" />Reseñas
-          </a>
-          <a href="/plan" className="nav-link whitespace-nowrap">
-            <Gauge className="w-4 h-4" />Plan
-          </a>
-          <a href="/ajustes" className="nav-link whitespace-nowrap">
-            <Settings className="w-4 h-4" />Ajustes
-          </a>
-          {esAdmin && (
-            <a href="/admin" className="nav-link whitespace-nowrap">
-              <Shield className="w-4 h-4" />Admin
-            </a>
-          )}
+            {/* Separador entre acciones rápidas y el menú */}
+            <div className="h-6 w-px bg-border mx-1" />
+
+            <div className="relative">
+              <button
+                onClick={() => setMenuAbierto(v => !v)}
+                className="btn-ghost p-2.5"
+                aria-haspopup="menu"
+                aria-expanded={menuAbierto}
+                title="Menú de navegación"
+              >
+                {menuAbierto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+
+              {menuAbierto && (
+                <>
+                  {/* Capa para cerrar al pulsar fuera */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMenuAbierto(false)}
+                    aria-hidden
+                  />
+                  <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
+                    {LINKS_NAV.map(({ href, icono: Icono, label, soloAdmin }) => (
+                      (!soloAdmin || esAdmin) && (
+                        <a
+                          key={href}
+                          href={href}
+                          role="menuitem"
+                          onClick={() => setMenuAbierto(false)}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            pathname === href
+                              ? 'bg-accent/10 text-accent'
+                              : 'text-text-muted hover:text-text hover:bg-surface-2'
+                          }`}
+                        >
+                          <Icono className="w-4 h-4 flex-shrink-0" />
+                          {label}
+                        </a>
+                      )
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1260,7 +1264,7 @@ export default function PaginaPedidos() {
             onClick={() => setPestana('hoy')}
             className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
               pestana === 'hoy'
-                ? 'border-accent text-text'
+                ? 'border-accent text-accent'
                 : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
@@ -1274,7 +1278,7 @@ export default function PaginaPedidos() {
             onClick={() => setPestana('historial')}
             className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
               pestana === 'historial'
-                ? 'border-accent text-text'
+                ? 'border-accent text-accent'
                 : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
@@ -1327,7 +1331,7 @@ export default function PaginaPedidos() {
                 <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
                 <span className="text-sm font-medium text-text">Estadísticas del día</span>
                 {!statsAbiertas && (
-                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate hidden sm:inline">
+                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate">
                     {estadisticas.pedidosHoy} pedidos · {estadisticas.ingresosHoy.toFixed(2)}€
                   </span>
                 )}
@@ -1390,12 +1394,12 @@ export default function PaginaPedidos() {
         {pestana === 'hoy' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Columna RECIBIDOS */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
               <div className="mb-3 px-1 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse-soft" />
-                    <h2 className="text-sm font-semibold text-text">Recibidos</h2>
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft" />
+                    <h2 className="text-base font-bold text-text">Recibidos</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Hay que prepararlos</p>
                 </div>
@@ -1415,12 +1419,12 @@ export default function PaginaPedidos() {
             </div>
 
             {/* Columna EN PROCESO */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
               <div className="mb-3 px-1 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                    <h2 className="text-sm font-semibold text-text">En proceso</h2>
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <h2 className="text-base font-bold text-text">En proceso</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Listos o en reparto</p>
                 </div>
@@ -1440,7 +1444,7 @@ export default function PaginaPedidos() {
             </div>
 
             {/* Columna FINALIZADOS (plegable) */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-accent/50">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
                 className="w-full mb-3 px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
@@ -1448,7 +1452,7 @@ export default function PaginaPedidos() {
                 <div className="text-left">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-accent" />
-                    <h2 className="text-sm font-semibold text-text">Finalizados</h2>
+                    <h2 className="text-base font-bold text-text">Finalizados</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Entregados o recogidos</p>
                 </div>
@@ -1582,7 +1586,16 @@ export default function PaginaPedidos() {
             ) : historialPedidos.length === 0 ? (
               <div className="py-12 text-center text-text-muted">
                 <Receipt className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p>No hay pedidos que coincidan.</p>
+                {(filtroBusqueda || filtroProducto || filtroFechaDesde || filtroFechaHasta || filtroEstado) ? (
+                  <>
+                    <p>Ningún pedido coincide con los filtros.</p>
+                    <button onClick={limpiarFiltros} className="btn-secondary text-sm mt-3">
+                      Quitar filtros
+                    </button>
+                  </>
+                ) : (
+                  <p>Aún no tienes pedidos en el historial.</p>
+                )}
               </div>
             ) : (
               <div className="card overflow-x-auto">
@@ -1964,7 +1977,7 @@ export default function PaginaPedidos() {
                             <span className="font-medium text-text tabular-nums">{(l.cantidad * l.precio_unitario).toFixed(2)}€</span>
                           </div>
                           {l.notas && l.notas.trim() !== '' && (
-                            <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-2 py-1 mt-1.5 italic">
+                            <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 dark:bg-yellow-500/15 border border-yellow-500/20 dark:border-yellow-500/30 rounded-md px-2 py-1 mt-1.5 italic">
                               {l.notas}
                             </p>
                           )}

@@ -280,7 +280,7 @@ export default function PaginaCocina() {
                             <span className="font-medium">{l.nombre_producto}</span>
                           </p>
                           {l.notas && l.notas.trim() !== '' && (
-                            <p className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-2 py-1 mt-1.5 italic">
+                            <p className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 dark:bg-yellow-500/15 border border-yellow-500/20 dark:border-yellow-500/30 rounded-md px-2 py-1 mt-1.5 italic">
                               → {l.notas}
                             </p>
                           )}
