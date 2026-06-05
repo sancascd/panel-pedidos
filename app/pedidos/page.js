@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
+import MenuNav from '@/components/MenuNav';
 import {
-  Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
+  Sun, Moon, LogOut, Clock, UtensilsCrossed,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge,
-  LayoutDashboard, Menu
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, Download
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -54,20 +54,6 @@ const TONE_STRIPE = {
   green:  'border-l-accent',
   gray:   'border-l-border',
 };
-
-// Enlaces de navegación del panel (se muestran en el menú desplegable)
-const LINKS_NAV = [
-  { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
-  { href: '/cocina',     icono: ChefHat,         label: 'Cocina' },
-  { href: '/carta',      icono: UtensilsCrossed, label: 'Carta' },
-  { href: '/horarios',   icono: Clock,           label: 'Horarios' },
-  { href: '/clientes',   icono: Users,           label: 'Clientes' },
-  { href: '/analiticas', icono: BarChart3,       label: 'Analíticas' },
-  { href: '/resenas',    icono: Star,            label: 'Reseñas' },
-  { href: '/plan',       icono: Gauge,           label: 'Plan' },
-  { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
-  { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
-];
 
 function flujoDe(pedido) {
   return pedido.tipo_entrega === 'recogida' ? FLUJO_RECOGIDA : FLUJO_DOMICILIO;
@@ -238,7 +224,6 @@ function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) 
 
 export default function PaginaPedidos() {
   const router = useRouter();
-  const pathname = usePathname();
   const supabase = crearClienteSupabase();
 
   const [usuario, setUsuario] = useState(null);
@@ -260,7 +245,6 @@ export default function PaginaPedidos() {
   const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
 
   const [pestana, setPestana] = useState('hoy');
-  const [menuAbierto, setMenuAbierto] = useState(false);
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
@@ -1182,48 +1166,7 @@ export default function PaginaPedidos() {
             {/* Separador entre acciones rápidas y el menú */}
             <div className="h-6 w-px bg-border mx-1" />
 
-            <div className="relative">
-              <button
-                onClick={() => setMenuAbierto(v => !v)}
-                className="btn-ghost p-2.5"
-                aria-haspopup="menu"
-                aria-expanded={menuAbierto}
-                title="Menú de navegación"
-              >
-                {menuAbierto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-
-              {menuAbierto && (
-                <>
-                  {/* Capa para cerrar al pulsar fuera */}
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setMenuAbierto(false)}
-                    aria-hidden
-                  />
-                  <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
-                    {LINKS_NAV.map(({ href, icono: Icono, label, soloAdmin }) => (
-                      (!soloAdmin || esAdmin) && (
-                        <a
-                          key={href}
-                          href={href}
-                          role="menuitem"
-                          onClick={() => setMenuAbierto(false)}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                            pathname === href
-                              ? 'bg-accent/10 text-accent'
-                              : 'text-text-muted hover:text-text hover:bg-surface-2'
-                          }`}
-                        >
-                          <Icono className="w-4 h-4 flex-shrink-0" />
-                          {label}
-                        </a>
-                      )
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <MenuNav esAdmin={esAdmin} />
           </div>
         </div>
       </header>

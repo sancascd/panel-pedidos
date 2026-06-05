@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
   Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare
@@ -234,10 +235,14 @@ export default function PaginaAjustes() {
               <p className="text-xs text-text-muted hidden sm:block">Datos de tu restaurante</p>
             </div>
           </div>
-          <a href="/pedidos" className="btn-ghost">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Volver</span>
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="/pedidos" className="btn-ghost">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Volver</span>
+            </a>
+            <div className="h-6 w-px bg-border mx-1" />
+            <MenuNav />
+          </div>
         </div>
       </header>
 

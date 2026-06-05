@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import MenuNav from '@/components/MenuNav';
 import { minutosDesde } from '@/lib/fechas';
 import {
   ChefHat, Home, Store, ArrowLeft, Volume2, VolumeX,
@@ -207,6 +208,8 @@ export default function PaginaCocina() {
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Volver al panel</span>
             </a>
+            <div className="h-6 w-px bg-border mx-1" />
+            <MenuNav />
           </div>
         </div>
       </header>
