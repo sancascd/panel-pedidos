@@ -24,19 +24,20 @@ const HORA_INICIO_DIA = 6;
 // "Empezar preparación" para no confundir (en domicilio 'listo' = comida en
 // cocina, todavía quedan pasos; no es el final como en recogida).
 const FLUJO_DOMICILIO = {
-  recibido:   { label: 'Pedido recibido', tone: 'red',    siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
+  recibido:   { label: 'Pedido recibido', tone: 'amber',  siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
   listo:      { label: 'En preparación',  tone: 'yellow', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
   en_reparto: { label: 'En reparto',      tone: 'blue',   siguiente: 'entregado',  siguienteLabel: 'Marcar como entregado' },
   entregado:  { label: 'Entregado',       tone: 'green',  siguiente: null,         siguienteLabel: null },
 };
 
 const FLUJO_RECOGIDA = {
-  recibido:   { label: 'Pedido recibido',     tone: 'red',   siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
+  recibido:   { label: 'Pedido recibido',     tone: 'amber', siguiente: 'listo', siguienteLabel: 'Marcar como listo' },
   listo:      { label: 'Listo para recoger',  tone: 'green', siguiente: null,    siguienteLabel: null },
 };
 
 const TONE_CLASSES = {
   red:    'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+  amber:  'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
   yellow: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
   blue:   'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
   green:  'bg-accent/10 text-accent border-accent/20',
@@ -1021,7 +1022,7 @@ export default function PaginaPedidos() {
     return (
       <button
         onClick={() => abrirPedido(p)}
-        className={`group w-full text-left card p-3.5 hover:shadow-lift transition-all duration-200 animate-fade-in ${
+        className={`group w-full text-left card p-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
           olvidado
             ? 'border-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
             : 'hover:border-accent/30'
@@ -1056,9 +1057,11 @@ export default function PaginaPedidos() {
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-xs text-text-muted tabular-nums">{telefonoLimpio(p.cliente_telefono)}</span>
-          <span className="text-base font-semibold text-text tabular-nums">
+        <div className="flex justify-between items-center gap-2 pt-2 border-t border-border">
+          <span className="text-sm font-medium text-text truncate">
+            {p.cliente_nombre || telefonoLimpio(p.cliente_telefono)}
+          </span>
+          <span className="text-lg font-bold text-text tabular-nums flex-shrink-0">
             {Number(p.total).toFixed(2)}€
           </span>
         </div>
@@ -1327,7 +1330,7 @@ export default function PaginaPedidos() {
                 <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
                 <span className="text-sm font-medium text-text">Estadísticas del día</span>
                 {!statsAbiertas && (
-                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate hidden sm:inline">
+                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate">
                     {estadisticas.pedidosHoy} pedidos · {estadisticas.ingresosHoy.toFixed(2)}€
                   </span>
                 )}
@@ -1394,7 +1397,7 @@ export default function PaginaPedidos() {
               <div className="mb-3 px-1 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse-soft" />
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft" />
                     <h2 className="text-sm font-semibold text-text">Recibidos</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Hay que prepararlos</p>
@@ -1582,7 +1585,16 @@ export default function PaginaPedidos() {
             ) : historialPedidos.length === 0 ? (
               <div className="py-12 text-center text-text-muted">
                 <Receipt className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p>No hay pedidos que coincidan.</p>
+                {(filtroBusqueda || filtroProducto || filtroFechaDesde || filtroFechaHasta || filtroEstado) ? (
+                  <>
+                    <p>Ningún pedido coincide con los filtros.</p>
+                    <button onClick={limpiarFiltros} className="btn-secondary text-sm mt-3">
+                      Quitar filtros
+                    </button>
+                  </>
+                ) : (
+                  <p>Aún no tienes pedidos en el historial.</p>
+                )}
               </div>
             ) : (
               <div className="card overflow-x-auto">
@@ -1964,7 +1976,7 @@ export default function PaginaPedidos() {
                             <span className="font-medium text-text tabular-nums">{(l.cantidad * l.precio_unitario).toFixed(2)}€</span>
                           </div>
                           {l.notas && l.notas.trim() !== '' && (
-                            <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-2 py-1 mt-1.5 italic">
+                            <p className="text-xs text-yellow-700 dark:text-yellow-400 bg-yellow-500/10 dark:bg-yellow-500/15 border border-yellow-500/20 dark:border-yellow-500/30 rounded-md px-2 py-1 mt-1.5 italic">
                               {l.notas}
                             </p>
                           )}
