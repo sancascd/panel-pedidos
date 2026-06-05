@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
+import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import {
   Sun, Moon, LogOut, Settings, Clock, UtensilsCrossed, Shield,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
@@ -528,17 +529,21 @@ export default function PaginaPedidos() {
 
     if (usaProducto) {
       query = query.select('*, lineas_pedido!inner(nombre_producto)');
-      query = query.ilike('lineas_pedido.nombre_producto', '%' + filtroProducto.trim() + '%');
+      // Búsqueda literal: escapamos los comodines de LIKE (% _ \) del input.
+      query = query.ilike('lineas_pedido.nombre_producto', '%' + escaparComodinesLike(filtroProducto.trim()) + '%');
     } else {
       query = query.select('*');
     }
 
     query = query.order('creado_en', { ascending: false });
 
-    // Búsqueda por nombre o teléfono (OR)
+    // Búsqueda por nombre o teléfono (OR). Entrecomillamos el valor para que
+    // comas/paréntesis/puntos del input se traten como texto literal y no rompan
+    // (ni manipulen) la sintaxis del filtro de PostgREST. RLS ya limita los datos
+    // al propio restaurante; esto es robustez + búsqueda predecible.
     if (filtroBusqueda.trim()) {
-      const q = filtroBusqueda.trim().replace(/[,()]/g, '');
-      query = query.or(`cliente_nombre.ilike.%${q}%,cliente_telefono.ilike.%${q}%`);
+      const val = valorContienePostgrest(filtroBusqueda.trim());
+      query = query.or(`cliente_nombre.ilike.${val},cliente_telefono.ilike.${val}`);
     }
 
     // Rango de fechas
