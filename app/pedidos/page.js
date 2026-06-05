@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Fragment } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
@@ -11,7 +11,8 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge
+  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge,
+  LayoutDashboard
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -42,6 +43,16 @@ const TONE_CLASSES = {
   blue:   'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
   green:  'bg-accent/10 text-accent border-accent/20',
   gray:   'bg-surface-2 text-text-muted border-border',
+};
+
+// Color de la franja izquierda de la tarjeta según el estado (tablero color-codificado)
+const TONE_STRIPE = {
+  red:    'border-l-red-500',
+  amber:  'border-l-amber-500',
+  yellow: 'border-l-yellow-500',
+  blue:   'border-l-blue-500',
+  green:  'border-l-accent',
+  gray:   'border-l-border',
 };
 
 function flujoDe(pedido) {
@@ -191,11 +202,13 @@ function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) 
 
   return (
     <div className="card p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Icono className="w-4 h-4 text-text-muted" />
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+          <Icono className="w-5 h-5 text-accent" />
+        </div>
         <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-text tabular-nums">{valor}</p>
+      <p className="text-3xl font-bold text-text tabular-nums">{valor}</p>
       {deltaContenido !== null ? (
         <div className={`flex items-center gap-1 mt-1 text-xs ${deltaClase}`}>
           {DeltaIcono && <DeltaIcono className="w-3 h-3" />}
@@ -211,6 +224,7 @@ function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) 
 
 export default function PaginaPedidos() {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = crearClienteSupabase();
 
   const [usuario, setUsuario] = useState(null);
@@ -1022,10 +1036,10 @@ export default function PaginaPedidos() {
     return (
       <button
         onClick={() => abrirPedido(p)}
-        className={`group w-full text-left card p-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
+        className={`group w-full text-left card p-4 border-l-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
           olvidado
-            ? 'border-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
-            : 'hover:border-accent/30'
+            ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
+            : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30`
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -1134,6 +1148,10 @@ export default function PaginaPedidos() {
 
           {/* Navegación */}
           <nav className="flex items-center gap-1">
+            <a href="/pedidos" className={`nav-link hidden md:inline-flex ${pathname === '/pedidos' ? 'bg-accent/10 text-accent' : ''}`} title="Tablero de pedidos">
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="hidden lg:inline">Tablero</span>
+            </a>
             <a href="/cocina" className="nav-link hidden md:inline-flex" title="Vista cocina">
               <ChefHat className="w-4 h-4" />
               <span className="hidden lg:inline">Cocina</span>
@@ -1195,6 +1213,9 @@ export default function PaginaPedidos() {
 
         {/* Menú móvil compacto */}
         <div className="md:hidden border-t border-border px-4 py-2 flex gap-1 overflow-x-auto">
+          <a href="/pedidos" className={`nav-link whitespace-nowrap ${pathname === '/pedidos' ? 'bg-accent/10 text-accent' : ''}`}>
+            <LayoutDashboard className="w-4 h-4" />Tablero
+          </a>
           <a href="/cocina" className="nav-link whitespace-nowrap">
             <ChefHat className="w-4 h-4" />Cocina
           </a>
@@ -1263,7 +1284,7 @@ export default function PaginaPedidos() {
             onClick={() => setPestana('hoy')}
             className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
               pestana === 'hoy'
-                ? 'border-accent text-text'
+                ? 'border-accent text-accent'
                 : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
@@ -1277,7 +1298,7 @@ export default function PaginaPedidos() {
             onClick={() => setPestana('historial')}
             className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
               pestana === 'historial'
-                ? 'border-accent text-text'
+                ? 'border-accent text-accent'
                 : 'border-transparent text-text-muted hover:text-text'
             }`}
           >
@@ -1393,12 +1414,12 @@ export default function PaginaPedidos() {
         {pestana === 'hoy' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Columna RECIBIDOS */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
               <div className="mb-3 px-1 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft" />
-                    <h2 className="text-sm font-semibold text-text">Recibidos</h2>
+                    <h2 className="text-base font-bold text-text">Recibidos</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Hay que prepararlos</p>
                 </div>
@@ -1418,12 +1439,12 @@ export default function PaginaPedidos() {
             </div>
 
             {/* Columna EN PROCESO */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
               <div className="mb-3 px-1 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                    <h2 className="text-sm font-semibold text-text">En proceso</h2>
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <h2 className="text-base font-bold text-text">En proceso</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Listos o en reparto</p>
                 </div>
@@ -1443,7 +1464,7 @@ export default function PaginaPedidos() {
             </div>
 
             {/* Columna FINALIZADOS (plegable) */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border">
+            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-accent/50">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
                 className="w-full mb-3 px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
@@ -1451,7 +1472,7 @@ export default function PaginaPedidos() {
                 <div className="text-left">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-accent" />
-                    <h2 className="text-sm font-semibold text-text">Finalizados</h2>
+                    <h2 className="text-base font-bold text-text">Finalizados</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Entregados o recogidos</p>
                 </div>
