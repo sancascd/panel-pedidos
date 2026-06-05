@@ -12,7 +12,7 @@ import {
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
   ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, ChefHat, Download, Users, BarChart3, Gauge,
-  LayoutDashboard
+  LayoutDashboard, Menu
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -54,6 +54,20 @@ const TONE_STRIPE = {
   green:  'border-l-accent',
   gray:   'border-l-border',
 };
+
+// Enlaces de navegación del panel (se muestran en el menú desplegable)
+const LINKS_NAV = [
+  { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
+  { href: '/cocina',     icono: ChefHat,         label: 'Cocina' },
+  { href: '/carta',      icono: UtensilsCrossed, label: 'Carta' },
+  { href: '/horarios',   icono: Clock,           label: 'Horarios' },
+  { href: '/clientes',   icono: Users,           label: 'Clientes' },
+  { href: '/analiticas', icono: BarChart3,       label: 'Analíticas' },
+  { href: '/resenas',    icono: Star,            label: 'Reseñas' },
+  { href: '/plan',       icono: Gauge,           label: 'Plan' },
+  { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
+  { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
+];
 
 function flujoDe(pedido) {
   return pedido.tipo_entrega === 'recogida' ? FLUJO_RECOGIDA : FLUJO_DOMICILIO;
@@ -246,6 +260,7 @@ export default function PaginaPedidos() {
   const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
 
   const [pestana, setPestana] = useState('hoy');
+  const [menuAbierto, setMenuAbierto] = useState(false);
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
@@ -1146,56 +1161,11 @@ export default function PaginaPedidos() {
             </div>
           </div>
 
-          {/* Navegación */}
-          <nav className="flex items-center gap-1">
-            <a href="/pedidos" className={`nav-link hidden md:inline-flex ${pathname === '/pedidos' ? 'bg-accent/10 text-accent' : ''}`} title="Tablero de pedidos">
-              <LayoutDashboard className="w-4 h-4" />
-              <span className="hidden lg:inline">Tablero</span>
-            </a>
-            <a href="/cocina" className="nav-link hidden md:inline-flex" title="Vista cocina">
-              <ChefHat className="w-4 h-4" />
-              <span className="hidden lg:inline">Cocina</span>
-            </a>
-            <a href="/carta" className="nav-link hidden md:inline-flex" title="Carta">
-              <UtensilsCrossed className="w-4 h-4" />
-              <span className="hidden lg:inline">Carta</span>
-            </a>
-            <a href="/horarios" className="nav-link hidden md:inline-flex" title="Horarios">
-              <Clock className="w-4 h-4" />
-              <span className="hidden lg:inline">Horarios</span>
-            </a>
-            <a href="/clientes" className="nav-link hidden md:inline-flex" title="Clientes">
-              <Users className="w-4 h-4" />
-              <span className="hidden lg:inline">Clientes</span>
-            </a>
-            <a href="/analiticas" className="nav-link hidden md:inline-flex" title="Analíticas">
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden lg:inline">Analíticas</span>
-            </a>
-            <a href="/resenas" className="nav-link hidden md:inline-flex" title="Reseñas">
-              <Star className="w-4 h-4" />
-              <span className="hidden lg:inline">Reseñas</span>
-            </a>
-            <a href="/plan" className="nav-link hidden md:inline-flex" title="Tu plan">
-              <Gauge className="w-4 h-4" />
-              <span className="hidden lg:inline">Plan</span>
-            </a>
-            <a href="/ajustes" className="nav-link hidden md:inline-flex" title="Ajustes">
-              <Settings className="w-4 h-4" />
-              <span className="hidden lg:inline">Ajustes</span>
-            </a>
-            {esAdmin && (
-              <a href="/admin" className="nav-link hidden md:inline-flex" title="Admin">
-                <Shield className="w-4 h-4" />
-                <span className="hidden lg:inline">Admin</span>
-              </a>
-            )}
-
-            <div className="h-6 w-px bg-border mx-1 hidden md:block" />
-
+          {/* Acciones: tema, salir y menú desplegable */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={alternarTema}
-              className="btn-ghost p-2"
+              className="btn-ghost p-2.5"
               title={modoOscuro ? 'Modo claro' : 'Modo oscuro'}
             >
               {modoOscuro ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -1203,48 +1173,56 @@ export default function PaginaPedidos() {
 
             <button
               onClick={cerrarSesion}
-              className="btn-ghost p-2"
+              className="btn-ghost p-2.5"
               title="Cerrar sesión"
             >
               <LogOut className="w-4 h-4" />
             </button>
-          </nav>
-        </div>
 
-        {/* Menú móvil compacto */}
-        <div className="md:hidden border-t border-border px-4 py-2 flex gap-1 overflow-x-auto">
-          <a href="/pedidos" className={`nav-link whitespace-nowrap ${pathname === '/pedidos' ? 'bg-accent/10 text-accent' : ''}`}>
-            <LayoutDashboard className="w-4 h-4" />Tablero
-          </a>
-          <a href="/cocina" className="nav-link whitespace-nowrap">
-            <ChefHat className="w-4 h-4" />Cocina
-          </a>
-          <a href="/carta" className="nav-link whitespace-nowrap">
-            <UtensilsCrossed className="w-4 h-4" />Carta
-          </a>
-          <a href="/horarios" className="nav-link whitespace-nowrap">
-            <Clock className="w-4 h-4" />Horarios
-          </a>
-          <a href="/clientes" className="nav-link whitespace-nowrap">
-            <Users className="w-4 h-4" />Clientes
-          </a>
-          <a href="/analiticas" className="nav-link whitespace-nowrap">
-            <BarChart3 className="w-4 h-4" />Analíticas
-          </a>
-          <a href="/resenas" className="nav-link whitespace-nowrap">
-            <Star className="w-4 h-4" />Reseñas
-          </a>
-          <a href="/plan" className="nav-link whitespace-nowrap">
-            <Gauge className="w-4 h-4" />Plan
-          </a>
-          <a href="/ajustes" className="nav-link whitespace-nowrap">
-            <Settings className="w-4 h-4" />Ajustes
-          </a>
-          {esAdmin && (
-            <a href="/admin" className="nav-link whitespace-nowrap">
-              <Shield className="w-4 h-4" />Admin
-            </a>
-          )}
+            <div className="relative">
+              <button
+                onClick={() => setMenuAbierto(v => !v)}
+                className="btn-secondary"
+                aria-haspopup="menu"
+                aria-expanded={menuAbierto}
+                title="Menú de navegación"
+              >
+                {menuAbierto ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+                <span className="hidden sm:inline">Menú</span>
+              </button>
+
+              {menuAbierto && (
+                <>
+                  {/* Capa para cerrar al pulsar fuera */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMenuAbierto(false)}
+                    aria-hidden
+                  />
+                  <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
+                    {LINKS_NAV.map(({ href, icono: Icono, label, soloAdmin }) => (
+                      (!soloAdmin || esAdmin) && (
+                        <a
+                          key={href}
+                          href={href}
+                          role="menuitem"
+                          onClick={() => setMenuAbierto(false)}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            pathname === href
+                              ? 'bg-accent/10 text-accent'
+                              : 'text-text-muted hover:text-text hover:bg-surface-2'
+                          }`}
+                        >
+                          <Icono className="w-4 h-4 flex-shrink-0" />
+                          {label}
+                        </a>
+                      )
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
