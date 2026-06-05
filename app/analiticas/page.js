@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import MenuNav from '@/components/MenuNav';
 import { parsearFechaUTC } from '@/lib/fechas';
 import {
   BarChart3, ArrowLeft, Loader2, TrendingUp, TrendingDown,
@@ -136,6 +137,8 @@ export default function PaginaAnaliticas() {
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Volver</span>
             </a>
+            <div className="h-6 w-px bg-border mx-1" />
+            <MenuNav />
           </div>
         </div>
       </header>

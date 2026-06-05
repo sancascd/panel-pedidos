@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Users, Loader2, AlertCircle, CheckCircle2,
   Send, Search, Sparkles, X, Megaphone, ShieldAlert,
@@ -346,10 +347,14 @@ export default function PaginaClientes() {
               <p className="text-xs text-text-muted hidden sm:block">Lista de clientes y campañas de marketing</p>
             </div>
           </div>
-          <a href="/pedidos" className="btn-ghost">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Volver</span>
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="/pedidos" className="btn-ghost">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Volver</span>
+            </a>
+            <div className="h-6 w-px bg-border mx-1" />
+            <MenuNav />
+          </div>
         </div>
       </header>
 

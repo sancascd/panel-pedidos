@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, GripVertical,
   UtensilsCrossed, Loader2, AlertCircle, ChevronDown, ChevronRight
@@ -184,10 +185,14 @@ export default function PaginaCarta() {
               <p className="text-xs text-text-muted hidden sm:block">Categorías y productos</p>
             </div>
           </div>
-          <a href="/pedidos" className="btn-ghost">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Volver</span>
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="/pedidos" className="btn-ghost">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">Volver</span>
+            </a>
+            <div className="h-6 w-px bg-border mx-1" />
+            <MenuNav />
+          </div>
         </div>
       </header>
 
