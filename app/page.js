@@ -1171,8 +1171,8 @@ export default function PaginaLanding() {
               </div>
               <p className="text-xs text-text-muted leading-relaxed">
                 Comandi — SCD TECH SL<br />
-                NIF [NIF/CIF]<br />
-                [DIRECCIÓN FISCAL]<br />
+                NIF B88886437<br />
+                Calle Manuel Soro Tinte, 3 · 14001<br />
                 Córdoba, España
               </p>
             </div>
