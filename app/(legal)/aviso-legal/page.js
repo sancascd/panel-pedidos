@@ -18,8 +18,8 @@ export default function AvisoLegal() {
           </p>
           <ul className="mt-3 space-y-1 text-text-muted">
             <li><strong className="text-text">Titular:</strong> SCD TECH SL</li>
-            <li><strong className="text-text">NIF/CIF:</strong> [NIF]</li>
-            <li><strong className="text-text">Domicilio:</strong> [DIRECCIÓN FISCAL]</li>
+            <li><strong className="text-text">NIF/CIF:</strong> B88886437</li>
+            <li><strong className="text-text">Domicilio:</strong> Calle Manuel Soro Tinte, 3, 14001 Córdoba</li>
             <li><strong className="text-text">Email de contacto:</strong> info@comandi.es</li>
             <li><strong className="text-text">Sitio web:</strong> https://comandi.es</li>
           </ul>

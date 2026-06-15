@@ -83,8 +83,8 @@ export default function Contacto() {
             <h2 className="text-base font-semibold text-text mb-1">Dirección</h2>
             <p className="text-sm text-text-muted">
               Comandi — SCD TECH SL<br />
-              NIF [NIF]<br />
-              [DIRECCIÓN FISCAL]<br />
+              NIF B88886437<br />
+              Calle Manuel Soro Tinte, 3 · 14001<br />
               Córdoba, España
             </p>
           </div>

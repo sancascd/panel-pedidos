@@ -19,8 +19,8 @@ export default function Privacidad() {
           </p>
           <ul className="mt-3 space-y-1 text-text-muted">
             <li><strong className="text-text">Responsable:</strong> SCD TECH SL</li>
-            <li><strong className="text-text">NIF/CIF:</strong> [NIF]</li>
-            <li><strong className="text-text">Domicilio:</strong> [DIRECCIÓN FISCAL]</li>
+            <li><strong className="text-text">NIF/CIF:</strong> B88886437</li>
+            <li><strong className="text-text">Domicilio:</strong> Calle Manuel Soro Tinte, 3, 14001 Córdoba</li>
             <li><strong className="text-text">Email:</strong> info@comandi.es</li>
           </ul>
         </section>
