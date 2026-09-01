@@ -87,6 +87,7 @@ export default function PaginaAjustes() {
     direccion: '',
     email_contacto: '',
     carta_url: '',
+    carta_tipo: 'comandi',
     resenas_activas: true,
     mensaje_bienvenida: '',
     mensaje_cerrado: '',
@@ -110,6 +111,9 @@ export default function PaginaAjustes() {
           direccion: rest.direccion || '',
           email_contacto: rest.email_contacto || '',
           carta_url: rest.carta_url || '',
+          // Si no hay preferencia guardada, inferir la efectiva actual.
+          carta_tipo: rest.carta_tipo
+            || (rest.slug ? 'comandi' : (rest.carta_url ? 'enlace' : (rest.carta_pdf_url ? 'pdf' : 'comandi'))),
           resenas_activas: rest.resenas_activas !== false,
           mensaje_bienvenida: rest.mensaje_bienvenida || '',
           mensaje_cerrado: rest.mensaje_cerrado || '',
@@ -137,6 +141,7 @@ export default function PaginaAjustes() {
         direccion: datos.direccion.trim() || null,
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
+        carta_tipo: datos.carta_tipo || null,
         resenas_activas: datos.resenas_activas,
         mensaje_bienvenida: datos.mensaje_bienvenida.trim() || null,
         mensaje_cerrado: datos.mensaje_cerrado.trim() || null,
@@ -365,11 +370,74 @@ export default function PaginaAjustes() {
         {/* Carta */}
         <div className="card p-6">
           <h2 className="text-base font-semibold text-text mb-2">Carta para clientes</h2>
-          <p className="text-sm text-text-muted mb-5">
-            El bot enviará la carta al cliente cuando salude.
-            Si tienes una <strong>URL web</strong> se manda eso. Si no, intenta el <strong>PDF</strong>.
-            Si tampoco, manda la carta del panel como texto.
+          <p className="text-sm text-text-muted mb-4">
+            Elige qué carta manda el bot cuando un cliente pide verla.
           </p>
+
+          <div className="space-y-2 mb-6">
+            {/* Opción: Carta Comandi */}
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'comandi' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
+              <input
+                type="radio"
+                name="carta_tipo"
+                className="mt-1 accent-accent"
+                checked={datos.carta_tipo === 'comandi'}
+                onChange={() => setDatos({ ...datos, carta_tipo: 'comandi' })}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-text">
+                  Carta Comandi <span className="text-xs text-accent">(recomendada)</span>
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Página online con tu carta por categorías, siempre actualizada desde el panel.
+                </p>
+                {restaurante?.slug ? (
+                  <a
+                    href={`https://comandi.es/r/${restaurante.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline mt-1"
+                  >
+                    comandi.es/r/{restaurante.slug} <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <p className="text-xs text-text-muted italic mt-1">
+                    Comandi activará tu carta online al darte de alta.
+                  </p>
+                )}
+              </div>
+            </label>
+
+            {/* Opción: Mi enlace web */}
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'enlace' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
+              <input
+                type="radio"
+                name="carta_tipo"
+                className="mt-1 accent-accent"
+                checked={datos.carta_tipo === 'enlace'}
+                onChange={() => setDatos({ ...datos, carta_tipo: 'enlace' })}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-text">Mi enlace web</p>
+                <p className="text-xs text-text-muted mt-0.5">El bot manda la URL que pongas abajo.</p>
+              </div>
+            </label>
+
+            {/* Opción: Mi PDF */}
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'pdf' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
+              <input
+                type="radio"
+                name="carta_tipo"
+                className="mt-1 accent-accent"
+                checked={datos.carta_tipo === 'pdf'}
+                onChange={() => setDatos({ ...datos, carta_tipo: 'pdf' })}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-text">Mi PDF</p>
+                <p className="text-xs text-text-muted mt-0.5">El bot manda el PDF que subas abajo.</p>
+              </div>
+            </label>
+          </div>
 
           <div className="space-y-4">
             <div>
