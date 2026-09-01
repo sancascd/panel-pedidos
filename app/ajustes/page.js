@@ -628,7 +628,7 @@ export default function PaginaAjustes() {
               <h2 className="text-base font-semibold text-text">Métodos de pago</h2>
               <p className="text-sm text-text-muted mt-1">
                 Elige qué formas de pago aceptas. El bot lo informa en el primer mensaje y solo
-                ofrece las activas al finalizar el pedido a domicilio. (Bizum se incluye en tarjeta.)
+                ofrece las activas al finalizar el pedido a domicilio.
               </p>
             </div>
           </div>
@@ -649,7 +649,7 @@ export default function PaginaAjustes() {
                 onChange={(e) => setDatos({ ...datos, acepta_tarjeta: e.target.checked })}
                 className="w-4 h-4 accent-accent"
               />
-              <span className="text-sm text-text"><strong className="font-medium">Tarjeta o Bizum</strong></span>
+              <span className="text-sm text-text"><strong className="font-medium">Tarjeta</strong></span>
             </label>
           </div>
           {!datos.acepta_efectivo && !datos.acepta_tarjeta && (
