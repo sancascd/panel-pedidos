@@ -7,7 +7,7 @@ export default function Privacidad() {
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
       <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-text mb-2">Política de privacidad</h1>
-      <p className="text-sm text-text-muted mb-10">Última actualización: 3 de junio de 2026</p>
+      <p className="text-sm text-text-muted mb-10">Última actualización: 1 de septiembre de 2026</p>
 
       <div className="space-y-8 text-sm text-text leading-relaxed">
         <section>
@@ -80,18 +80,18 @@ export default function Privacidad() {
             <li><strong className="text-text">Supabase</strong> — alojamiento de la base de datos. Datos almacenados en la <strong className="text-text">Unión Europea (Irlanda)</strong>.</li>
             <li><strong className="text-text">Postmark</strong> (ActiveCampaign LLC) — envío de correos electrónicos transaccionales. Servidores en la <strong className="text-text">Unión Europea (Irlanda)</strong>.</li>
             <li><strong className="text-text">Anthropic, PBC</strong> (Estados Unidos) — procesamiento por IA de los mensajes para entender pedidos. No utiliza los datos para entrenar sus modelos.</li>
-            <li><strong className="text-text">Twilio Inc.</strong> (Estados Unidos) — pasarela de mensajería de WhatsApp.</li>
+            <li><strong className="text-text">Meta Platforms Ireland Ltd.</strong> (Irlanda, Unión Europea) — canal de mensajería de WhatsApp (WhatsApp Business Cloud API). Datos almacenados en la <strong className="text-text">Unión Europea</strong>.</li>
+            <li><strong className="text-text">Twilio Inc.</strong> (Estados Unidos) — pasarela de mensajería de WhatsApp utilizada como alternativa o respaldo en algunos casos.</li>
             <li><strong className="text-text">Vercel Inc.</strong> (Estados Unidos / Unión Europea) — alojamiento del panel web.</li>
             <li><strong className="text-text">Railway Corp.</strong> (Estados Unidos) — alojamiento del servicio del bot.</li>
           </ul>
           <p className="text-text-muted mt-3">
             Los datos personales se <strong className="text-text">almacenan en reposo dentro de la
-            Unión Europea</strong> (base de datos y correo en Irlanda). Algunos proveedores procesan
-            datos en tránsito desde Estados Unidos (la inteligencia artificial y la pasarela de
-            WhatsApp). En esos casos, las transferencias internacionales fuera del Espacio Económico
-            Europeo se amparan en las <strong className="text-text">Cláusulas Contractuales Tipo</strong>
-            aprobadas por la Comisión Europea y los acuerdos de tratamiento de datos (DPA) suscritos
-            con cada proveedor.
+            Unión Europea</strong> (base de datos, correo y canal de WhatsApp en Irlanda). El
+            procesamiento por inteligencia artificial se realiza desde Estados Unidos. En los casos de
+            transferencias internacionales fuera del Espacio Económico Europeo, estas se amparan en las
+            <strong className="text-text"> Cláusulas Contractuales Tipo</strong> aprobadas por la
+            Comisión Europea y los acuerdos de tratamiento de datos (DPA) suscritos con cada proveedor.
           </p>
         </section>
 
