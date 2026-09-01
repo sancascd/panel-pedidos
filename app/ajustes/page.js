@@ -6,7 +6,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet
 } from 'lucide-react';
 
 // Helpers para construir los mensajes completos del bot
@@ -88,6 +88,8 @@ export default function PaginaAjustes() {
     email_contacto: '',
     carta_url: '',
     carta_tipo: 'comandi',
+    acepta_efectivo: true,
+    acepta_tarjeta: true,
     resenas_activas: true,
     mensaje_bienvenida: '',
     mensaje_cerrado: '',
@@ -114,6 +116,8 @@ export default function PaginaAjustes() {
           // Si no hay preferencia guardada, inferir la efectiva actual.
           carta_tipo: rest.carta_tipo
             || (rest.slug ? 'comandi' : (rest.carta_url ? 'enlace' : (rest.carta_pdf_url ? 'pdf' : 'comandi'))),
+          acepta_efectivo: rest.acepta_efectivo !== false,
+          acepta_tarjeta: rest.acepta_tarjeta !== false,
           resenas_activas: rest.resenas_activas !== false,
           mensaje_bienvenida: rest.mensaje_bienvenida || '',
           mensaje_cerrado: rest.mensaje_cerrado || '',
@@ -131,6 +135,10 @@ export default function PaginaAjustes() {
   }
 
   async function guardar() {
+    if (!datos.acepta_efectivo && !datos.acepta_tarjeta) {
+      avisar('Debes aceptar al menos un método de pago.', 'error');
+      return;
+    }
     setGuardando(true);
     const { error } = await supabase
       .from('restaurantes')
@@ -142,6 +150,8 @@ export default function PaginaAjustes() {
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
         carta_tipo: datos.carta_tipo || null,
+        acepta_efectivo: datos.acepta_efectivo,
+        acepta_tarjeta: datos.acepta_tarjeta,
         resenas_activas: datos.resenas_activas,
         mensaje_bienvenida: datos.mensaje_bienvenida.trim() || null,
         mensaje_cerrado: datos.mensaje_cerrado.trim() || null,
@@ -606,6 +616,45 @@ export default function PaginaAjustes() {
               {' '}<span className="text-text-muted">(se piden 30 min después de entregar a domicilio, o al instante si es recogida)</span>
             </span>
           </label>
+        </div>
+
+        {/* Métodos de pago */}
+        <div className="card p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <Wallet className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text">Métodos de pago</h2>
+              <p className="text-sm text-text-muted mt-1">
+                Elige qué formas de pago aceptas. El bot lo informa en el primer mensaje y solo
+                ofrece las activas al finalizar el pedido a domicilio.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
+              <input
+                type="checkbox"
+                checked={datos.acepta_efectivo}
+                onChange={(e) => setDatos({ ...datos, acepta_efectivo: e.target.checked })}
+                className="w-4 h-4 accent-accent"
+              />
+              <span className="text-sm text-text"><strong className="font-medium">Efectivo</strong></span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
+              <input
+                type="checkbox"
+                checked={datos.acepta_tarjeta}
+                onChange={(e) => setDatos({ ...datos, acepta_tarjeta: e.target.checked })}
+                className="w-4 h-4 accent-accent"
+              />
+              <span className="text-sm text-text"><strong className="font-medium">Tarjeta</strong></span>
+            </label>
+          </div>
+          {!datos.acepta_efectivo && !datos.acepta_tarjeta && (
+            <p className="text-xs text-red-500 mt-3">Debes aceptar al menos un método de pago.</p>
+          )}
         </div>
 
         <div className="sticky bottom-4">
