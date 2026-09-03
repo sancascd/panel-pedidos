@@ -801,12 +801,28 @@ export default function PaginaPedidos() {
     }
   }
 
-  function imprimirComanda() { window.print(); }
+  // Marca pedidos como impresos (optimista + BD). Asi "Imprimir pendientes"
+  // deja de ofrecer los que ya salieron por la impresora.
+  async function marcarImpresos(ids) {
+    if (!ids || ids.length === 0) return;
+    const ahora = new Date().toISOString();
+    setPedidos(prev => prev.map(p => (ids.includes(p.id) ? { ...p, impreso_en: ahora } : p)));
+    const { error } = await supabase
+      .from('pedidos').update({ impreso_en: ahora }).in('id', ids);
+    if (error) console.log('Error marcando impresos:', error);
+  }
+
+  function imprimirComanda() {
+    window.print();
+    if (seleccionado) marcarImpresos([seleccionado.id]);
+  }
 
   async function imprimirLotePendientes() {
     const pendientes = pedidos
       .filter(esDelDiaActual)
-      .filter(p => columnaDe(p) !== 'finalizados');
+      .filter(p => p.estado !== 'cancelado')
+      .filter(p => columnaDe(p) !== 'finalizados')
+      .filter(p => !p.impreso_en);
     if (pendientes.length === 0) return;
 
     const ids = pendientes.map(p => p.id);
@@ -826,6 +842,8 @@ export default function PaginaPedidos() {
     // Esperamos al render antes de lanzar la impresión
     setTimeout(() => {
       window.print();
+      // Ya han salido por la impresora: dejan de estar pendientes de imprimir.
+      marcarImpresos(ids);
       // Después de cerrar el diálogo de impresión, limpiamos
       setTimeout(() => {
         setImprimiendoLote(false);
@@ -975,6 +993,12 @@ export default function PaginaPedidos() {
             <span className="badge bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
               <AlertCircle className="w-3 h-3" />
               Lleva {minutos < 60 ? minutos + ' min' : Math.floor(minutos / 60) + 'h ' + (minutos % 60) + 'min'}
+            </span>
+          )}
+          {p.impreso_en && (
+            <span className="badge bg-surface-2 text-text-muted border border-border" title="El ticket ya se ha impreso">
+              <Printer className="w-3 h-3" />
+              Impreso
             </span>
           )}
         </div>
@@ -1196,13 +1220,18 @@ export default function PaginaPedidos() {
         )}
 
         {pestana === 'hoy' && (() => {
-          const pendientesCount = pedidos.filter(esDelDiaActual).filter(p => columnaDe(p) !== 'finalizados').length;
+          // "Pendientes" = pendientes DE IMPRIMIR (los ya impresos no se ofrecen).
+          const pendientesCount = pedidos
+            .filter(esDelDiaActual)
+            .filter(p => p.estado !== 'cancelado')
+            .filter(p => columnaDe(p) !== 'finalizados')
+            .filter(p => !p.impreso_en).length;
           return pendientesCount > 0 ? (
             <div className="mb-4 flex justify-end">
               <button
                 onClick={imprimirLotePendientes}
                 className="btn-secondary text-sm"
-                title="Imprimir todos los pedidos pendientes"
+                title="Imprime los pedidos que aún no han salido por la impresora"
               >
                 <Printer className="w-4 h-4" />
                 Imprimir pendientes ({pendientesCount})
