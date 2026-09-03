@@ -93,7 +93,7 @@ export default async function CartaPublica({ params }) {
                     <li key={j} className="flex items-baseline gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium">
-                          {prod.numero != null ? (
+                          {prod.numero ? (
                             <span className="text-text-muted tabular-nums mr-1.5">{prod.numero}.</span>
                           ) : null}
                           {prod.nombre}

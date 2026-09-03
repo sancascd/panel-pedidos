@@ -72,13 +72,25 @@ export default function PaginaCarta() {
     }
   }
 
+  // El numero es texto (admite "6b"), asi que ordenamos por su parte numerica
+  // y, a igualdad, por el texto: 6 -> 6b -> 6c -> 10. Los que no tienen, al final.
+  function ordenNumero(a, b) {
+    const nDe = v => {
+      const d = String(v ?? '').replace(/\D/g, '');
+      return d === '' ? Infinity : parseInt(d, 10);
+    };
+    const na = nDe(a.numero), nb = nDe(b.numero);
+    if (na !== nb) return na - nb;
+    const sa = String(a.numero ?? ''), sb = String(b.numero ?? '');
+    if (sa !== sb) return sa.localeCompare(sb, 'es');
+    return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+  }
+
   async function cargarProductos(catId) {
     const { data } = await supabase
       .from('productos').select('*')
-      .eq('categoria_id', catId)
-      .order('numero', { ascending: true, nullsFirst: false })
-      .order('nombre');
-    setProductosPorCategoria(prev => ({ ...prev, [catId]: data || [] }));
+      .eq('categoria_id', catId);
+    setProductosPorCategoria(prev => ({ ...prev, [catId]: (data || []).sort(ordenNumero) }));
   }
 
   async function crearCategoria() {
@@ -120,7 +132,7 @@ export default function PaginaCarta() {
         precio: parseFloat(datosProd.precio),
         descripcion: datosProd.descripcion.trim() || null,
         disponible: datosProd.disponible,
-        numero: datosProd.numero === '' ? null : parseInt(datosProd.numero, 10),
+        numero: datosProd.numero.trim() || null,
         alergenos_contiene: datosProd.contiene,
         alergenos_trazas: datosProd.trazas
       });
@@ -141,7 +153,7 @@ export default function PaginaCarta() {
         precio: parseFloat(datosProd.precio),
         descripcion: datosProd.descripcion.trim() || null,
         disponible: datosProd.disponible,
-        numero: datosProd.numero === '' ? null : parseInt(datosProd.numero, 10),
+        numero: datosProd.numero.trim() || null,
         alergenos_contiene: datosProd.contiene,
         alergenos_trazas: datosProd.trazas
       }).eq('id', prodId);
@@ -186,7 +198,7 @@ export default function PaginaCarta() {
       precio: String(prod.precio),
       descripcion: prod.descripcion || '',
       disponible: prod.disponible,
-      numero: prod.numero == null ? '' : String(prod.numero),
+      numero: prod.numero || '',
       contiene: prod.alergenos_contiene || [],
       trazas: prod.alergenos_trazas || []
     });
@@ -328,12 +340,13 @@ export default function PaginaCarta() {
                             />
                             <div className="flex gap-2">
                               <input
-                                type="number"
+                                type="text"
                                 value={datosProd.numero}
                                 onChange={(e) => setDatosProd({ ...datosProd, numero: e.target.value })}
-                                className="input w-20"
+                                className="input w-24"
                                 placeholder="Nº"
-                                title="Número del plato en la carta"
+                                maxLength={10}
+                                title="Número del plato en la carta (admite letras: 6b, 6c...)"
                               />
                               <input
                                 type="number"
@@ -403,7 +416,7 @@ export default function PaginaCarta() {
                           <div className="flex items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2 flex-wrap">
-                                {prod.numero != null && (
+                                {prod.numero && (
                                   <span className="text-sm font-bold text-text-muted tabular-nums">
                                     {prod.numero}.
                                   </span>

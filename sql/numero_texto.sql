@@ -1,21 +1,14 @@
 -- =============================================================
--- Número de plato + alérgenos
+-- El número de plato pasa a TEXTO (admite 6b, 6c, 12A...)
 -- =============================================================
--- - `numero`: el número de la carta física (en cocina trabajan por números).
---   Va en su propio campo, NO dentro del nombre, para no romper el matcheo
---   del bot y poder renumerar sin reescribir platos.
--- - Alérgenos: los 14 oficiales de la UE, separando lo que CONTIENE de las
---   TRAZAS ("puede contener"), que legalmente no es lo mismo.
+-- El restaurante numera las variantes con letra (varios rollos = 6b, 6c),
+-- así que `numero` no puede ser entero.
+-- Ojo al ORDEN: por texto, "10" iría antes que "6". Se ordena por la parte
+-- numérica y, a igualdad, por el texto completo (6b antes que 6c).
 -- Aplicar en Supabase -> SQL editor.
 
-alter table productos add column if not exists numero text;
-alter table productos add column if not exists alergenos_contiene text[] not null default '{}';
-alter table productos add column if not exists alergenos_trazas   text[] not null default '{}';
+alter table productos alter column numero type text using numero::text;
 
-create index if not exists productos_numero_idx on productos (restaurante_id, numero);
-
--- La carta pública ahora devuelve también número y alérgenos, y ordena por
--- número (los que no tienen, al final por nombre).
 create or replace function carta_publica(p_slug text)
 returns json language sql stable security definer set search_path = public as $$
   select json_build_object(
@@ -33,7 +26,11 @@ returns json language sql stable security definer set search_path = public as $$
                        'numero', p.numero,
                        'contiene', p.alergenos_contiene,
                        'trazas', p.alergenos_trazas
-                     ) order by nullif(regexp_replace(coalesce(p.numero,''), '\D', '', 'g'), '')::int nulls last, p.numero nulls last, p.nombre)
+                     ) order by
+                       nullif(regexp_replace(coalesce(p.numero, ''), '\D', '', 'g'), '')::int
+                         nulls last,
+                       p.numero nulls last,
+                       p.nombre)
               from productos p
               where p.categoria_id = c.id and p.restaurante_id = r.id and p.disponible = true
             ), '[]'::json)) as cat
