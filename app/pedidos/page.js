@@ -8,11 +8,11 @@ import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import MenuNav from '@/components/MenuNav';
 import {
-  Sun, Moon, LogOut, Clock, UtensilsCrossed,
+  Sun, Moon, LogOut, UtensilsCrossed,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, Download
+  Bell, BellOff, Download
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -178,50 +178,6 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   );
 }
 
-function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) {
-  let deltaContenido = null;
-  let deltaClase = 'text-text-muted';
-  let DeltaIcono = null;
-
-  if (delta !== undefined && delta !== null && !isNaN(delta)) {
-    const positivo = delta > 0;
-    const cero = delta === 0;
-    if (cero) {
-      deltaClase = 'text-text-muted';
-    } else if (positivo) {
-      deltaClase = 'text-accent';
-      DeltaIcono = TrendingUp;
-    } else {
-      deltaClase = 'text-red-500';
-      DeltaIcono = TrendingDown;
-    }
-    deltaContenido = deltaFormat
-      ? deltaFormat(delta)
-      : (positivo ? '+' : '') + delta;
-  }
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-          <Icono className="w-5 h-5 text-accent" />
-        </div>
-        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-3xl font-bold text-text tabular-nums">{valor}</p>
-      {deltaContenido !== null ? (
-        <div className={`flex items-center gap-1 mt-1 text-xs ${deltaClase}`}>
-          {DeltaIcono && <DeltaIcono className="w-3 h-3" />}
-          <span className="tabular-nums">{deltaContenido}</span>
-          <span className="text-text-muted">vs ayer</span>
-        </div>
-      ) : sublabel ? (
-        <p className="text-xs mt-1 text-text-muted">{sublabel}</p>
-      ) : null}
-    </div>
-  );
-}
-
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -235,8 +191,6 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
-  const [estadisticas, setEstadisticas] = useState(null);
-  const [statsAbiertas, setStatsAbiertas] = useState(true);
   // 'default' | 'granted' | 'denied' | 'unsupported'
   const [permisoNotif, setPermisoNotif] = useState('default');
   // Estado para impresión en lote (varios pedidos a la vez)
@@ -246,6 +200,8 @@ export default function PaginaPedidos() {
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
+  // Filtro por tipo de entrega: 'todos' | 'recogida' | 'domicilio'
+  const [filtroEntrega, setFiltroEntrega] = useState('todos');
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
   const [avisoPlan, setAvisoPlan] = useState(null);
@@ -287,13 +243,6 @@ export default function PaginaPedidos() {
     } else {
       setPermisoNotif(Notification.permission);
     }
-  }, []);
-
-  // Leer preferencia de stats abiertas/cerradas de localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const guardado = localStorage.getItem('stats-abiertas');
-    if (guardado !== null) setStatsAbiertas(guardado === 'true');
   }, []);
 
   // Refrescar las alertas de pedidos olvidados cada minuto
@@ -348,14 +297,6 @@ export default function PaginaPedidos() {
       try { localStorage.setItem('comandi-aviso-plan', avisoPlan.firma); } catch (e) {}
     }
     setAvisoPlan(null);
-  }
-
-  function alternarStats() {
-    const nuevo = !statsAbiertas;
-    setStatsAbiertas(nuevo);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stats-abiertas', String(nuevo));
-    }
   }
 
   async function solicitarPermisoNotif() {
@@ -430,7 +371,6 @@ export default function PaginaPedidos() {
       // Pasamos el id directo: setRestaurante no actualiza el state sincronamente,
       // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
       await cargarPedidos(restCargado?.id);
-      await cargarEstadisticas(restCargado?.id);
       setCargando(false);
     }
     init();
@@ -447,7 +387,6 @@ export default function PaginaPedidos() {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         cargarPedidos();
-        cargarEstadisticas();
       }, 300);
     }
     const canal = supabase.channel('pedidos-realtime')
@@ -475,63 +414,6 @@ export default function PaginaPedidos() {
       .eq('restaurante_id', id)
       .order('creado_en', { ascending: true });
     setPedidos(data || []);
-  }
-
-  async function cargarEstadisticas() {
-    const inicioHoy = inicioDiaTrabajo();
-    const inicioAyer = inicioHoy - 24 * 60 * 60 * 1000;
-    const inicioAyerISO = new Date(inicioAyer).toISOString();
-
-    const { data } = await supabase
-      .from('pedidos')
-      .select('total, creado_en, entregado_en, estado')
-      .gte('creado_en', inicioAyerISO);
-
-    if (!data) {
-      setEstadisticas({
-        pedidosHoy: 0, deltaPedidos: 0,
-        ingresosHoy: 0, deltaIngresos: 0,
-        ticketMedioHoy: 0, tiempoMedio: null
-      });
-      return;
-    }
-
-    const hoy = data.filter(p => {
-      const d = parsearFechaUTC(p.creado_en);
-      return d && d.getTime() >= inicioHoy;
-    });
-    const ayer = data.filter(p => {
-      const d = parsearFechaUTC(p.creado_en);
-      if (!d) return false;
-      const t = d.getTime();
-      return t >= inicioAyer && t < inicioHoy;
-    });
-
-    const sumar = arr => arr.reduce((s, p) => s + Number(p.total || 0), 0);
-    const ingresosHoy = sumar(hoy);
-    const ingresosAyer = sumar(ayer);
-
-    // Tiempo medio de preparación: entregado_en - creado_en (en minutos) de los entregados hoy
-    const entregadosHoy = hoy.filter(p => p.entregado_en);
-    let tiempoMedio = null;
-    if (entregadosHoy.length > 0) {
-      const totalMs = entregadosHoy.reduce((s, p) => {
-        const dEntregado = parsearFechaUTC(p.entregado_en);
-        const dCreado = parsearFechaUTC(p.creado_en);
-        if (!dEntregado || !dCreado) return s;
-        return s + (dEntregado.getTime() - dCreado.getTime());
-      }, 0);
-      tiempoMedio = Math.round(totalMs / entregadosHoy.length / 1000 / 60);
-    }
-
-    setEstadisticas({
-      pedidosHoy: hoy.length,
-      deltaPedidos: hoy.length - ayer.length,
-      ingresosHoy: ingresosHoy,
-      deltaIngresos: ingresosHoy - ingresosAyer,
-      ticketMedioHoy: hoy.length > 0 ? ingresosHoy / hoy.length : 0,
-      tiempoMedio: tiempoMedio
-    });
   }
 
   async function cargarHistorial() {
@@ -739,9 +621,6 @@ export default function PaginaPedidos() {
       alert('No se pudo cambiar el estado. Intentalo de nuevo.');
       return;
     }
-
-    // Refrescar estadisticas (no recargamos pedidos: el optimistic ya esta)
-    cargarEstadisticas().catch(() => {});
 
     // Notificar al cliente (el bot decide si la transición es notificable o no)
     fetch('/api/bot-proxy/notificar-estado', {
@@ -958,7 +837,30 @@ export default function PaginaPedidos() {
     }, 100);
   }
 
+  // Eliminar un pedido de la pantalla (p.ej. el cliente lo cancela).
+  // Se marca como 'cancelado': desaparece del tablero y de las estadisticas,
+  // pero el dato NO se borra de la base de datos.
+  async function eliminarPedido(p) {
+    const numero = '#' + p.id.slice(-4).toUpperCase();
+    const ok = window.confirm(
+      `¿Eliminar el pedido ${numero}?\n\n` +
+      'Desaparecerá de la pantalla. Úsalo si el cliente ha cancelado.'
+    );
+    if (!ok) return;
+    const { error } = await supabase
+      .from('pedidos').update({ estado: 'cancelado' }).eq('id', p.id);
+    if (error) {
+      window.alert('No se pudo eliminar el pedido: ' + error.message);
+      return;
+    }
+    // Optimista: lo quitamos ya de la vista.
+    setPedidos(prev => prev.map(x => (x.id === p.id ? { ...x, estado: 'cancelado' } : x)));
+    if (seleccionado?.id === p.id) setSeleccionado(null);
+  }
+
   async function cerrarSesion() {
+    // Confirmacion: es facil pulsarlo sin querer y perder la pantalla de pedidos.
+    if (!window.confirm('¿Seguro que quieres cerrar sesión?')) return;
     await supabase.auth.signOut();
     router.push('/login');
   }
@@ -1015,7 +917,20 @@ export default function PaginaPedidos() {
     );
   }
 
-  const pedidosHoy = pedidos.filter(esDelDiaActual);
+  // Pedidos del dia (los cancelados no se muestran, pero siguen en la BD).
+  const pedidosDia = pedidos.filter(esDelDiaActual).filter(p => p.estado !== 'cancelado');
+
+  // Contadores por tipo de entrega (solo los que quedan por atender).
+  const pendientesRecogida = pedidosDia.filter(
+    p => p.tipo_entrega === 'recogida' && columnaDe(p) !== 'finalizados').length;
+  const pendientesDomicilio = pedidosDia.filter(
+    p => p.tipo_entrega !== 'recogida' && columnaDe(p) !== 'finalizados').length;
+
+  const pedidosHoy = pedidosDia.filter(p => {
+    if (filtroEntrega === 'recogida') return p.tipo_entrega === 'recogida';
+    if (filtroEntrega === 'domicilio') return p.tipo_entrega !== 'recogida';
+    return true;
+  });
 
   const columnas = {
     recibidos: pedidosHoy.filter(p => columnaDe(p) === 'recibidos'),
@@ -1023,7 +938,8 @@ export default function PaginaPedidos() {
     finalizados: pedidosHoy.filter(p => columnaDe(p) === 'finalizados'),
   };
 
-  function TarjetaPedido({ p }) {
+  // `atenuado`: tarjetas de la columna Terminados -> tono apagado, sin reclamar atencion.
+  function TarjetaPedido({ p, atenuado }) {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
     // Pedidos olvidados: +30 min en estado 'recibido'
@@ -1033,12 +949,19 @@ export default function PaginaPedidos() {
     const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => abrirPedido(p)}
-        className={`group w-full text-left card p-4 border-l-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
-          olvidado
-            ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
-            : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30`
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPedido(p); }
+        }}
+        className={`group w-full text-left card p-4 border-l-4 cursor-pointer transition-all duration-200 animate-fade-in ${
+          atenuado
+            ? 'border-l-border opacity-60 hover:opacity-100'
+            : olvidado
+              ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft hover:shadow-lift'
+              : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30 hover:shadow-lift`
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -1074,11 +997,22 @@ export default function PaginaPedidos() {
           <span className="text-sm font-medium text-text truncate">
             {p.cliente_nombre || telefonoLimpio(p.cliente_telefono)}
           </span>
-          <span className="text-lg font-bold text-text tabular-nums flex-shrink-0">
-            {Number(p.total).toFixed(2)}€
-          </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span className="text-lg font-bold text-text tabular-nums">
+              {Number(p.total).toFixed(2)}€
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); eliminarPedido(p); }}
+              title="Eliminar pedido (el cliente lo ha cancelado)"
+              aria-label="Eliminar pedido"
+              className="p-1.5 rounded-lg text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </button>
+      </div>
     );
   }
 
@@ -1263,58 +1197,36 @@ export default function PaginaPedidos() {
           </div>
         )}
 
-        {pestana === 'hoy' && estadisticas && (
-          <div className="mb-6">
-            <button
-              onClick={alternarStats}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-surface-2/50 border border-border hover:border-accent/30 transition-colors"
-              aria-expanded={statsAbiertas}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
-                <span className="text-sm font-medium text-text">Estadísticas del día</span>
-                {!statsAbiertas && (
-                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate">
-                    {estadisticas.pedidosHoy} pedidos · {estadisticas.ingresosHoy.toFixed(2)}€
+        {/* Filtro por tipo de entrega: Todos / Recogida / Reparto */}
+        {pestana === 'hoy' && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              { key: 'todos', label: 'Todos', n: pendientesRecogida + pendientesDomicilio, Icono: null },
+              { key: 'recogida', label: 'Recogida', n: pendientesRecogida, Icono: Store },
+              { key: 'domicilio', label: 'Reparto', n: pendientesDomicilio, Icono: Home },
+            ].map(f => {
+              const activo = filtroEntrega === f.key;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setFiltroEntrega(f.key)}
+                  aria-pressed={activo}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                    activo
+                      ? 'bg-accent text-white border-accent shadow-card'
+                      : 'bg-surface-2/50 text-text border-border hover:border-accent/40'
+                  }`}
+                >
+                  {f.Icono && <f.Icono className="w-4 h-4" />}
+                  {f.label}
+                  <span className={`tabular-nums text-xs px-1.5 py-0.5 rounded-md ${
+                    activo ? 'bg-white/20 text-white' : 'bg-surface text-text-muted'
+                  }`}>
+                    {f.n}
                   </span>
-                )}
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform duration-200 ${
-                  statsAbiertas ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {statsAbiertas && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3 animate-fade-in">
-                <StatCard
-                  icono={ShoppingBag}
-                  label="Pedidos hoy"
-                  valor={estadisticas.pedidosHoy}
-                  delta={estadisticas.deltaPedidos}
-                />
-                <StatCard
-                  icono={Euro}
-                  label="Ingresos hoy"
-                  valor={`${estadisticas.ingresosHoy.toFixed(2)}€`}
-                  delta={estadisticas.deltaIngresos}
-                  deltaFormat={(d) => `${d > 0 ? '+' : ''}${d.toFixed(2)}€`}
-                />
-                <StatCard
-                  icono={Receipt}
-                  label="Ticket medio"
-                  valor={`${estadisticas.ticketMedioHoy.toFixed(2)}€`}
-                  sublabel={estadisticas.pedidosHoy > 0 ? 'por pedido' : 'sin pedidos hoy'}
-                />
-                <StatCard
-                  icono={Clock}
-                  label="Tiempo medio"
-                  valor={estadisticas.tiempoMedio !== null ? `${estadisticas.tiempoMedio} min` : '—'}
-                  sublabel={estadisticas.tiempoMedio !== null ? 'de preparación' : 'sin entregas hoy'}
-                />
-              </div>
-            )}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1386,18 +1298,18 @@ export default function PaginaPedidos() {
               </div>
             </div>
 
-            {/* Columna FINALIZADOS (plegable) */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-accent/50">
+            {/* Columna TERMINADOS (plegable, en tono apagado: ya no requieren accion) */}
+            <div className="bg-surface-2/30 rounded-xl p-3 border border-border">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
                 className="w-full mb-3 px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
               >
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <h2 className="text-base font-bold text-text">Finalizados</h2>
+                    <div className="w-2 h-2 rounded-full bg-text-muted/40" />
+                    <h2 className="text-sm font-semibold text-text-muted">Terminados</h2>
                   </div>
-                  <p className="text-xs text-text-muted mt-0.5">Entregados o recogidos</p>
+                  <p className="text-xs text-text-muted/70 mt-0.5">Entregados o recogidos</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
@@ -1413,10 +1325,10 @@ export default function PaginaPedidos() {
                 <div className="space-y-2 animate-fade-in">
                   {columnas.finalizados.length === 0 ? (
                     <div className="py-8 text-center">
-                      <p className="text-sm text-text-muted">Sin pedidos finalizados</p>
+                      <p className="text-sm text-text-muted">Sin pedidos terminados</p>
                     </div>
                   ) : (
-                    columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} />)
+                    columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} atenuado />)
                   )}
                 </div>
               )}
