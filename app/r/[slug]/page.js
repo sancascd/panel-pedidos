@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
+import { listaAlergenos } from '@/lib/alergenos';
 
 // Refresca la carta cada 30s (ISR). El restaurante edita en el panel y se ve
 // reflejado casi al instante, sin pegarle a la BD en cada visita.
@@ -91,10 +92,25 @@ export default async function CartaPublica({ params }) {
                   {cat.productos.map((prod, j) => (
                     <li key={j} className="flex items-baseline gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">{prod.nombre}</p>
+                        <p className="font-medium">
+                          {prod.numero ? (
+                            <span className="text-text-muted tabular-nums mr-1.5">{prod.numero}.</span>
+                          ) : null}
+                          {prod.nombre}
+                        </p>
                         {prod.descripcion ? (
                           <p className="text-sm text-text-muted mt-0.5">
                             {prod.descripcion}
+                          </p>
+                        ) : null}
+                        {(prod.contiene?.length || prod.trazas?.length) ? (
+                          <p className="text-xs text-text-muted mt-1">
+                            {prod.contiene?.length ? (
+                              <>Contiene: {listaAlergenos(prod.contiene)}</>
+                            ) : null}
+                            {prod.trazas?.length ? (
+                              <>{prod.contiene?.length ? ' · ' : ''}Trazas: {listaAlergenos(prod.trazas)}</>
+                            ) : null}
                           </p>
                         ) : null}
                       </div>

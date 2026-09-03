@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
+import { ALERGENOS, listaAlergenos } from '@/lib/alergenos';
 import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, GripVertical,
@@ -27,7 +28,10 @@ export default function PaginaCarta() {
   // Estados de edicion de producto
   const [editandoProdId, setEditandoProdId] = useState(null);
   const [agregandoProductoEnCat, setAgregandoProductoEnCat] = useState(null);
-  const [datosProd, setDatosProd] = useState({ nombre: '', precio: '', descripcion: '', disponible: true });
+  const [datosProd, setDatosProd] = useState({
+    nombre: '', precio: '', descripcion: '', disponible: true,
+    numero: '', contiene: [], trazas: []
+  });
 
   const [categoriasAbiertas, setCategoriasAbiertas] = useState({});
 
@@ -68,11 +72,25 @@ export default function PaginaCarta() {
     }
   }
 
+  // El numero es texto (admite "6b"), asi que ordenamos por su parte numerica
+  // y, a igualdad, por el texto: 6 -> 6b -> 6c -> 10. Los que no tienen, al final.
+  function ordenNumero(a, b) {
+    const nDe = v => {
+      const d = String(v ?? '').replace(/\D/g, '');
+      return d === '' ? Infinity : parseInt(d, 10);
+    };
+    const na = nDe(a.numero), nb = nDe(b.numero);
+    if (na !== nb) return na - nb;
+    const sa = String(a.numero ?? ''), sb = String(b.numero ?? '');
+    if (sa !== sb) return sa.localeCompare(sb, 'es');
+    return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+  }
+
   async function cargarProductos(catId) {
     const { data } = await supabase
       .from('productos').select('*')
-      .eq('categoria_id', catId).order('nombre');
-    setProductosPorCategoria(prev => ({ ...prev, [catId]: data || [] }));
+      .eq('categoria_id', catId);
+    setProductosPorCategoria(prev => ({ ...prev, [catId]: (data || []).sort(ordenNumero) }));
   }
 
   async function crearCategoria() {
@@ -113,11 +131,17 @@ export default function PaginaCarta() {
         nombre: datosProd.nombre.trim(),
         precio: parseFloat(datosProd.precio),
         descripcion: datosProd.descripcion.trim() || null,
-        disponible: datosProd.disponible
+        disponible: datosProd.disponible,
+        numero: datosProd.numero.trim() || null,
+        alergenos_contiene: datosProd.contiene,
+        alergenos_trazas: datosProd.trazas
       });
     if (error) { avisar('Error: ' + error.message); return; }
     setAgregandoProductoEnCat(null);
-    setDatosProd({ nombre: '', precio: '', descripcion: '', disponible: true });
+    setDatosProd({
+      nombre: '', precio: '', descripcion: '', disponible: true,
+      numero: '', contiene: [], trazas: []
+    });
     await cargarProductos(catId);
   }
 
@@ -128,11 +152,17 @@ export default function PaginaCarta() {
         nombre: datosProd.nombre.trim(),
         precio: parseFloat(datosProd.precio),
         descripcion: datosProd.descripcion.trim() || null,
-        disponible: datosProd.disponible
+        disponible: datosProd.disponible,
+        numero: datosProd.numero.trim() || null,
+        alergenos_contiene: datosProd.contiene,
+        alergenos_trazas: datosProd.trazas
       }).eq('id', prodId);
     if (error) { avisar('Error: ' + error.message); return; }
     setEditandoProdId(null);
-    setDatosProd({ nombre: '', precio: '', descripcion: '', disponible: true });
+    setDatosProd({
+      nombre: '', precio: '', descripcion: '', disponible: true,
+      numero: '', contiene: [], trazas: []
+    });
     await cargarProductos(catId);
   }
 
@@ -150,13 +180,27 @@ export default function PaginaCarta() {
     await cargarProductos(prod.categoria_id);
   }
 
+  // Cada alérgeno cicla: no marcado -> Contiene -> Trazas -> no marcado.
+  function alternarAlergeno(id) {
+    const esContiene = datosProd.contiene.includes(id);
+    const esTrazas = datosProd.trazas.includes(id);
+    let contiene = datosProd.contiene.filter(x => x !== id);
+    let trazas = datosProd.trazas.filter(x => x !== id);
+    if (!esContiene && !esTrazas) contiene = [...contiene, id];
+    else if (esContiene) trazas = [...trazas, id];
+    setDatosProd({ ...datosProd, contiene, trazas });
+  }
+
   function empezarEditarProducto(prod) {
     setEditandoProdId(prod.id);
     setDatosProd({
       nombre: prod.nombre,
       precio: String(prod.precio),
       descripcion: prod.descripcion || '',
-      disponible: prod.disponible
+      disponible: prod.disponible,
+      numero: prod.numero || '',
+      contiene: prod.alergenos_contiene || [],
+      trazas: prod.alergenos_trazas || []
     });
   }
 
@@ -296,6 +340,15 @@ export default function PaginaCarta() {
                             />
                             <div className="flex gap-2">
                               <input
+                                type="text"
+                                value={datosProd.numero}
+                                onChange={(e) => setDatosProd({ ...datosProd, numero: e.target.value })}
+                                className="input w-24"
+                                placeholder="Nº"
+                                maxLength={10}
+                                title="Número del plato en la carta (admite letras: 6b, 6c...)"
+                              />
+                              <input
                                 type="number"
                                 step="0.01"
                                 value={datosProd.precio}
@@ -320,6 +373,35 @@ export default function PaginaCarta() {
                               rows="2"
                               placeholder="Descripción (opcional)"
                             />
+
+                            {/* Alérgenos: cada uno cicla Contiene -> Trazas -> ninguno */}
+                            <div className="rounded-lg border border-border p-3 bg-surface-2/40">
+                              <p className="text-xs text-text-muted mb-2">
+                                <strong className="text-text">Alérgenos</strong> · pulsa una vez = <span className="text-red-600 dark:text-red-400">contiene</span>,
+                                dos veces = <span className="text-amber-600 dark:text-amber-400">trazas</span>, tres = quitar
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {ALERGENOS.map(a => {
+                                  const c = datosProd.contiene.includes(a.id);
+                                  const t = datosProd.trazas.includes(a.id);
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      type="button"
+                                      onClick={() => alternarAlergeno(a.id)}
+                                      className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                                        c ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30'
+                                          : t ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                            : 'bg-surface text-text-muted border-border hover:border-accent/40'
+                                      }`}
+                                    >
+                                      {a.label}{t ? ' (trazas)' : ''}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
                             <div className="flex gap-2">
                               <button onClick={() => guardarProducto(prod.id, cat.id)} className="btn-primary flex-1">
                                 <Check className="w-4 h-4" />
@@ -334,6 +416,11 @@ export default function PaginaCarta() {
                           <div className="flex items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2 flex-wrap">
+                                {prod.numero && (
+                                  <span className="text-sm font-bold text-text-muted tabular-nums">
+                                    {prod.numero}.
+                                  </span>
+                                )}
                                 <h3 className={`font-medium text-text ${!prod.disponible ? 'line-through opacity-50' : ''}`}>
                                   {prod.nombre}
                                 </h3>
@@ -348,6 +435,16 @@ export default function PaginaCarta() {
                               </div>
                               {prod.descripcion && (
                                 <p className="text-sm text-text-muted mt-1">{prod.descripcion}</p>
+                              )}
+                              {(prod.alergenos_contiene?.length > 0 || prod.alergenos_trazas?.length > 0) && (
+                                <p className="text-xs text-text-muted mt-1">
+                                  {prod.alergenos_contiene?.length > 0 && (
+                                    <>Contiene: <span className="text-red-600 dark:text-red-400">{listaAlergenos(prod.alergenos_contiene)}</span></>
+                                  )}
+                                  {prod.alergenos_trazas?.length > 0 && (
+                                    <> {prod.alergenos_contiene?.length > 0 ? '· ' : ''}Trazas: <span className="text-amber-600 dark:text-amber-400">{listaAlergenos(prod.alergenos_trazas)}</span></>
+                                  )}
+                                </p>
                               )}
                             </div>
                             <button
