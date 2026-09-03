@@ -200,8 +200,6 @@ export default function PaginaPedidos() {
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
-  // Filtro por tipo de entrega: 'todos' | 'recogida' | 'domicilio'
-  const [filtroEntrega, setFiltroEntrega] = useState('todos');
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
   const [avisoPlan, setAvisoPlan] = useState(null);
@@ -920,26 +918,16 @@ export default function PaginaPedidos() {
   // Pedidos del dia (los cancelados no se muestran, pero siguen en la BD).
   const pedidosDia = pedidos.filter(esDelDiaActual).filter(p => p.estado !== 'cancelado');
 
-  // Contadores por tipo de entrega (solo los que quedan por atender).
-  const pendientesRecogida = pedidosDia.filter(
-    p => p.tipo_entrega === 'recogida' && columnaDe(p) !== 'finalizados').length;
-  const pendientesDomicilio = pedidosDia.filter(
-    p => p.tipo_entrega !== 'recogida' && columnaDe(p) !== 'finalizados').length;
-
-  const pedidosHoy = pedidosDia.filter(p => {
-    if (filtroEntrega === 'recogida') return p.tipo_entrega === 'recogida';
-    if (filtroEntrega === 'domicilio') return p.tipo_entrega !== 'recogida';
-    return true;
-  });
-
+  // Tablero por TIPO DE ENTREGA: una columna de recogida y otra de reparto.
+  // Los terminados van aparte, debajo (ya no requieren accion).
+  const activos = pedidosDia.filter(p => columnaDe(p) !== 'finalizados');
   const columnas = {
-    recibidos: pedidosHoy.filter(p => columnaDe(p) === 'recibidos'),
-    proceso: pedidosHoy.filter(p => columnaDe(p) === 'proceso'),
-    finalizados: pedidosHoy.filter(p => columnaDe(p) === 'finalizados'),
+    recogida: activos.filter(p => p.tipo_entrega === 'recogida'),
+    reparto: activos.filter(p => p.tipo_entrega !== 'recogida'),
+    finalizados: pedidosDia.filter(p => columnaDe(p) === 'finalizados'),
   };
 
-  // `atenuado`: tarjetas de la columna Terminados -> tono apagado, sin reclamar atencion.
-  function TarjetaPedido({ p, atenuado }) {
+  function TarjetaPedido({ p }) {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
     // Pedidos olvidados: +30 min en estado 'recibido'
@@ -956,12 +944,10 @@ export default function PaginaPedidos() {
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPedido(p); }
         }}
-        className={`group w-full text-left card p-4 border-l-4 cursor-pointer transition-all duration-200 animate-fade-in ${
-          atenuado
-            ? 'border-l-border opacity-60 hover:opacity-100'
-            : olvidado
-              ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft hover:shadow-lift'
-              : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30 hover:shadow-lift`
+        className={`group w-full text-left card p-4 border-l-4 cursor-pointer transition-all duration-200 animate-fade-in hover:shadow-lift ${
+          olvidado
+            ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
+            : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30`
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -1012,6 +998,18 @@ export default function PaginaPedidos() {
             </button>
           </div>
         </div>
+
+        {/* Accion directa: avanzar el pedido sin tener que abrirlo. */}
+        {est.siguiente && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); cambiarEstado(p, est.siguiente); }}
+            className="btn-primary w-full mt-3 text-sm py-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {est.siguienteLabel}
+          </button>
+        )}
       </div>
     );
   }
@@ -1148,7 +1146,7 @@ export default function PaginaPedidos() {
             <Calendar className="w-4 h-4" />
             Hoy
             <span className="ml-1 tabular-nums text-xs px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
-              {pedidosHoy.length}
+              {pedidosDia.length}
             </span>
           </button>
           <button
@@ -1197,39 +1195,6 @@ export default function PaginaPedidos() {
           </div>
         )}
 
-        {/* Filtro por tipo de entrega: Todos / Recogida / Reparto */}
-        {pestana === 'hoy' && (
-          <div className="mb-4 flex flex-wrap gap-2">
-            {[
-              { key: 'todos', label: 'Todos', n: pendientesRecogida + pendientesDomicilio, Icono: null },
-              { key: 'recogida', label: 'Recogida', n: pendientesRecogida, Icono: Store },
-              { key: 'domicilio', label: 'Reparto', n: pendientesDomicilio, Icono: Home },
-            ].map(f => {
-              const activo = filtroEntrega === f.key;
-              return (
-                <button
-                  key={f.key}
-                  onClick={() => setFiltroEntrega(f.key)}
-                  aria-pressed={activo}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
-                    activo
-                      ? 'bg-accent text-white border-accent shadow-card'
-                      : 'bg-surface-2/50 text-text border-border hover:border-accent/40'
-                  }`}
-                >
-                  {f.Icono && <f.Icono className="w-4 h-4" />}
-                  {f.label}
-                  <span className={`tabular-nums text-xs px-1.5 py-0.5 rounded-md ${
-                    activo ? 'bg-white/20 text-white' : 'bg-surface text-text-muted'
-                  }`}>
-                    {f.n}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {pestana === 'hoy' && (() => {
           const pendientesCount = pedidos.filter(esDelDiaActual).filter(p => columnaDe(p) !== 'finalizados').length;
           return pendientesCount > 0 ? (
@@ -1247,72 +1212,76 @@ export default function PaginaPedidos() {
         })()}
 
         {pestana === 'hoy' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Columna RECIBIDOS */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
-              <div className="mb-3 px-1 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft" />
-                    <h2 className="text-base font-bold text-text">Recibidos</h2>
+          <>
+            {/* Tablero por TIPO DE ENTREGA: cada flujo en su columna.
+                En movil se apilan (recogida arriba, reparto debajo). */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* COLUMNA RECOGIDA */}
+              <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
+                <div className="mb-3 px-1 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-amber-500" />
+                      <h2 className="text-base font-bold text-text">Recogida</h2>
+                    </div>
+                    <p className="text-xs text-text-muted mt-0.5">Vienen a recogerlo al local</p>
                   </div>
-                  <p className="text-xs text-text-muted mt-0.5">Hay que prepararlos</p>
+                  <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-surface text-text tabular-nums">
+                    {columnas.recogida.length}
+                  </span>
                 </div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
-                  {columnas.recibidos.length}
-                </span>
+                <div className="space-y-2">
+                  {columnas.recogida.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">Sin pedidos de recogida</p>
+                    </div>
+                  ) : (
+                    columnas.recogida.map(p => <TarjetaPedido key={p.id} p={p} />)
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                {columnas.recibidos.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-text-muted">Sin pedidos nuevos</p>
+
+              {/* COLUMNA REPARTO */}
+              <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
+                <div className="mb-3 px-1 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Home className="w-4 h-4 text-blue-500" />
+                      <h2 className="text-base font-bold text-text">Reparto</h2>
+                    </div>
+                    <p className="text-xs text-text-muted mt-0.5">Se llevan a domicilio</p>
                   </div>
-                ) : (
-                  columnas.recibidos.map(p => <TarjetaPedido key={p.id} p={p} />)
-                )}
+                  <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-surface text-text tabular-nums">
+                    {columnas.reparto.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {columnas.reparto.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">Sin pedidos de reparto</p>
+                    </div>
+                  ) : (
+                    columnas.reparto.map(p => <TarjetaPedido key={p.id} p={p} />)
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Columna EN PROCESO */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
-              <div className="mb-3 px-1 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <h2 className="text-base font-bold text-text">En proceso</h2>
-                  </div>
-                  <p className="text-xs text-text-muted mt-0.5">Listos o en reparto</p>
-                </div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
-                  {columnas.proceso.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {columnas.proceso.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-text-muted">Sin pedidos en proceso</p>
-                  </div>
-                ) : (
-                  columnas.proceso.map(p => <TarjetaPedido key={p.id} p={p} />)
-                )}
-              </div>
-            </div>
-
-            {/* Columna TERMINADOS (plegable, en tono apagado: ya no requieren accion) */}
-            <div className="bg-surface-2/30 rounded-xl p-3 border border-border">
+            {/* TERMINADOS: aparte y debajo (posicion menos prioritaria), plegable. */}
+            <div className="mt-6 bg-surface-2/50 rounded-xl p-3 border border-border">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
-                className="w-full mb-3 px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
+                className="w-full px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
               >
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-text-muted/40" />
-                    <h2 className="text-sm font-semibold text-text-muted">Terminados</h2>
+                    <CheckCircle2 className="w-4 h-4 text-text-muted" />
+                    <h2 className="text-base font-bold text-text">Terminados</h2>
                   </div>
-                  <p className="text-xs text-text-muted/70 mt-0.5">Entregados o recogidos</p>
+                  <p className="text-xs text-text-muted mt-0.5">Entregados o recogidos</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
+                  <span className="text-sm font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
                     {columnas.finalizados.length}
                   </span>
                   {finalizadosAbierto ?
@@ -1322,18 +1291,18 @@ export default function PaginaPedidos() {
                 </div>
               </button>
               {finalizadosAbierto && (
-                <div className="space-y-2 animate-fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 animate-fade-in">
                   {columnas.finalizados.length === 0 ? (
-                    <div className="py-8 text-center">
+                    <div className="py-8 text-center md:col-span-2">
                       <p className="text-sm text-text-muted">Sin pedidos terminados</p>
                     </div>
                   ) : (
-                    columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} atenuado />)
+                    columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} />)
                   )}
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {pestana === 'historial' && (
