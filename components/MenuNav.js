@@ -11,13 +11,12 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
-  Menu, X, LayoutDashboard, ChefHat, UtensilsCrossed, Clock,
+  Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield
 } from 'lucide-react';
 
 const LINKS_NAV = [
   { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
-  { href: '/cocina',     icono: ChefHat,         label: 'Cocina' },
   { href: '/carta',      icono: UtensilsCrossed, label: 'Carta' },
   { href: '/horarios',   icono: Clock,           label: 'Horarios' },
   { href: '/clientes',   icono: Users,           label: 'Clientes' },

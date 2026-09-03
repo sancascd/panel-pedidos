@@ -8,11 +8,11 @@ import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import MenuNav from '@/components/MenuNav';
 import {
-  Sun, Moon, LogOut, Clock, UtensilsCrossed,
+  Sun, Moon, LogOut, UtensilsCrossed,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  ShoppingBag, Euro, TrendingUp, TrendingDown, Bell, BellOff, Download
+  Bell, BellOff, Download
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -178,50 +178,6 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   );
 }
 
-function StatCard({ icono: Icono, label, valor, delta, deltaFormat, sublabel }) {
-  let deltaContenido = null;
-  let deltaClase = 'text-text-muted';
-  let DeltaIcono = null;
-
-  if (delta !== undefined && delta !== null && !isNaN(delta)) {
-    const positivo = delta > 0;
-    const cero = delta === 0;
-    if (cero) {
-      deltaClase = 'text-text-muted';
-    } else if (positivo) {
-      deltaClase = 'text-accent';
-      DeltaIcono = TrendingUp;
-    } else {
-      deltaClase = 'text-red-500';
-      DeltaIcono = TrendingDown;
-    }
-    deltaContenido = deltaFormat
-      ? deltaFormat(delta)
-      : (positivo ? '+' : '') + delta;
-  }
-
-  return (
-    <div className="card p-4">
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-          <Icono className="w-5 h-5 text-accent" />
-        </div>
-        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-3xl font-bold text-text tabular-nums">{valor}</p>
-      {deltaContenido !== null ? (
-        <div className={`flex items-center gap-1 mt-1 text-xs ${deltaClase}`}>
-          {DeltaIcono && <DeltaIcono className="w-3 h-3" />}
-          <span className="tabular-nums">{deltaContenido}</span>
-          <span className="text-text-muted">vs ayer</span>
-        </div>
-      ) : sublabel ? (
-        <p className="text-xs mt-1 text-text-muted">{sublabel}</p>
-      ) : null}
-    </div>
-  );
-}
-
 export default function PaginaPedidos() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -235,8 +191,6 @@ export default function PaginaPedidos() {
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
   const [modoOscuro, setModoOscuro] = useState(false);
-  const [estadisticas, setEstadisticas] = useState(null);
-  const [statsAbiertas, setStatsAbiertas] = useState(true);
   // 'default' | 'granted' | 'denied' | 'unsupported'
   const [permisoNotif, setPermisoNotif] = useState('default');
   // Estado para impresión en lote (varios pedidos a la vez)
@@ -287,13 +241,6 @@ export default function PaginaPedidos() {
     } else {
       setPermisoNotif(Notification.permission);
     }
-  }, []);
-
-  // Leer preferencia de stats abiertas/cerradas de localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const guardado = localStorage.getItem('stats-abiertas');
-    if (guardado !== null) setStatsAbiertas(guardado === 'true');
   }, []);
 
   // Refrescar las alertas de pedidos olvidados cada minuto
@@ -348,14 +295,6 @@ export default function PaginaPedidos() {
       try { localStorage.setItem('comandi-aviso-plan', avisoPlan.firma); } catch (e) {}
     }
     setAvisoPlan(null);
-  }
-
-  function alternarStats() {
-    const nuevo = !statsAbiertas;
-    setStatsAbiertas(nuevo);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stats-abiertas', String(nuevo));
-    }
   }
 
   async function solicitarPermisoNotif() {
@@ -430,7 +369,6 @@ export default function PaginaPedidos() {
       // Pasamos el id directo: setRestaurante no actualiza el state sincronamente,
       // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
       await cargarPedidos(restCargado?.id);
-      await cargarEstadisticas(restCargado?.id);
       setCargando(false);
     }
     init();
@@ -447,7 +385,6 @@ export default function PaginaPedidos() {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
         cargarPedidos();
-        cargarEstadisticas();
       }, 300);
     }
     const canal = supabase.channel('pedidos-realtime')
@@ -475,63 +412,6 @@ export default function PaginaPedidos() {
       .eq('restaurante_id', id)
       .order('creado_en', { ascending: true });
     setPedidos(data || []);
-  }
-
-  async function cargarEstadisticas() {
-    const inicioHoy = inicioDiaTrabajo();
-    const inicioAyer = inicioHoy - 24 * 60 * 60 * 1000;
-    const inicioAyerISO = new Date(inicioAyer).toISOString();
-
-    const { data } = await supabase
-      .from('pedidos')
-      .select('total, creado_en, entregado_en, estado')
-      .gte('creado_en', inicioAyerISO);
-
-    if (!data) {
-      setEstadisticas({
-        pedidosHoy: 0, deltaPedidos: 0,
-        ingresosHoy: 0, deltaIngresos: 0,
-        ticketMedioHoy: 0, tiempoMedio: null
-      });
-      return;
-    }
-
-    const hoy = data.filter(p => {
-      const d = parsearFechaUTC(p.creado_en);
-      return d && d.getTime() >= inicioHoy;
-    });
-    const ayer = data.filter(p => {
-      const d = parsearFechaUTC(p.creado_en);
-      if (!d) return false;
-      const t = d.getTime();
-      return t >= inicioAyer && t < inicioHoy;
-    });
-
-    const sumar = arr => arr.reduce((s, p) => s + Number(p.total || 0), 0);
-    const ingresosHoy = sumar(hoy);
-    const ingresosAyer = sumar(ayer);
-
-    // Tiempo medio de preparación: entregado_en - creado_en (en minutos) de los entregados hoy
-    const entregadosHoy = hoy.filter(p => p.entregado_en);
-    let tiempoMedio = null;
-    if (entregadosHoy.length > 0) {
-      const totalMs = entregadosHoy.reduce((s, p) => {
-        const dEntregado = parsearFechaUTC(p.entregado_en);
-        const dCreado = parsearFechaUTC(p.creado_en);
-        if (!dEntregado || !dCreado) return s;
-        return s + (dEntregado.getTime() - dCreado.getTime());
-      }, 0);
-      tiempoMedio = Math.round(totalMs / entregadosHoy.length / 1000 / 60);
-    }
-
-    setEstadisticas({
-      pedidosHoy: hoy.length,
-      deltaPedidos: hoy.length - ayer.length,
-      ingresosHoy: ingresosHoy,
-      deltaIngresos: ingresosHoy - ingresosAyer,
-      ticketMedioHoy: hoy.length > 0 ? ingresosHoy / hoy.length : 0,
-      tiempoMedio: tiempoMedio
-    });
   }
 
   async function cargarHistorial() {
@@ -740,9 +620,6 @@ export default function PaginaPedidos() {
       return;
     }
 
-    // Refrescar estadisticas (no recargamos pedidos: el optimistic ya esta)
-    cargarEstadisticas().catch(() => {});
-
     // Notificar al cliente (el bot decide si la transición es notificable o no)
     fetch('/api/bot-proxy/notificar-estado', {
       method: 'POST',
@@ -924,12 +801,28 @@ export default function PaginaPedidos() {
     }
   }
 
-  function imprimirComanda() { window.print(); }
+  // Marca pedidos como impresos (optimista + BD). Asi "Imprimir pendientes"
+  // deja de ofrecer los que ya salieron por la impresora.
+  async function marcarImpresos(ids) {
+    if (!ids || ids.length === 0) return;
+    const ahora = new Date().toISOString();
+    setPedidos(prev => prev.map(p => (ids.includes(p.id) ? { ...p, impreso_en: ahora } : p)));
+    const { error } = await supabase
+      .from('pedidos').update({ impreso_en: ahora }).in('id', ids);
+    if (error) console.log('Error marcando impresos:', error);
+  }
+
+  function imprimirComanda() {
+    window.print();
+    if (seleccionado) marcarImpresos([seleccionado.id]);
+  }
 
   async function imprimirLotePendientes() {
     const pendientes = pedidos
       .filter(esDelDiaActual)
-      .filter(p => columnaDe(p) !== 'finalizados');
+      .filter(p => p.estado !== 'cancelado')
+      .filter(p => columnaDe(p) !== 'finalizados')
+      .filter(p => !p.impreso_en);
     if (pendientes.length === 0) return;
 
     const ids = pendientes.map(p => p.id);
@@ -949,6 +842,8 @@ export default function PaginaPedidos() {
     // Esperamos al render antes de lanzar la impresión
     setTimeout(() => {
       window.print();
+      // Ya han salido por la impresora: dejan de estar pendientes de imprimir.
+      marcarImpresos(ids);
       // Después de cerrar el diálogo de impresión, limpiamos
       setTimeout(() => {
         setImprimiendoLote(false);
@@ -958,7 +853,30 @@ export default function PaginaPedidos() {
     }, 100);
   }
 
+  // Eliminar un pedido de la pantalla (p.ej. el cliente lo cancela).
+  // Se marca como 'cancelado': desaparece del tablero y de las estadisticas,
+  // pero el dato NO se borra de la base de datos.
+  async function eliminarPedido(p) {
+    const numero = '#' + p.id.slice(-4).toUpperCase();
+    const ok = window.confirm(
+      `¿Eliminar el pedido ${numero}?\n\n` +
+      'Desaparecerá de la pantalla. Úsalo si el cliente ha cancelado.'
+    );
+    if (!ok) return;
+    const { error } = await supabase
+      .from('pedidos').update({ estado: 'cancelado' }).eq('id', p.id);
+    if (error) {
+      window.alert('No se pudo eliminar el pedido: ' + error.message);
+      return;
+    }
+    // Optimista: lo quitamos ya de la vista.
+    setPedidos(prev => prev.map(x => (x.id === p.id ? { ...x, estado: 'cancelado' } : x)));
+    if (seleccionado?.id === p.id) setSeleccionado(null);
+  }
+
   async function cerrarSesion() {
+    // Confirmacion: es facil pulsarlo sin querer y perder la pantalla de pedidos.
+    if (!window.confirm('¿Seguro que quieres cerrar sesión?')) return;
     await supabase.auth.signOut();
     router.push('/login');
   }
@@ -1015,12 +933,16 @@ export default function PaginaPedidos() {
     );
   }
 
-  const pedidosHoy = pedidos.filter(esDelDiaActual);
+  // Pedidos del dia (los cancelados no se muestran, pero siguen en la BD).
+  const pedidosDia = pedidos.filter(esDelDiaActual).filter(p => p.estado !== 'cancelado');
 
+  // Tablero por TIPO DE ENTREGA: una columna de recogida y otra de reparto.
+  // Los terminados van aparte, debajo (ya no requieren accion).
+  const activos = pedidosDia.filter(p => columnaDe(p) !== 'finalizados');
   const columnas = {
-    recibidos: pedidosHoy.filter(p => columnaDe(p) === 'recibidos'),
-    proceso: pedidosHoy.filter(p => columnaDe(p) === 'proceso'),
-    finalizados: pedidosHoy.filter(p => columnaDe(p) === 'finalizados'),
+    recogida: activos.filter(p => p.tipo_entrega === 'recogida'),
+    reparto: activos.filter(p => p.tipo_entrega !== 'recogida'),
+    finalizados: pedidosDia.filter(p => columnaDe(p) === 'finalizados'),
   };
 
   function TarjetaPedido({ p }) {
@@ -1033,9 +955,14 @@ export default function PaginaPedidos() {
     const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => abrirPedido(p)}
-        className={`group w-full text-left card p-4 border-l-4 hover:shadow-lift transition-all duration-200 animate-fade-in ${
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPedido(p); }
+        }}
+        className={`group w-full text-left card p-4 border-l-4 cursor-pointer transition-all duration-200 animate-fade-in hover:shadow-lift ${
           olvidado
             ? 'border-red-500 border-l-red-500 ring-1 ring-red-500/30 animate-pulse-soft'
             : `${TONE_STRIPE[est.tone] || 'border-l-border'} hover:border-accent/30`
@@ -1068,17 +995,46 @@ export default function PaginaPedidos() {
               Lleva {minutos < 60 ? minutos + ' min' : Math.floor(minutos / 60) + 'h ' + (minutos % 60) + 'min'}
             </span>
           )}
+          {p.impreso_en && (
+            <span className="badge bg-surface-2 text-text-muted border border-border" title="El ticket ya se ha impreso">
+              <Printer className="w-3 h-3" />
+              Impreso
+            </span>
+          )}
         </div>
 
         <div className="flex justify-between items-center gap-2 pt-2 border-t border-border">
           <span className="text-sm font-medium text-text truncate">
             {p.cliente_nombre || telefonoLimpio(p.cliente_telefono)}
           </span>
-          <span className="text-lg font-bold text-text tabular-nums flex-shrink-0">
-            {Number(p.total).toFixed(2)}€
-          </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <span className="text-lg font-bold text-text tabular-nums">
+              {Number(p.total).toFixed(2)}€
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); eliminarPedido(p); }}
+              title="Eliminar pedido (el cliente lo ha cancelado)"
+              aria-label="Eliminar pedido"
+              className="p-1.5 rounded-lg text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </button>
+
+        {/* Accion directa: avanzar el pedido sin tener que abrirlo. */}
+        {est.siguiente && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); cambiarEstado(p, est.siguiente); }}
+            className="btn-primary w-full mt-3 text-sm py-2"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {est.siguienteLabel}
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -1214,7 +1170,7 @@ export default function PaginaPedidos() {
             <Calendar className="w-4 h-4" />
             Hoy
             <span className="ml-1 tabular-nums text-xs px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
-              {pedidosHoy.length}
+              {pedidosDia.length}
             </span>
           </button>
           <button
@@ -1263,69 +1219,19 @@ export default function PaginaPedidos() {
           </div>
         )}
 
-        {pestana === 'hoy' && estadisticas && (
-          <div className="mb-6">
-            <button
-              onClick={alternarStats}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-surface-2/50 border border-border hover:border-accent/30 transition-colors"
-              aria-expanded={statsAbiertas}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
-                <span className="text-sm font-medium text-text">Estadísticas del día</span>
-                {!statsAbiertas && (
-                  <span className="text-xs text-text-muted ml-2 tabular-nums truncate">
-                    {estadisticas.pedidosHoy} pedidos · {estadisticas.ingresosHoy.toFixed(2)}€
-                  </span>
-                )}
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform duration-200 ${
-                  statsAbiertas ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {statsAbiertas && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3 animate-fade-in">
-                <StatCard
-                  icono={ShoppingBag}
-                  label="Pedidos hoy"
-                  valor={estadisticas.pedidosHoy}
-                  delta={estadisticas.deltaPedidos}
-                />
-                <StatCard
-                  icono={Euro}
-                  label="Ingresos hoy"
-                  valor={`${estadisticas.ingresosHoy.toFixed(2)}€`}
-                  delta={estadisticas.deltaIngresos}
-                  deltaFormat={(d) => `${d > 0 ? '+' : ''}${d.toFixed(2)}€`}
-                />
-                <StatCard
-                  icono={Receipt}
-                  label="Ticket medio"
-                  valor={`${estadisticas.ticketMedioHoy.toFixed(2)}€`}
-                  sublabel={estadisticas.pedidosHoy > 0 ? 'por pedido' : 'sin pedidos hoy'}
-                />
-                <StatCard
-                  icono={Clock}
-                  label="Tiempo medio"
-                  valor={estadisticas.tiempoMedio !== null ? `${estadisticas.tiempoMedio} min` : '—'}
-                  sublabel={estadisticas.tiempoMedio !== null ? 'de preparación' : 'sin entregas hoy'}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         {pestana === 'hoy' && (() => {
-          const pendientesCount = pedidos.filter(esDelDiaActual).filter(p => columnaDe(p) !== 'finalizados').length;
+          // "Pendientes" = pendientes DE IMPRIMIR (los ya impresos no se ofrecen).
+          const pendientesCount = pedidos
+            .filter(esDelDiaActual)
+            .filter(p => p.estado !== 'cancelado')
+            .filter(p => columnaDe(p) !== 'finalizados')
+            .filter(p => !p.impreso_en).length;
           return pendientesCount > 0 ? (
             <div className="mb-4 flex justify-end">
               <button
                 onClick={imprimirLotePendientes}
                 className="btn-secondary text-sm"
-                title="Imprimir todos los pedidos pendientes"
+                title="Imprime los pedidos que aún no han salido por la impresora"
               >
                 <Printer className="w-4 h-4" />
                 Imprimir pendientes ({pendientesCount})
@@ -1335,72 +1241,76 @@ export default function PaginaPedidos() {
         })()}
 
         {pestana === 'hoy' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Columna RECIBIDOS */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
-              <div className="mb-3 px-1 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-soft" />
-                    <h2 className="text-base font-bold text-text">Recibidos</h2>
+          <>
+            {/* Tablero por TIPO DE ENTREGA: cada flujo en su columna.
+                En movil se apilan (recogida arriba, reparto debajo). */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* COLUMNA RECOGIDA */}
+              <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-amber-500/50">
+                <div className="mb-3 px-1 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-amber-500" />
+                      <h2 className="text-base font-bold text-text">Recogida</h2>
+                    </div>
+                    <p className="text-xs text-text-muted mt-0.5">Vienen a recogerlo al local</p>
                   </div>
-                  <p className="text-xs text-text-muted mt-0.5">Hay que prepararlos</p>
+                  <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-surface text-text tabular-nums">
+                    {columnas.recogida.length}
+                  </span>
                 </div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
-                  {columnas.recibidos.length}
-                </span>
+                <div className="space-y-2">
+                  {columnas.recogida.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">Sin pedidos de recogida</p>
+                    </div>
+                  ) : (
+                    columnas.recogida.map(p => <TarjetaPedido key={p.id} p={p} />)
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                {columnas.recibidos.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-text-muted">Sin pedidos nuevos</p>
+
+              {/* COLUMNA REPARTO */}
+              <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
+                <div className="mb-3 px-1 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Home className="w-4 h-4 text-blue-500" />
+                      <h2 className="text-base font-bold text-text">Reparto</h2>
+                    </div>
+                    <p className="text-xs text-text-muted mt-0.5">Se llevan a domicilio</p>
                   </div>
-                ) : (
-                  columnas.recibidos.map(p => <TarjetaPedido key={p.id} p={p} />)
-                )}
+                  <span className="text-sm font-bold px-2.5 py-1 rounded-lg bg-surface text-text tabular-nums">
+                    {columnas.reparto.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {columnas.reparto.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-text-muted">Sin pedidos de reparto</p>
+                    </div>
+                  ) : (
+                    columnas.reparto.map(p => <TarjetaPedido key={p.id} p={p} />)
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Columna EN PROCESO */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-blue-500/50">
-              <div className="mb-3 px-1 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    <h2 className="text-base font-bold text-text">En proceso</h2>
-                  </div>
-                  <p className="text-xs text-text-muted mt-0.5">Listos o en reparto</p>
-                </div>
-                <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
-                  {columnas.proceso.length}
-                </span>
-              </div>
-              <div className="space-y-2">
-                {columnas.proceso.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-text-muted">Sin pedidos en proceso</p>
-                  </div>
-                ) : (
-                  columnas.proceso.map(p => <TarjetaPedido key={p.id} p={p} />)
-                )}
-              </div>
-            </div>
-
-            {/* Columna FINALIZADOS (plegable) */}
-            <div className="bg-surface-2/50 rounded-xl p-3 border border-border border-t-2 border-t-accent/50">
+            {/* TERMINADOS: aparte y debajo (posicion menos prioritaria), plegable. */}
+            <div className="mt-6 bg-surface-2/50 rounded-xl p-3 border border-border">
               <button
                 onClick={() => setFinalizadosAbierto(!finalizadosAbierto)}
-                className="w-full mb-3 px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
+                className="w-full px-1 flex items-center justify-between hover:bg-surface rounded-lg p-2 -m-1 transition-colors"
               >
                 <div className="text-left">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    <h2 className="text-base font-bold text-text">Finalizados</h2>
+                    <CheckCircle2 className="w-4 h-4 text-text-muted" />
+                    <h2 className="text-base font-bold text-text">Terminados</h2>
                   </div>
                   <p className="text-xs text-text-muted mt-0.5">Entregados o recogidos</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
+                  <span className="text-sm font-medium px-2 py-0.5 rounded-md bg-surface text-text-muted tabular-nums">
                     {columnas.finalizados.length}
                   </span>
                   {finalizadosAbierto ?
@@ -1410,10 +1320,10 @@ export default function PaginaPedidos() {
                 </div>
               </button>
               {finalizadosAbierto && (
-                <div className="space-y-2 animate-fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 animate-fade-in">
                   {columnas.finalizados.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-sm text-text-muted">Sin pedidos finalizados</p>
+                    <div className="py-8 text-center md:col-span-2">
+                      <p className="text-sm text-text-muted">Sin pedidos terminados</p>
                     </div>
                   ) : (
                     columnas.finalizados.map(p => <TarjetaPedido key={p.id} p={p} />)
@@ -1421,7 +1331,7 @@ export default function PaginaPedidos() {
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {pestana === 'historial' && (

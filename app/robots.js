@@ -9,7 +9,6 @@ export default function robots() {
         allow: ['/', '/login', '/registro', '/recuperar-contrasena', '/aviso-legal', '/privacidad', '/contacto'],
         disallow: [
           '/pedidos',
-          '/cocina',
           '/clientes',
           '/carta',
           '/horarios',
