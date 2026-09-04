@@ -37,6 +37,7 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
   // Si algun dia se vincula a un restaurante para ayudarle, vuelve el menu
   // completo solo.
   const [sinRestaurante, setSinRestaurante] = useState(false);
+  const [nombreRestaurante, setNombreRestaurante] = useState('');
 
   // Si la página no nos dice si es admin, lo consultamos nosotros.
   useEffect(() => {
@@ -56,7 +57,14 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
     let activo = true;
     const supabase = crearClienteSupabase();
     supabase.rpc('mi_restaurante_id')
-      .then(({ data }) => { if (activo) setSinRestaurante(!data); })
+      .then(async ({ data }) => {
+        if (!activo) return;
+        setSinRestaurante(!data);
+        if (!data) { setNombreRestaurante(''); return; }
+        const { data: rest } = await supabase
+          .from('restaurantes').select('nombre').eq('id', data).maybeSingle();
+        if (activo) setNombreRestaurante(rest?.nombre || '');
+      })
       .catch(() => {});
     return () => { activo = false; };
   }, []);
@@ -73,6 +81,28 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
   }
 
   return (
+    <>
+      {/* Barra fija mientras el superadmin esta dentro del panel de un
+          restaurante. Estaba solo en el menu desplegable y se olvidaba:
+          volvias a entrar al dia siguiente y seguias dentro sin darte cuenta. */}
+      {dentroDeUnRestaurante && (
+        <div className="fixed bottom-0 left-0 right-0 z-[60] no-imprimir bg-amber-500 text-black shadow-lift">
+          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm font-medium min-w-0">
+              Estas viendo el panel de{' '}
+              <strong>{nombreRestaurante || 'un restaurante'}</strong> como administradora
+            </p>
+            <button
+              onClick={salirDelPanel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/85 text-white text-sm font-semibold hover:bg-black transition-colors flex-shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+              Salir
+            </button>
+          </div>
+        </div>
+      )}
+
     <div className="relative">
       <button
         onClick={() => setAbierto(v => !v)}
@@ -131,5 +161,6 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
         </>
       )}
     </div>
+    </>
   );
 }
