@@ -463,6 +463,8 @@ export default function PaginaPedidos() {
       setEsAdmin(admin === true);
 
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
+      // Superadmin sin restaurante: su sitio es /admin, aqui solo veria vacio.
+      if (!restId && admin === true) { router.push('/admin'); return; }
       let restCargado = null;
       if (restId) {
         const { data: rest } = await supabase
@@ -600,6 +602,7 @@ export default function PaginaPedidos() {
   }
 
   async function cargarHistorial() {
+    if (!restaurante?.id) return;
     setHistorialCargando(true);
 
     // Si hay filtro de producto, hacemos inner join con lineas_pedido
@@ -613,6 +616,11 @@ export default function PaginaPedidos() {
     } else {
       query = query.select('*');
     }
+
+    // Filtro EXPLICITO por restaurante. Antes se confiaba solo en RLS, pero
+    // el superadmin puede ver todos los pedidos: sin esto, al entrar en el
+    // panel de un restaurante el historial mezclaria los de todos.
+    query = query.eq('restaurante_id', restaurante.id);
 
     query = query.order('creado_en', { ascending: false });
 

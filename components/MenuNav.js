@@ -8,11 +8,11 @@
 //       <MenuNav esAdmin={bool} />  -> si la página ya sabe si es admin
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
-  Users, BarChart3, Star, Gauge, Settings, Shield
+  Users, BarChart3, Star, Gauge, Settings, Shield, LogOut
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -29,8 +29,14 @@ const LINKS_NAV = [
 
 export default function MenuNav({ esAdmin: esAdminProp }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [esAdmin, setEsAdmin] = useState(esAdminProp === true);
+  // Un superadmin sin restaurante vinculado (la cuenta de plataforma) no
+  // tiene nada que hacer en Tablero, Carta, etc.: se le deja solo Admin.
+  // Si algun dia se vincula a un restaurante para ayudarle, vuelve el menu
+  // completo solo.
+  const [sinRestaurante, setSinRestaurante] = useState(false);
 
   // Si la página no nos dice si es admin, lo consultamos nosotros.
   useEffect(() => {
@@ -45,6 +51,26 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
       .catch(() => {});
     return () => { activo = false; };
   }, [esAdminProp]);
+
+  useEffect(() => {
+    let activo = true;
+    const supabase = crearClienteSupabase();
+    supabase.rpc('mi_restaurante_id')
+      .then(({ data }) => { if (activo) setSinRestaurante(!data); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, []);
+
+  // Solo aparece cuando un superadmin esta DENTRO del panel de un
+  // restaurante (entro desde /admin). Deshace el vinculo temporal.
+  const dentroDeUnRestaurante = esAdmin && !sinRestaurante;
+
+  async function salirDelPanel() {
+    const supabase = crearClienteSupabase();
+    const { error } = await supabase.rpc('salir_del_restaurante');
+    if (error) { alert('No se pudo salir: ' + error.message); return; }
+    window.location.href = '/admin';
+  }
 
   return (
     <div className="relative">
@@ -67,7 +93,23 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
             aria-hidden
           />
           <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
-            {LINKS_NAV.map(({ href, icono: Icono, label, soloAdmin }) => (
+            {dentroDeUnRestaurante && (
+              <>
+                <button
+                  onClick={() => { setAbierto(false); salirDelPanel(); }}
+                  role="menuitem"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4 flex-shrink-0" />
+                  Salir del panel
+                </button>
+                <div className="my-1.5 border-t border-border" />
+              </>
+            )}
+            {(esAdmin && sinRestaurante
+              ? LINKS_NAV.filter(l => l.soloAdmin)
+              : LINKS_NAV
+            ).map(({ href, icono: Icono, label, soloAdmin }) => (
               (!soloAdmin || esAdmin) && (
                 <a
                   key={href}

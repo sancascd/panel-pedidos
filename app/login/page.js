@@ -50,6 +50,13 @@ export default function PaginaLogin() {
       if (recordar) localStorage.setItem('comandi-email-recordado', email.trim());
       else localStorage.removeItem('comandi-email-recordado');
     } catch (e) {}
+    // La cuenta de plataforma (superadmin sin restaurante) entra directa a
+    // /admin: el tablero de pedidos no tiene nada que ensenarle.
+    const { data: restId } = await supabase.rpc('mi_restaurante_id');
+    if (!restId) {
+      const { data: admin } = await supabase.rpc('soy_superadmin');
+      if (admin === true) { router.push('/admin'); return; }
+    }
     router.push('/pedidos');
   }
 
