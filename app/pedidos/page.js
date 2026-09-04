@@ -12,11 +12,15 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  Bell, BellOff, Download
+  Bell, BellOff, Download, Settings
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
 // La INTERNAL_API_KEY vive solo en el server, nunca en el bundle del navegador.
+// Acceso directo de Chrome que imprime sin cuadro de dialogo (ver ayuda del panel).
+const COMANDO_KIOSK =
+  '"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing https://comandi.es/pedidos';
+
 const HORAS_LIMITE_AVISO = 24;
 const HORA_INICIO_DIA = 6;
 
@@ -112,8 +116,19 @@ function estrellas(puntuacion) {
   return llenas + vacias;
 }
 
-function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefonoLimpio }) {
+// Un pedido puede salir en dos formatos muy distintos:
+//  - 'cocina': SIN precios ni datos de entrega. Solo que se cocinar, en grande.
+//  - 'bolsa' : el ticket completo que se grapa a la bolsa (cliente, direccion,
+//              precios, total y forma de pago).
+function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefonoLimpio, numerosProd = {}, variante = 'bolsa' }) {
   if (!pedido) return null;
+  const esCocina = variante === 'cocina';
+  const numeroDe = (l) => (l.producto_id && numerosProd[l.producto_id]) || '';
+  // Si ningun plato tiene numero no pintamos la columna: no dejamos un hueco.
+  const hayNumeros = lineas.some(l => numeroDe(l) !== '');
+  const numero = '#' + pedido.id.slice(-4).toUpperCase();
+  const esRecogida = pedido.tipo_entrega === 'recogida';
+
   const pagoTexto = (() => {
     if (pedido.metodo_pago === 'tarjeta') return 'TARJETA';
     if (pedido.metodo_pago === 'pago_en_local') return 'AL RECOGER';
@@ -127,19 +142,57 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
     return '-';
   })();
 
+  // ---------- TICKET DE COCINA ----------
+  if (esCocina) {
+    const totalArticulos = lineas.reduce((n, l) => n + Number(l.cantidad || 0), 0);
+    return (
+      <div className="ticket ticket-cocina">
+        <p className="etiqueta">* * *  C O C I N A  * * *</p>
+        <h1>{numero}</h1>
+        <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
+        <div className="separador"></div>
+        <p className="grande">{esRecogida ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
+        <div className="separador"></div>
+        <table>
+          <tbody>
+            {lineas.map(l => (
+              <Fragment key={l.id}>
+                <tr>
+                  <td className="col-cant">{l.cantidad}x</td>
+                  {hayNumeros && <td className="col-num">{numeroDe(l)}</td>}
+                  <td className="col-prod">{l.nombre_producto}</td>
+                </tr>
+                {l.notas && l.notas.trim() !== '' && (
+                  <tr>
+                    <td colSpan={hayNumeros ? 3 : 2} className="nota">&rarr; {l.notas}</td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+        <div className="separador"></div>
+        {/* El nombre permite casar este ticket con el de la bolsa */}
+        <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
+        <p><strong>Articulos:</strong> {totalArticulos}</p>
+      </div>
+    );
+  }
+
+  // ---------- TICKET PARA LA BOLSA ----------
   return (
     <div className="ticket">
-      <h1>PEDIDO #{pedido.id.slice(-4).toUpperCase()}</h1>
+      <h1>PEDIDO {numero}</h1>
       <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
       {restaurante?.nombre && (
         <p style={{ textAlign: 'center', margin: '0 0 3mm 0', fontSize: '18pt' }}>{restaurante.nombre}</p>
       )}
       <div className="separador"></div>
-      <p className="grande">{pedido.tipo_entrega === 'recogida' ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
+      <p className="grande">{esRecogida ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
       <div className="separador"></div>
       <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
       <p><strong>Telefono:</strong> {telefonoLimpio(pedido.cliente_telefono)}</p>
-      {pedido.tipo_entrega !== 'recogida' && (
+      {!esRecogida && (
         <p><strong>Direccion:</strong> {pedido.cliente_direccion || '-'}</p>
       )}
       <div className="separador"></div>
@@ -156,12 +209,14 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
             <Fragment key={l.id}>
               <tr>
                 <td className="col-cant">{l.cantidad}x</td>
-                <td className="col-prod">{l.nombre_producto}</td>
-                <td className="col-tot">{(l.cantidad * Number(l.precio_unitario)).toFixed(2)}€</td>
+                <td className="col-prod">
+                  {numeroDe(l) ? <strong>{numeroDe(l)}. </strong> : null}{l.nombre_producto}
+                </td>
+                <td className="col-tot">{(l.cantidad * Number(l.precio_unitario)).toFixed(2)}&euro;</td>
               </tr>
               {l.notas && l.notas.trim() !== '' && (
                 <tr>
-                  <td colSpan="3" className="nota">→ {l.notas}</td>
+                  <td colSpan="3" className="nota">&rarr; {l.notas}</td>
                 </tr>
               )}
             </Fragment>
@@ -169,12 +224,23 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
         </tbody>
       </table>
       <div className="separador"></div>
-      <p className="total">TOTAL: {Number(pedido.total).toFixed(2)}€</p>
+      <p className="total">TOTAL: {Number(pedido.total).toFixed(2)}&euro;</p>
       <div className="separador"></div>
       <p><strong>Pago:</strong> {pagoTexto}</p>
       <div className="separador"></div>
       <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
     </div>
+  );
+}
+
+// Lo que sale por la impresora para UN pedido: segun ajuste, el ticket de
+// cocina + el de la bolsa, o solo el de la bolsa.
+function TicketsDePedido({ dosTickets, ...props }) {
+  return (
+    <>
+      {dosTickets ? <TicketImprimible {...props} variante="cocina" /> : null}
+      <TicketImprimible {...props} variante="bolsa" />
+    </>
   );
 }
 
@@ -197,6 +263,20 @@ export default function PaginaPedidos() {
   const [imprimiendoLote, setImprimiendoLote] = useState(false);
   const [pedidosLote, setPedidosLote] = useState([]);
   const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
+  // Ajustes de impresion POR DISPOSITIVO (localStorage): la impresora esta en
+  // el PC del local, no en el movil del dueno. Por eso no van en la BD.
+  const [ajustesImpr, setAjustesImpr] = useState({ auto: false, dosTickets: true });
+  // Mapa producto_id -> numero de carta. Las lineas del pedido guardan una
+  // copia del NOMBRE, no el numero, asi que lo cruzamos con la carta al vuelo.
+  const [numerosProd, setNumerosProd] = useState({});
+  const [menuImpresion, setMenuImpresion] = useState(false);
+  const [ayudaKiosk, setAyudaKiosk] = useState(false);
+  // Refs: los callbacks de realtime capturan el closure y se quedarian con
+  // valores viejos si leyeran el state directamente.
+  const ajustesImprRef = useRef({ auto: false, dosTickets: true });
+  const colaImprRef = useRef([]);        // trabajos pendientes: array de arrays
+  const imprimiendoRef = useRef(false);  // hay un window.print() en curso
+  const vistosImprRef = useRef(null);    // ids ya evaluados (null = sin inicializar)
 
   const [pestana, setPestana] = useState('hoy');
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
@@ -290,6 +370,24 @@ export default function PaginaPedidos() {
     return () => { cancelado = true; };
   }, [restaurante?.id]);
 
+  useEffect(() => {
+    try {
+      const guardado = JSON.parse(localStorage.getItem('comandi-impresion') || 'null');
+      if (guardado && typeof guardado === 'object') {
+        setAjustesImpr({ auto: guardado.auto === true, dosTickets: guardado.dosTickets !== false });
+      }
+    } catch (e) { /* localStorage no disponible: nos quedamos con los defaults */ }
+  }, []);
+
+  useEffect(() => {
+    ajustesImprRef.current = ajustesImpr;
+    try { localStorage.setItem('comandi-impresion', JSON.stringify(ajustesImpr)); } catch (e) {}
+  }, [ajustesImpr]);
+
+  function cambiarAjusteImpr(campo, valor) {
+    setAjustesImpr(prev => ({ ...prev, [campo]: valor }));
+  }
+
   function descartarAvisoPlan() {
     if (avisoPlan) {
       try { localStorage.setItem('comandi-aviso-plan', avisoPlan.firma); } catch (e) {}
@@ -369,6 +467,7 @@ export default function PaginaPedidos() {
       // Pasamos el id directo: setRestaurante no actualiza el state sincronamente,
       // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
       await cargarPedidos(restCargado?.id);
+      await cargarNumerosProductos(restCargado?.id);
       setCargando(false);
     }
     init();
@@ -400,6 +499,45 @@ export default function PaginaPedidos() {
       .subscribe();
     return () => { clearTimeout(timeout); supabase.removeChannel(canal); };
   }, [restaurante?.id]);
+
+  // IMPRESION AUTOMATICA
+  // Se dispara solo con pedidos que llegan CON EL PANEL YA ABIERTO. Los que
+  // habia al abrir (o los acumulados con el ajuste apagado) se marcan como
+  // vistos: si no, al encender el PC saldria por la impresora toda la tarde.
+  // Para esos esta el boton "Imprimir pendientes".
+  useEffect(() => {
+    if (cargando) return;
+
+    if (vistosImprRef.current === null) {
+      vistosImprRef.current = new Set(pedidos.map(p => p.id));
+      return;
+    }
+
+    if (!ajustesImprRef.current.auto) {
+      pedidos.forEach(p => vistosImprRef.current.add(p.id));
+      return;
+    }
+
+    const nuevos = pedidos.filter(p =>
+      !vistosImprRef.current.has(p.id) &&
+      !p.impreso_en &&
+      p.estado !== 'cancelado' &&
+      esDelDiaActual(p)
+    );
+    pedidos.forEach(p => vistosImprRef.current.add(p.id));
+    if (nuevos.length > 0) encolarImpresion(nuevos);
+  }, [pedidos, cargando]);
+
+  async function cargarNumerosProductos(idForzado) {
+    const id = idForzado || restaurante?.id;
+    if (!id) return;
+    const { data, error } = await supabase
+      .from('productos').select('id, numero').eq('restaurante_id', id);
+    if (error) { console.log('Error cargando numeros de carta:', error); return; }
+    const mapa = {};
+    (data || []).forEach(prod => { if (prod.numero) mapa[prod.id] = prod.numero; });
+    setNumerosProd(mapa);
+  }
 
   async function cargarPedidos(idForzado) {
     // Acepta un id forzado para no depender del state restaurante en el primer
@@ -812,45 +950,85 @@ export default function PaginaPedidos() {
     if (error) console.log('Error marcando impresos:', error);
   }
 
-  function imprimirComanda() {
-    window.print();
-    if (seleccionado) marcarImpresos([seleccionado.id]);
+  function esperar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async function imprimirLotePendientes() {
-    const pendientes = pedidos
-      .filter(esDelDiaActual)
-      .filter(p => p.estado !== 'cancelado')
-      .filter(p => columnaDe(p) !== 'finalizados')
-      .filter(p => !p.impreso_en);
-    if (pendientes.length === 0) return;
+  // Motor unico de impresion. Todo pasa por aqui (manual, lote y automatica)
+  // para que nunca haya dos window.print() solapados.
+  async function imprimirPedidos(lista) {
+    if (!lista || lista.length === 0) return;
+    const ids = lista.map(p => p.id);
 
-    const ids = pendientes.map(p => p.id);
-    const { data: lineas } = await supabase
+    // Refrescamos por si han tocado los numeros de la carta desde otra pestana.
+    await cargarNumerosProductos();
+
+    const { data: lineasBD, error } = await supabase
       .from('lineas_pedido').select('*').in('pedido_id', ids);
+    if (error) { console.log('Error cargando lineas para imprimir:', error); return; }
 
     const porPedido = {};
-    (lineas || []).forEach(l => {
+    (lineasBD || []).forEach(l => {
       if (!porPedido[l.pedido_id]) porPedido[l.pedido_id] = [];
       porPedido[l.pedido_id].push(l);
     });
 
-    setPedidosLote(pendientes);
+    setPedidosLote(lista);
     setLineasLote(porPedido);
     setImprimiendoLote(true);
 
-    // Esperamos al render antes de lanzar la impresión
-    setTimeout(() => {
+    // Damos margen a React para pintar los tickets antes de llamar a print().
+    await esperar(150);
+    try {
       window.print();
-      // Ya han salido por la impresora: dejan de estar pendientes de imprimir.
-      marcarImpresos(ids);
-      // Después de cerrar el diálogo de impresión, limpiamos
-      setTimeout(() => {
-        setImprimiendoLote(false);
-        setPedidosLote([]);
-        setLineasLote({});
-      }, 500);
-    }, 100);
+    } catch (e) {
+      console.log('Error al imprimir:', e);
+    }
+    // Ya han salido por la impresora: dejan de estar pendientes de imprimir.
+    await marcarImpresos(ids);
+
+    // No limpiamos el DOM enseguida: en modo kiosk Chrome procesa el trabajo
+    // de impresion despues de que print() haya devuelto el control.
+    await esperar(800);
+    setImprimiendoLote(false);
+    setPedidosLote([]);
+    setLineasLote({});
+  }
+
+  // Cola: si entran tres pedidos seguidos, se imprimen uno detras de otro.
+  function encolarImpresion(trabajo) {
+    if (!trabajo || trabajo.length === 0) return;
+    colaImprRef.current.push(trabajo);
+    procesarColaImpresion();
+  }
+
+  async function procesarColaImpresion() {
+    if (imprimiendoRef.current) return;
+    const trabajo = colaImprRef.current.shift();
+    if (!trabajo) return;
+    imprimiendoRef.current = true;
+    try {
+      await imprimirPedidos(trabajo);
+    } finally {
+      imprimiendoRef.current = false;
+    }
+    if (colaImprRef.current.length > 0) procesarColaImpresion();
+  }
+
+  function imprimirComanda() {
+    if (seleccionado) encolarImpresion([seleccionado]);
+  }
+
+  function pendientesDeImprimir() {
+    return pedidos
+      .filter(esDelDiaActual)
+      .filter(p => p.estado !== 'cancelado')
+      .filter(p => columnaDe(p) !== 'finalizados')
+      .filter(p => !p.impreso_en);
+  }
+
+  function imprimirLotePendientes() {
+    encolarImpresion(pendientesDeImprimir());
   }
 
   // Eliminar un pedido de la pantalla (p.ej. el cliente lo cancela).
@@ -1070,6 +1248,16 @@ export default function PaginaPedidos() {
           .ticket table .col-prod { width: 58%; }
           .ticket table .col-tot { width: 28%; text-align: right; }
           .ticket .nota { font-size: 14pt; font-style: italic; padding-left: 4mm; }
+          .ticket .etiqueta { text-align: center; font-size: 15pt; letter-spacing: 1px; margin: 0 0 2mm 0; }
+          /* El de cocina se lee de lejos y de un vistazo: solo cantidad y plato */
+          .ticket-cocina { font-size: 19pt; }
+          .ticket-cocina h1 { font-size: 34pt; }
+          .ticket-cocina table td { font-size: 22pt; padding: 2.5mm 0; }
+          .ticket-cocina table .col-cant { width: 16%; }
+          /* El numero es lo primero que mira cocina: mas grande que el nombre */
+          .ticket-cocina table .col-num { width: 20%; font-size: 26pt; font-weight: bold; text-align: center; }
+          .ticket-cocina table .col-prod { width: 64%; }
+          .ticket-cocina .nota { font-size: 17pt; font-style: normal; }
           .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
           /* Corte entre tickets cuando se imprimen varios en lote */
           .ticket + .ticket { page-break-before: always; break-before: page; }
@@ -1221,23 +1409,93 @@ export default function PaginaPedidos() {
 
         {pestana === 'hoy' && (() => {
           // "Pendientes" = pendientes DE IMPRIMIR (los ya impresos no se ofrecen).
-          const pendientesCount = pedidos
-            .filter(esDelDiaActual)
-            .filter(p => p.estado !== 'cancelado')
-            .filter(p => columnaDe(p) !== 'finalizados')
-            .filter(p => !p.impreso_en).length;
-          return pendientesCount > 0 ? (
-            <div className="mb-4 flex justify-end">
+          const pendientesCount = pendientesDeImprimir().length;
+          return (
+            <div className="mb-4 flex justify-end items-center gap-2 relative">
+              {ajustesImpr.auto && (
+                <span className="text-xs font-medium text-accent flex items-center gap-1.5 mr-auto">
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                  Impresión automática activada
+                </span>
+              )}
+
+              {pendientesCount > 0 && (
+                <button
+                  onClick={imprimirLotePendientes}
+                  className="btn-secondary text-sm"
+                  title="Imprime los pedidos que aún no han salido por la impresora"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir pendientes ({pendientesCount})
+                </button>
+              )}
+
               <button
-                onClick={imprimirLotePendientes}
-                className="btn-secondary text-sm"
-                title="Imprime los pedidos que aún no han salido por la impresora"
+                onClick={() => setMenuImpresion(v => !v)}
+                className="btn-ghost text-sm"
+                title="Ajustes de impresión de este dispositivo"
               >
-                <Printer className="w-4 h-4" />
-                Imprimir pendientes ({pendientesCount})
+                <Settings className="w-4 h-4" />
+                Impresión
               </button>
+
+              {menuImpresion && (
+                <>
+                  {/* Capa para cerrar al pulsar fuera */}
+                  <div className="fixed inset-0 z-40" onClick={() => setMenuImpresion(false)} />
+                  <div className="absolute right-0 top-full mt-2 z-50 w-80 card p-4 shadow-lg animate-fade-in">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-text">Impresión</p>
+                      <button onClick={() => setMenuImpresion(false)} className="text-text-muted hover:text-text">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-text-muted mb-4">
+                      Estos ajustes son <strong>solo de este dispositivo</strong>. Actívalos en el ordenador
+                      que tiene la impresora.
+                    </p>
+
+                    <label className="flex items-start gap-3 mb-4 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ajustesImpr.auto}
+                        onChange={e => cambiarAjusteImpr('auto', e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-emerald-500 flex-shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-text">Imprimir automáticamente</span>
+                        <span className="block text-xs text-text-muted mt-0.5">
+                          Cada pedido nuevo sale por la impresora al llegar, sin pulsar nada.
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-3 mb-4 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ajustesImpr.dosTickets}
+                        onChange={e => cambiarAjusteImpr('dosTickets', e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-emerald-500 flex-shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-text">Dos tickets por pedido</span>
+                        <span className="block text-xs text-text-muted mt-0.5">
+                          Uno para <strong>cocina</strong> (sin precios) y otro para <strong>grapar en la bolsa</strong>.
+                        </span>
+                      </span>
+                    </label>
+
+                    <button
+                      onClick={() => { setMenuImpresion(false); setAyudaKiosk(true); }}
+                      className="text-xs text-accent hover:underline font-medium"
+                    >
+                      ¿Te sale el cuadro de "Imprimir" cada vez? →
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          ) : null;
+          );
         })()}
 
         {pestana === 'hoy' && (
@@ -1882,14 +2140,75 @@ export default function PaginaPedidos() {
         </div>
       )}
 
+      {/* Ayuda: como imprimir sin que salga el cuadro de dialogo (Chrome kiosk) */}
+      {ayudaKiosk && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 no-imprimir animate-fade-in"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setAyudaKiosk(false)}
+        >
+          <div
+            className="card p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <h3 className="text-lg font-semibold text-text">Imprimir sin que salga el cuadro</h3>
+              <button onClick={() => setAyudaKiosk(false)} className="text-text-muted hover:text-text">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-text-muted mb-4">
+              Por seguridad, el navegador siempre pide confirmación antes de imprimir. Para que los tickets
+              salgan solos hay que abrir Chrome en modo impresión directa. Se hace <strong>una sola vez</strong> en
+              el ordenador del local:
+            </p>
+
+            <ol className="text-sm text-text space-y-3 list-decimal pl-5 mb-4">
+              <li>Comprueba que la impresora de tickets es la <strong>predeterminada de Windows</strong>
+                  (Configuración → Bluetooth y dispositivos → Impresoras).</li>
+              <li>Cierra Chrome por completo.</li>
+              <li>Clic derecho en el escritorio → <strong>Nuevo</strong> → <strong>Acceso directo</strong>.</li>
+              <li>
+                Pega esta ruta y pulsa Siguiente:
+                <code className="block mt-2 p-3 rounded-lg bg-surface-2 border border-border text-xs break-all font-mono">
+                  {COMANDO_KIOSK}
+                </code>
+                <button
+                  onClick={() => { try { navigator.clipboard.writeText(COMANDO_KIOSK); } catch (e) {} }}
+                  className="btn-ghost text-xs mt-2"
+                >
+                  Copiar
+                </button>
+              </li>
+              <li>Llámalo <strong>Comandi</strong> y termina.</li>
+              <li>A partir de ahora, <strong>abre el panel siempre desde ese icono</strong>.</li>
+            </ol>
+
+            <div className="card p-3 bg-amber-500/5 border-amber-500/20">
+              <p className="text-xs text-text-muted">
+                <strong className="text-text">Ojo:</strong> en esa ventana todo lo que se imprima irá directo a la
+                impresora predeterminada, sin preguntar. Úsala solo para el panel de pedidos.
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button onClick={() => setAyudaKiosk(false)} className="btn-primary">Entendido</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Zona imprimible (ticket) — soporta tanto el pedido seleccionado
           como el lote de pedidos pendientes */}
       {((seleccionado && !editando) || imprimiendoLote) && (
         <div className="zona-imprimible solo-imprimir">
           {imprimiendoLote
             ? pedidosLote.map(p => (
-                <TicketImprimible
+                <TicketsDePedido
                   key={p.id}
+                  dosTickets={ajustesImpr.dosTickets}
+                  numerosProd={numerosProd}
                   pedido={p}
                   lineas={lineasLote[p.id] || []}
                   restaurante={restaurante}
@@ -1898,7 +2217,9 @@ export default function PaginaPedidos() {
                 />
               ))
             : (
-              <TicketImprimible
+              <TicketsDePedido
+                dosTickets={ajustesImpr.dosTickets}
+                numerosProd={numerosProd}
                 pedido={seleccionado}
                 lineas={lineas}
                 restaurante={restaurante}
