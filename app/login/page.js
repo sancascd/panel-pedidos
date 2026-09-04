@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { crearClienteSupabase } from '@/lib/supabase';
@@ -14,6 +14,17 @@ export default function PaginaLogin() {
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  // En el local usan siempre el mismo ordenador: que no tengan que escribir
+  // el correo cada vez. Se guarda solo en ESE equipo, nunca la contrasena.
+  const [recordar, setRecordar] = useState(true);
+
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem('comandi-email-recordado');
+      if (guardado) setEmail(guardado);
+      else setRecordar(false);
+    } catch (e) { /* localStorage bloqueado: se escribe a mano y ya esta */ }
+  }, []);
 
   async function iniciarSesion(e) {
     e.preventDefault();
@@ -35,6 +46,10 @@ export default function PaginaLogin() {
       setError('Email o contraseña incorrectos.');
       return;
     }
+    try {
+      if (recordar) localStorage.setItem('comandi-email-recordado', email.trim());
+      else localStorage.removeItem('comandi-email-recordado');
+    } catch (e) {}
     router.push('/pedidos');
   }
 
@@ -108,6 +123,18 @@ export default function PaginaLogin() {
                   autoComplete="current-password"
                 />
               </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={recordar}
+                  onChange={(e) => setRecordar(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500"
+                />
+                <span className="text-sm text-text-muted">
+                  Recordar mi correo en este equipo
+                </span>
+              </label>
 
               <button
                 type="submit"
