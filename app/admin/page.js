@@ -8,7 +8,7 @@ import { parsearFechaUTC } from '@/lib/fechas';
 import {
   ArrowLeft, Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn
 } from 'lucide-react';
 import {
   infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade
@@ -126,6 +126,24 @@ export default function PaginaAdmin() {
     if (error) { avisar('Error: ' + error.message, 'error'); return; }
     avisar('Solicitud rechazada.');
     await cargarPlanes();
+  }
+
+  // Entrar en el panel de un restaurante para ayudarle. Vincula temporalmente
+  // la cuenta de admin a ese restaurante (RPC guardada por soy_superadmin) y
+  // a partir de ahi el panel funciona igual que para ellos. Se sale desde el
+  // menu, que muestra "Salir del panel" mientras estas dentro.
+  async function entrarEnPanel(rest) {
+    const ok = window.confirm(
+      'Vas a entrar en el panel de "' + (rest.nombre || 'este restaurante') + '".' +
+      '\n\nVeras y podras modificar sus datos como si fueras ellos. ' +
+      'Para volver aqui, usa "Salir del panel" en el menu.'
+    );
+    if (!ok) return;
+    setProcesando(rest.id);
+    const { error } = await supabase.rpc('entrar_en_restaurante', { p_restaurante_id: rest.id });
+    setProcesando(null);
+    if (error) { avisar('No se pudo entrar: ' + error.message, 'error'); return; }
+    router.push('/pedidos');
   }
 
   async function cargarRestaurantes() {
@@ -422,6 +440,18 @@ export default function PaginaAdmin() {
                         <span className="truncate">{r.email_usuario}</span>
                       </div>
                     )}
+                  </div>
+
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+                    <button
+                      onClick={() => entrarEnPanel(r)}
+                      disabled={procesando === r.id}
+                      className="btn-secondary text-sm"
+                      title="Ver y gestionar su panel para ayudarles"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Entrar en su panel
+                    </button>
                   </div>
 
                   {r.estado === 'pendiente' && (
