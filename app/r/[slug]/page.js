@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
-import { listaAlergenos } from '@/lib/alergenos';
+import CartaInteractiva from './CartaInteractiva';
 
 // Refresca la carta cada 30s (ISR). El restaurante edita en el panel y se ve
 // reflejado casi al instante, sin pegarle a la BD en cada visita.
@@ -57,7 +57,7 @@ export default async function CartaPublica({ params }) {
 
   return (
     <main className="min-h-screen bg-bg text-text">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-40">
         <header className="mb-8 text-center">
           <p className="text-xs font-semibold tracking-[0.2em] uppercase text-accent mb-2">
             Carta
@@ -79,50 +79,10 @@ export default async function CartaPublica({ params }) {
 
         {categorias.length === 0 ? (
           <p className="text-center text-text-muted">
-            La carta se está actualizando. Vuelve pronto.
+            La carta se esta actualizando. Vuelve pronto.
           </p>
         ) : (
-          <div className="space-y-10">
-            {categorias.map((cat, i) => (
-              <section key={i}>
-                <h2 className="text-lg font-semibold text-accent border-b border-border pb-2 mb-4">
-                  {cat.nombre}
-                </h2>
-                <ul className="space-y-4">
-                  {cat.productos.map((prod, j) => (
-                    <li key={j} className="flex items-baseline gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium">
-                          {prod.numero ? (
-                            <span className="text-text-muted tabular-nums mr-1.5">{prod.numero}.</span>
-                          ) : null}
-                          {prod.nombre}
-                        </p>
-                        {prod.descripcion ? (
-                          <p className="text-sm text-text-muted mt-0.5">
-                            {prod.descripcion}
-                          </p>
-                        ) : null}
-                        {(prod.contiene?.length || prod.trazas?.length) ? (
-                          <p className="text-xs text-text-muted mt-1">
-                            {prod.contiene?.length ? (
-                              <>Contiene: {listaAlergenos(prod.contiene)}</>
-                            ) : null}
-                            {prod.trazas?.length ? (
-                              <>{prod.contiene?.length ? ' · ' : ''}Trazas: {listaAlergenos(prod.trazas)}</>
-                            ) : null}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="whitespace-nowrap font-semibold tabular-nums">
-                        {formatoPrecio(prod.precio)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
+          <CartaInteractiva categorias={categorias} whatsapp={carta.whatsapp} />
         )}
 
         <footer className="mt-14 pt-6 border-t border-border text-center">
