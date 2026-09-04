@@ -51,7 +51,7 @@ export default function CartaInteractiva({ categorias, whatsapp }) {
   // parsearPedidoEstructurado() en el bot: "2x #12 Nombre (nota)".
   // El numero de plato es lo que lo hace inequivoco.
   function textoPedido() {
-    let t = 'Hola, quiero pedir:\n\n';
+    let t = 'Quiero pedir:\n\n';
     lineas.forEach(([, l]) => {
       t += l.cantidad + 'x ';
       if (l.prod.numero) t += '#' + l.prod.numero + ' ';
