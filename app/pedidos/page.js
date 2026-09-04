@@ -12,14 +12,18 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  Bell, BellOff, Download, Settings
+  Bell, BellOff, Download, Settings, Clock
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
 // La INTERNAL_API_KEY vive solo en el server, nunca en el bundle del navegador.
 // Acceso directo de Chrome que imprime sin cuadro de dialogo (ver ayuda del panel).
 const COMANDO_KIOSK =
-  '"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing https://comandi.es/pedidos';
+  String.raw`"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing https://comandi.es/pedidos`;
+
+// Minutos que se pueden anunciar cuando el local va saturado. Por debajo de
+// 45 no tiene sentido: es el estimado normal a domicilio.
+const OPCIONES_ESPERA = [45, 60, 75, 90, 120];
 
 const HORAS_LIMITE_AVISO = 24;
 const HORA_INICIO_DIA = 6;
@@ -269,6 +273,8 @@ export default function PaginaPedidos() {
   // Mapa producto_id -> numero de carta. Las lineas del pedido guardan una
   // copia del NOMBRE, no el numero, asi que lo cruzamos con la carta al vuelo.
   const [numerosProd, setNumerosProd] = useState({});
+  const [menuEspera, setMenuEspera] = useState(false);
+  const [guardandoEspera, setGuardandoEspera] = useState(false);
   const [menuImpresion, setMenuImpresion] = useState(false);
   const [ayudaKiosk, setAyudaKiosk] = useState(false);
   // Refs: los callbacks de realtime capturan el closure y se quedarian con
@@ -283,6 +289,7 @@ export default function PaginaPedidos() {
   // 'ocultar_historial'). No se borra nada: los pedidos siguen en la BD para
   // el conteo del plan y las analiticas. El superadmin lo ve siempre.
   const verHistorial = esAdmin || !restaurante?.ocultar_historial;
+  const espera = esperaVigente();
 
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
@@ -460,7 +467,7 @@ export default function PaginaPedidos() {
       if (restId) {
         const { data: rest } = await supabase
           .from('restaurantes')
-          .select('id, nombre, logo_url, ocultar_historial')
+          .select('id, nombre, logo_url, ocultar_historial, espera_minutos, espera_hasta')
           .eq('id', restId)
           .maybeSingle();
         if (rest) {
@@ -532,6 +539,41 @@ export default function PaginaPedidos() {
     pedidos.forEach(p => vistosImprRef.current.add(p.id));
     if (nuevos.length > 0) encolarImpresion(nuevos);
   }, [pedidos, cargando]);
+
+  // AVISO DE SATURACION
+  // Cuando el local va desbordado, avisa aqui de cuanto se esta tardando y el
+  // bot lo dice en la conversacion (en vez del tiempo estimado de siempre).
+  // Caduca solo al final del dia de servicio: un aviso olvidado un viernes
+  // noche no puede seguir vigente el lunes.
+  function esperaVigente() {
+    const min = Number(restaurante?.espera_minutos);
+    if (!isFinite(min) || min <= 0) return null;
+    const hasta = restaurante?.espera_hasta;
+    if (hasta && parsearFechaUTC(hasta).getTime() <= Date.now()) return null;
+    return Math.round(min);
+  }
+
+  function finDelDiaDeServicio() {
+    const d = new Date();
+    // El dia de servicio arranca a las 6:00 (mismo criterio que esDelDiaActual).
+    const fin = new Date(d.getFullYear(), d.getMonth(), d.getDate(), HORA_INICIO_DIA, 0, 0, 0);
+    if (fin.getTime() <= d.getTime()) fin.setDate(fin.getDate() + 1);
+    return fin.toISOString();
+  }
+
+  async function fijarEspera(minutos) {
+    if (!restaurante?.id) return;
+    setGuardandoEspera(true);
+    const cambios = minutos
+      ? { espera_minutos: minutos, espera_hasta: finDelDiaDeServicio() }
+      : { espera_minutos: null, espera_hasta: null };
+    const { error } = await supabase
+      .from('restaurantes').update(cambios).eq('id', restaurante.id);
+    setGuardandoEspera(false);
+    if (error) { console.log('Error guardando el tiempo de espera:', error); return; }
+    setRestaurante(prev => ({ ...prev, ...cambios }));
+    setMenuEspera(false);
+  }
 
   async function cargarNumerosProductos(idForzado) {
     const id = idForzado || restaurante?.id;
@@ -1423,6 +1465,27 @@ export default function PaginaPedidos() {
           </div>
         )}
 
+        {pestana === 'hoy' && espera ? (
+          <div className="mb-4 card p-4 flex items-center gap-3 bg-amber-500/5 border-amber-500/30 animate-fade-in">
+            <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text">
+                Estás avisando de <strong>{espera} minutos</strong> de espera
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">
+                El bot se lo está diciendo a los clientes. Se quitará solo al final del día.
+              </p>
+            </div>
+            <button
+              disabled={guardandoEspera}
+              onClick={() => fijarEspera(null)}
+              className="btn-secondary text-sm flex-shrink-0 disabled:opacity-50"
+            >
+              Quitar aviso
+            </button>
+          </div>
+        ) : null}
+
         {pestana === 'hoy' && (() => {
           // "Pendientes" = pendientes DE IMPRIMIR (los ya impresos no se ofrecen).
           const pendientesCount = pendientesDeImprimir().length;
@@ -1445,6 +1508,57 @@ export default function PaginaPedidos() {
                   Imprimir pendientes ({pendientesCount})
                 </button>
               )}
+
+              <div className="relative">
+                <button
+                  onClick={() => setMenuEspera(v => !v)}
+                  className={espera ? 'btn-primary text-sm' : 'btn-ghost text-sm'}
+                  title="Avisar de que hay más espera de lo normal"
+                >
+                  <Clock className="w-4 h-4" />
+                  {espera ? espera + ' min' : 'Tiempo de espera'}
+                </button>
+
+                {menuEspera && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuEspera(false)} />
+                    <div className="absolute right-0 top-full mt-2 z-50 w-72 card p-4 shadow-lg animate-fade-in">
+                      <p className="text-sm font-semibold text-text mb-1">¿Cuánto se está tardando?</p>
+                      <p className="text-xs text-text-muted mb-3">
+                        El bot se lo dirá a los clientes al empezar y al confirmar el pedido.
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {OPCIONES_ESPERA.map(min => (
+                          <button
+                            key={min}
+                            disabled={guardandoEspera}
+                            onClick={() => fijarEspera(min)}
+                            className={`py-2 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50 ${
+                              espera === min
+                                ? 'bg-accent text-white border-accent'
+                                : 'bg-surface-2 border-border text-text hover:border-accent/40'
+                            }`}
+                          >
+                            {min} min
+                          </button>
+                        ))}
+                      </div>
+                      {espera ? (
+                        <button
+                          disabled={guardandoEspera}
+                          onClick={() => fijarEspera(null)}
+                          className="btn-ghost text-sm w-full mt-3 disabled:opacity-50"
+                        >
+                          Volver al tiempo normal
+                        </button>
+                      ) : null}
+                      <p className="text-xs text-text-muted mt-3">
+                        Se quita solo al final del día, aunque se te olvide.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <button
                 onClick={() => setMenuImpresion(v => !v)}
