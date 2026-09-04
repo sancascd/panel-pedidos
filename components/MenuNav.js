@@ -31,6 +31,11 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
   const [esAdmin, setEsAdmin] = useState(esAdminProp === true);
+  // Un superadmin sin restaurante vinculado (la cuenta de plataforma) no
+  // tiene nada que hacer en Tablero, Carta, etc.: se le deja solo Admin.
+  // Si algun dia se vincula a un restaurante para ayudarle, vuelve el menu
+  // completo solo.
+  const [sinRestaurante, setSinRestaurante] = useState(false);
 
   // Si la página no nos dice si es admin, lo consultamos nosotros.
   useEffect(() => {
@@ -45,6 +50,15 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
       .catch(() => {});
     return () => { activo = false; };
   }, [esAdminProp]);
+
+  useEffect(() => {
+    let activo = true;
+    const supabase = crearClienteSupabase();
+    supabase.rpc('mi_restaurante_id')
+      .then(({ data }) => { if (activo) setSinRestaurante(!data); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, []);
 
   return (
     <div className="relative">
@@ -67,7 +81,10 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
             aria-hidden
           />
           <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
-            {LINKS_NAV.map(({ href, icono: Icono, label, soloAdmin }) => (
+            {(esAdmin && sinRestaurante
+              ? LINKS_NAV.filter(l => l.soloAdmin)
+              : LINKS_NAV
+            ).map(({ href, icono: Icono, label, soloAdmin }) => (
               (!soloAdmin || esAdmin) && (
                 <a
                   key={href}
