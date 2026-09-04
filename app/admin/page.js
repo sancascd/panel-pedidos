@@ -335,7 +335,10 @@ export default function PaginaAdmin() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            { id: 'planes', label: 'Planes', count: solicitudes.length, icon: Gauge },
+            // El contador de Planes son SOLICITUDES DE UPGRADE pendientes, no
+            // restaurantes. Un "0" ahi se lee como "no hay planes" y confunde:
+            // se muestra solo cuando hay alguna que atender.
+            { id: 'planes', label: 'Planes', count: solicitudes.length || undefined, icon: Gauge },
             { id: 'pendientes', label: 'Pendientes', count: pendientes.length, icon: Clock },
             { id: 'aprobados', label: 'Aprobados', count: aprobados.length, icon: Check },
             { id: 'rechazados', label: 'Rechazados', count: rechazados.length, icon: X },

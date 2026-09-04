@@ -97,3 +97,9 @@ revoke all on function public.entrar_en_restaurante(uuid) from public, anon;
 revoke all on function public.salir_del_restaurante()      from public, anon;
 grant execute on function public.entrar_en_restaurante(uuid) to authenticated;
 grant execute on function public.salir_del_restaurante()      to authenticated;
+
+
+-- PostgREST cachea el esquema: sin esto, las funciones recien creadas dan
+-- "Could not find the function ... in the schema cache" al llamarlas desde
+-- el panel. Paso el 2026-09-04.
+notify pgrst, 'reload schema';
