@@ -299,7 +299,7 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
         <h3 className="text-lg font-semibold text-text">{nombre}</h3>
         <div className="mt-2 md:mt-3 flex items-baseline gap-1">
           <span className="text-3xl md:text-4xl font-bold text-text tabular-nums">{precio}€</span>
-          <span className="text-text-muted text-sm">/mes</span>
+          <span className="text-text-muted text-sm">/mes + IVA</span>
         </div>
         <p className="text-sm text-text-muted mt-1.5">
           Hasta <strong className="text-text tabular-nums">{pedidos}</strong> pedidos al mes
@@ -1007,7 +1007,7 @@ export default function PaginaLanding() {
             </div>
             <div>
               <h3 className="font-semibold text-text mb-1">
-                Implementación: 119€ una sola vez
+                Implementación: 120€ + IVA, una sola vez
               </h3>
               <p className="text-sm text-text-muted leading-relaxed">
                 Antes de arrancar, hacemos juntos la puesta en marcha: reuniones contigo
@@ -1021,7 +1021,7 @@ export default function PaginaLanding() {
         </Reveal>
 
         <p className="text-xs text-text-muted text-center mt-6">
-          Precios con IVA incluido. Paga al año y ahorra un 10%.
+          Precios sin IVA. Paga al año y ahorra un 10%.
           Sin permanencia: cambia de plan o date de baja cuando quieras.
         </p>
       </section>
@@ -1103,7 +1103,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué pasa si paso de los pedidos incluidos en mi plan?"
-            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 600 pedidos), si haces 700 pedidos serían 99€ + (100 × 0,20€) = 119€. En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
+            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 600 pedidos), si haces 700 pedidos serían 99€ + (100 × 0,20€) = 119€ (mas IVA, como todos nuestros precios). En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
           />
           <FAQItem
             pregunta="¿Puedo subir o bajar de plan cuando quiera?"
@@ -1111,7 +1111,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué incluye la implementación y cuándo se paga?"
-            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 119€ que pagas al inicio, antes de empezar. A partir de ahí solo pagas la mensualidad del plan elegido."
+            respuesta="Reuniones contigo para entender tu carta y tu manera de trabajar, configuración del bot a tu tono y horarios, formación de tu equipo en el panel, y todos los ajustes que necesites hasta que todo funcione perfecto. Coste único de 120€ + IVA que pagas al inicio, antes de empezar. A partir de ahí solo pagas la mensualidad del plan elegido."
           />
           <FAQItem
             pregunta="¿Cómo se contrata y cómo se paga?"
