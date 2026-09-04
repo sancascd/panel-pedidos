@@ -120,9 +120,12 @@ function estrellas(puntuacion) {
 //  - 'cocina': SIN precios ni datos de entrega. Solo que se cocinar, en grande.
 //  - 'bolsa' : el ticket completo que se grapa a la bolsa (cliente, direccion,
 //              precios, total y forma de pago).
-function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefonoLimpio, variante = 'bolsa' }) {
+function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefonoLimpio, numerosProd = {}, variante = 'bolsa' }) {
   if (!pedido) return null;
   const esCocina = variante === 'cocina';
+  const numeroDe = (l) => (l.producto_id && numerosProd[l.producto_id]) || '';
+  // Si ningun plato tiene numero no pintamos la columna: no dejamos un hueco.
+  const hayNumeros = lineas.some(l => numeroDe(l) !== '');
   const numero = '#' + pedido.id.slice(-4).toUpperCase();
   const esRecogida = pedido.tipo_entrega === 'recogida';
 
@@ -156,11 +159,12 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
               <Fragment key={l.id}>
                 <tr>
                   <td className="col-cant">{l.cantidad}x</td>
+                  {hayNumeros && <td className="col-num">{numeroDe(l)}</td>}
                   <td className="col-prod">{l.nombre_producto}</td>
                 </tr>
                 {l.notas && l.notas.trim() !== '' && (
                   <tr>
-                    <td colSpan="2" className="nota">&rarr; {l.notas}</td>
+                    <td colSpan={hayNumeros ? 3 : 2} className="nota">&rarr; {l.notas}</td>
                   </tr>
                 )}
               </Fragment>
@@ -205,7 +209,9 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
             <Fragment key={l.id}>
               <tr>
                 <td className="col-cant">{l.cantidad}x</td>
-                <td className="col-prod">{l.nombre_producto}</td>
+                <td className="col-prod">
+                  {numeroDe(l) ? <strong>{numeroDe(l)}. </strong> : null}{l.nombre_producto}
+                </td>
                 <td className="col-tot">{(l.cantidad * Number(l.precio_unitario)).toFixed(2)}&euro;</td>
               </tr>
               {l.notas && l.notas.trim() !== '' && (
@@ -260,6 +266,9 @@ export default function PaginaPedidos() {
   // Ajustes de impresion POR DISPOSITIVO (localStorage): la impresora esta en
   // el PC del local, no en el movil del dueno. Por eso no van en la BD.
   const [ajustesImpr, setAjustesImpr] = useState({ auto: false, dosTickets: true });
+  // Mapa producto_id -> numero de carta. Las lineas del pedido guardan una
+  // copia del NOMBRE, no el numero, asi que lo cruzamos con la carta al vuelo.
+  const [numerosProd, setNumerosProd] = useState({});
   const [menuImpresion, setMenuImpresion] = useState(false);
   const [ayudaKiosk, setAyudaKiosk] = useState(false);
   // Refs: los callbacks de realtime capturan el closure y se quedarian con
@@ -458,6 +467,7 @@ export default function PaginaPedidos() {
       // Pasamos el id directo: setRestaurante no actualiza el state sincronamente,
       // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
       await cargarPedidos(restCargado?.id);
+      await cargarNumerosProductos(restCargado?.id);
       setCargando(false);
     }
     init();
@@ -517,6 +527,17 @@ export default function PaginaPedidos() {
     pedidos.forEach(p => vistosImprRef.current.add(p.id));
     if (nuevos.length > 0) encolarImpresion(nuevos);
   }, [pedidos, cargando]);
+
+  async function cargarNumerosProductos(idForzado) {
+    const id = idForzado || restaurante?.id;
+    if (!id) return;
+    const { data, error } = await supabase
+      .from('productos').select('id, numero').eq('restaurante_id', id);
+    if (error) { console.log('Error cargando numeros de carta:', error); return; }
+    const mapa = {};
+    (data || []).forEach(prod => { if (prod.numero) mapa[prod.id] = prod.numero; });
+    setNumerosProd(mapa);
+  }
 
   async function cargarPedidos(idForzado) {
     // Acepta un id forzado para no depender del state restaurante en el primer
@@ -939,6 +960,9 @@ export default function PaginaPedidos() {
     if (!lista || lista.length === 0) return;
     const ids = lista.map(p => p.id);
 
+    // Refrescamos por si han tocado los numeros de la carta desde otra pestana.
+    await cargarNumerosProductos();
+
     const { data: lineasBD, error } = await supabase
       .from('lineas_pedido').select('*').in('pedido_id', ids);
     if (error) { console.log('Error cargando lineas para imprimir:', error); return; }
@@ -1229,8 +1253,10 @@ export default function PaginaPedidos() {
           .ticket-cocina { font-size: 19pt; }
           .ticket-cocina h1 { font-size: 34pt; }
           .ticket-cocina table td { font-size: 22pt; padding: 2.5mm 0; }
-          .ticket-cocina table .col-cant { width: 20%; }
-          .ticket-cocina table .col-prod { width: 80%; }
+          .ticket-cocina table .col-cant { width: 16%; }
+          /* El numero es lo primero que mira cocina: mas grande que el nombre */
+          .ticket-cocina table .col-num { width: 20%; font-size: 26pt; font-weight: bold; text-align: center; }
+          .ticket-cocina table .col-prod { width: 64%; }
           .ticket-cocina .nota { font-size: 17pt; font-style: normal; }
           .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
           /* Corte entre tickets cuando se imprimen varios en lote */
@@ -2182,6 +2208,7 @@ export default function PaginaPedidos() {
                 <TicketsDePedido
                   key={p.id}
                   dosTickets={ajustesImpr.dosTickets}
+                  numerosProd={numerosProd}
                   pedido={p}
                   lineas={lineasLote[p.id] || []}
                   restaurante={restaurante}
@@ -2192,6 +2219,7 @@ export default function PaginaPedidos() {
             : (
               <TicketsDePedido
                 dosTickets={ajustesImpr.dosTickets}
+                numerosProd={numerosProd}
                 pedido={seleccionado}
                 lineas={lineas}
                 restaurante={restaurante}
