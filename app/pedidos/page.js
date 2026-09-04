@@ -279,6 +279,11 @@ export default function PaginaPedidos() {
   const vistosImprRef = useRef(null);    // ids ya evaluados (null = sin inicializar)
 
   const [pestana, setPestana] = useState('hoy');
+  // El restaurante puede pedir empezar cada dia limpio (ajuste
+  // 'ocultar_historial'). No se borra nada: los pedidos siguen en la BD para
+  // el conteo del plan y las analiticas. El superadmin lo ve siempre.
+  const verHistorial = esAdmin || !restaurante?.ocultar_historial;
+
   const [finalizadosAbierto, setFinalizadosAbierto] = useState(false);
 
   // Aviso de plan (banner 80/100/120%). Pieza aislada: si falla no afecta al resto.
@@ -455,7 +460,7 @@ export default function PaginaPedidos() {
       if (restId) {
         const { data: rest } = await supabase
           .from('restaurantes')
-          .select('id, nombre, logo_url')
+          .select('id, nombre, logo_url, ocultar_historial')
           .eq('id', restId)
           .maybeSingle();
         if (rest) {
@@ -711,6 +716,10 @@ export default function PaginaPedidos() {
   useEffect(() => {
     if (pestana === 'historial') cargarHistorial();
   }, [pestana]);
+
+  useEffect(() => {
+    if (pestana === 'historial' && !verHistorial) setPestana('hoy');
+  }, [pestana, verHistorial]);
 
   async function abrirPedido(pedido) {
     setSeleccionado(pedido);
@@ -1361,17 +1370,24 @@ export default function PaginaPedidos() {
               {pedidosDia.length}
             </span>
           </button>
-          <button
-            onClick={() => setPestana('historial')}
-            className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
-              pestana === 'historial'
-                ? 'border-accent text-accent'
-                : 'border-transparent text-text-muted hover:text-text'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            Historial
-          </button>
+          {verHistorial && (
+            <button
+              onClick={() => setPestana('historial')}
+              className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
+                pestana === 'historial'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-text-muted hover:text-text'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Historial
+              {esAdmin && restaurante?.ocultar_historial && (
+                <span className="ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
+                  solo admin
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

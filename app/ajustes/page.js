@@ -6,7 +6,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, History
 } from 'lucide-react';
 
 // Helpers para construir los mensajes completos del bot
@@ -94,6 +94,7 @@ export default function PaginaAjustes() {
     mensaje_bienvenida: '',
     mensaje_cerrado: '',
     mensaje_despedida: '',
+    ocultar_historial: false,
   });
 
   useEffect(() => {
@@ -122,6 +123,7 @@ export default function PaginaAjustes() {
           mensaje_bienvenida: rest.mensaje_bienvenida || '',
           mensaje_cerrado: rest.mensaje_cerrado || '',
           mensaje_despedida: rest.mensaje_despedida || '',
+          ocultar_historial: rest.ocultar_historial === true,
         });
       }
       setCargando(false);
@@ -156,6 +158,7 @@ export default function PaginaAjustes() {
         mensaje_bienvenida: datos.mensaje_bienvenida.trim() || null,
         mensaje_cerrado: datos.mensaje_cerrado.trim() || null,
         mensaje_despedida: datos.mensaje_despedida.trim() || null,
+        ocultar_historial: datos.ocultar_historial,
       })
       .eq('id', restaurante.id);
     setGuardando(false);
@@ -614,6 +617,35 @@ export default function PaginaAjustes() {
             <span className="text-sm text-text">
               <strong className="font-medium">Activar reseñas automáticas</strong>
               {' '}<span className="text-text-muted">(se piden 30 min después de entregar a domicilio, o al instante si es recogida)</span>
+            </span>
+          </label>
+        </div>
+
+        {/* Historial de pedidos */}
+        <div className="card p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <History className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text">Historial de pedidos</h2>
+              <p className="text-sm text-text-muted mt-1">
+                Si prefieres empezar cada día con la pantalla limpia, puedes esconder la pestaña
+                &laquo;Historial&raquo;. Solo se oculta de la vista: <strong>los pedidos no se borran</strong>,
+                así que tus estadísticas y tu facturación siguen siendo correctas.
+              </p>
+            </div>
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={datos.ocultar_historial}
+              onChange={(e) => setDatos({ ...datos, ocultar_historial: e.target.checked })}
+              className="w-4 h-4 accent-accent"
+            />
+            <span className="text-sm text-text">
+              <strong className="font-medium">Ocultar el historial de pedidos</strong>
+              {' '}<span className="text-text-muted">(en el panel solo se verán los pedidos de hoy)</span>
             </span>
           </label>
         </div>
