@@ -7,8 +7,9 @@ import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import MenuNav from '@/components/MenuNav';
+import BotonTema from '@/components/BotonTema';
 import {
-  Sun, Moon, LogOut, UtensilsCrossed,
+  LogOut, UtensilsCrossed,
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
@@ -260,7 +261,6 @@ export default function PaginaPedidos() {
   const [resena, setResena] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
-  const [modoOscuro, setModoOscuro] = useState(false);
   // 'default' | 'granted' | 'denied' | 'unsupported'
   const [permisoNotif, setPermisoNotif] = useState('default');
   // Estado para impresión en lote (varios pedidos a la vez)
@@ -317,13 +317,6 @@ export default function PaginaPedidos() {
   const [productoAAgregar, setProductoAAgregar] = useState('');
 
   const audioRef = useRef(null);
-
-  // Inicializar modo oscuro segun localStorage. Clave 'comandi-tema-v2' nueva
-  // para evitar cualquier valor viejo de 'theme'. Default = claro.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setModoOscuro(localStorage.getItem('comandi-tema-v2') === 'dark');
-  }, []);
 
   // Detectar el estado del permiso de notificaciones
   useEffect(() => {
@@ -439,18 +432,6 @@ export default function PaginaPedidos() {
       };
     } catch (e) {
       console.log('Error mostrando notificación:', e);
-    }
-  }
-
-  function alternarTema() {
-    const nuevo = !modoOscuro;
-    setModoOscuro(nuevo);
-    if (nuevo) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('comandi-tema-v2', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('comandi-tema-v2', 'light');
     }
   }
 
@@ -1350,13 +1331,7 @@ export default function PaginaPedidos() {
 
           {/* Acciones: tema, salir y menú desplegable */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={alternarTema}
-              className="btn-ghost p-2.5"
-              title={modoOscuro ? 'Modo claro' : 'Modo oscuro'}
-            >
-              {modoOscuro ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <BotonTema />
 
             <button
               onClick={cerrarSesion}
