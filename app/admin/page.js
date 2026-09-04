@@ -11,7 +11,7 @@ import {
   BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn
 } from 'lucide-react';
 import {
-  infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade
+  infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade, ORDEN_PLANES
 } from '@/lib/planes';
 
 const DIAS_INACTIVIDAD = 7;
@@ -28,6 +28,7 @@ export default function PaginaAdmin() {
   const [statsGlobales, setStatsGlobales] = useState(null);
   const [planesData, setPlanesData] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
+  const [editandoPlan, setEditandoPlan] = useState(null); // { id, nombre, plan, inicio }
 
   useEffect(() => {
     async function init() {
@@ -88,7 +89,8 @@ export default function PaginaAdmin() {
         diasTotales: per.diasTotales,
       });
       const reco = recomendacionUpgrade({ planId: r.plan, proyeccion: consumo.proyeccion });
-      return { id: r.id, nombre: r.nombre, plan: r.plan, consumo, reco };
+      return { id: r.id, nombre: r.nombre, plan: r.plan,
+               plan_iniciado_en: r.plan_iniciado_en, consumo, reco };
     }).sort((a, b) => b.consumo.porcentaje - a.consumo.porcentaje);
 
     // Nombres para las solicitudes
@@ -105,7 +107,10 @@ export default function PaginaAdmin() {
   async function aprobarUpgrade(sol) {
     setProcesando(sol.id);
     const { error: e1 } = await supabase
-      .from('restaurantes').update({ plan: sol.plan_solicitado }).eq('id', sol.restaurante_id);
+      .rpc('cambiar_plan_restaurante', {
+        p_restaurante_id: sol.restaurante_id,
+        p_plan: sol.plan_solicitado,
+      });
     const { error: e2 } = await supabase
       .from('solicitudes_upgrade')
       .update({ estado: 'aprobada', resuelto_en: new Date().toISOString() })
@@ -144,6 +149,41 @@ export default function PaginaAdmin() {
     setProcesando(null);
     if (error) { avisar('No se pudo entrar: ' + error.message, 'error'); return; }
     router.push('/pedidos');
+  }
+
+  // Fecha de un TIMESTAMPTZ para un <input type="date">.
+  function aFechaInput(iso) {
+    if (!iso) return '';
+    const d = parsearFechaUTC(iso);
+    const dosDigitos = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + dosDigitos(d.getMonth() + 1) + '-' + dosDigitos(d.getDate());
+  }
+
+  function abrirEditorPlan(fila) {
+    setEditandoPlan({
+      id: fila.id,
+      nombre: fila.nombre,
+      plan: fila.plan || 'basico',
+      inicio: aFechaInput(fila.plan_iniciado_en) || aFechaInput(new Date().toISOString()),
+    });
+  }
+
+  async function guardarPlan() {
+    if (!editandoPlan) return;
+    setProcesando(editandoPlan.id);
+    const { error } = await supabase.rpc('cambiar_plan_restaurante', {
+      p_restaurante_id: editandoPlan.id,
+      p_plan: editandoPlan.plan,
+      // El ancla del periodo: a partir de esta fecha se cuentan los pedidos.
+      p_inicio: editandoPlan.inicio
+        ? new Date(editandoPlan.inicio + 'T00:00:00').toISOString()
+        : null,
+    });
+    setProcesando(null);
+    if (error) { avisar('No se pudo guardar: ' + error.message, 'error'); return; }
+    avisar('Plan de ' + editandoPlan.nombre + ' actualizado a ' + infoPlan(editandoPlan.plan).nombre + '.');
+    setEditandoPlan(null);
+    await cargarPlanes();
   }
 
   async function cargarRestaurantes() {
@@ -388,6 +428,7 @@ export default function PaginaAdmin() {
           <PlanesPanel
             filas={planesData}
             solicitudes={solicitudes}
+            onGestionar={abrirEditorPlan}
             procesando={procesando}
             onAprobar={aprobarUpgrade}
             onRechazar={rechazarUpgrade}
@@ -488,6 +529,79 @@ export default function PaginaAdmin() {
             </div>
           )
         )}
+
+        {/* Cambiar el plan de un restaurante */}
+        {editandoPlan && (
+          <div
+            className="fixed inset-0 flex items-center justify-center z-50 p-4 animate-fade-in"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setEditandoPlan(null)}
+          >
+            <div className="card p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-4 mb-1">
+                <h3 className="text-lg font-semibold text-text">Plan de {editandoPlan.nombre}</h3>
+                <button onClick={() => setEditandoPlan(null)} className="text-text-muted hover:text-text">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-text-muted mb-5">
+                El cobro todavia es manual. Esto fija lo que cuenta el sistema: pedidos
+                incluidos, exceso y avisos de consumo.
+              </p>
+
+              <label className="label">Plan contratado</label>
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                {ORDEN_PLANES.map(id => {
+                  const p = infoPlan(id);
+                  const activo = editandoPlan.plan === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setEditandoPlan({ ...editandoPlan, plan: id })}
+                      className={`p-3 rounded-lg border text-left transition-colors ${
+                        activo
+                          ? 'bg-accent/10 border-accent text-text'
+                          : 'bg-surface-2 border-border text-text-muted hover:border-accent/40'
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold">{p.nombre}</span>
+                      <span className="block text-xs mt-0.5 tabular-nums">{p.precio}&euro;/mes</span>
+                      <span className="block text-xs text-text-muted mt-0.5 tabular-nums">
+                        {p.pedidosIncluidos} pedidos
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <label className="label">Fecha de alta</label>
+              <input
+                type="date"
+                value={editandoPlan.inicio}
+                onChange={(e) => setEditandoPlan({ ...editandoPlan, inicio: e.target.value })}
+                className="input"
+              />
+              <p className="text-xs text-text-muted mt-1.5 mb-5">
+                Marca el dia de cada mes en que empieza el periodo. Si la cambias, el
+                contador de pedidos del periodo actual se recalcula.
+              </p>
+
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditandoPlan(null)} className="btn-ghost">Cancelar</button>
+                <button
+                  onClick={guardarPlan}
+                  disabled={procesando === editandoPlan.id}
+                  className="btn-primary"
+                >
+                  {procesando === editandoPlan.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <><Check className="w-4 h-4" />Guardar</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );
@@ -495,7 +609,7 @@ export default function PaginaAdmin() {
 
 // ============== PANEL DE PLANES Y CONSUMO ==============
 
-function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar }) {
+function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar, onGestionar }) {
   if (!filas) {
     return (
       <div className="card p-12 text-center">
@@ -555,6 +669,7 @@ function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar }) 
                     <th className="px-4 py-3 font-medium">Consumo</th>
                     <th className="px-4 py-3 font-medium">Proyección</th>
                     <th className="px-4 py-3 font-medium">Overage</th>
+                    <th className="px-4 py-3 font-medium">Desde</th>
                     <th className="px-4 py-3 font-medium"></th>
                   </tr>
                 </thead>
@@ -584,12 +699,27 @@ function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar }) 
                             ? <span className="text-red-500">+{c.overageCoste.toFixed(2)}€</span>
                             : <span className="text-text-muted">—</span>}
                         </td>
+                        <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                          {f.plan_iniciado_en
+                            ? parsearFechaUTC(f.plan_iniciado_en).toLocaleDateString('es-ES')
+                            : <span className="text-yellow-600 dark:text-yellow-400">Sin fijar</span>}
+                        </td>
                         <td className="px-4 py-3">
-                          {f.reco && f.reco.recomendar && (
-                            <span className="badge bg-accent/10 text-accent border border-accent/20 whitespace-nowrap">
-                              <ArrowUpCircle className="w-3 h-3" /> Sugerir {infoPlan(f.reco.siguienteId).nombre}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 justify-end">
+                            {f.reco && f.reco.recomendar && (
+                              <span className="badge bg-accent/10 text-accent border border-accent/20 whitespace-nowrap">
+                                <ArrowUpCircle className="w-3 h-3" /> Sugerir {infoPlan(f.reco.siguienteId).nombre}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => onGestionar(f)}
+                              className="btn-ghost text-xs whitespace-nowrap"
+                              title="Cambiar de plan o ajustar la fecha de alta"
+                            >
+                              <Gauge className="w-3.5 h-3.5" />
+                              Gestionar
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
