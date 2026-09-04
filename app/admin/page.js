@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
+import BotonTema from '@/components/BotonTema';
 import { parsearFechaUTC } from '@/lib/fechas';
 import {
-  ArrowLeft, Shield, Loader2, AlertCircle, CheckCircle2,
+  Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
   BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn
 } from 'lucide-react';
@@ -360,10 +361,7 @@ export default function PaginaAdmin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/pedidos" className="btn-ghost">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Volver</span>
-            </a>
+            <BotonTema />
             <div className="h-6 w-px bg-border mx-1" />
             <MenuNav />
           </div>
