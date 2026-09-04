@@ -22,9 +22,11 @@
 select id, nombre, slug, estado, plan, meta_phone_number_id
 from restaurantes
 where slug = 'SLUG_DEL_RESTAURANTE';
--- Si estado <> 'aprobado', el restaurante no cuenta en el seguimiento de
--- planes del panel de admin. Se corrige con:
---   update restaurantes set estado = 'aprobado' where slug = 'SLUG_DEL_RESTAURANTE';
+-- El panel de admin SOLO entiende 'pendiente' | 'aprobado' | 'rechazado'.
+-- Con cualquier otro valor (p.ej. 'activo') el restaurante desaparece del
+-- seguimiento de planes y de la lista de restaurantes: sus pedidos no
+-- cuentan para facturar. Le paso a Gran Muralla. Se corrige con:
+--   update restaurantes set estado = 'aprobado' where id = 'UUID_DEL_RESTAURANTE';
 
 
 -- PASO 2 (comprobar). El usuario existe y tiene el email confirmado?
@@ -46,14 +48,17 @@ where ur.usuario_id = (select id from auth.users where email = lower('EMAIL_DEL_
 
 
 -- PASO 4 (escribir). Vincular el usuario al restaurante que YA existe.
+--
+-- POR ID, a proposito. La version con "insert ... select ... where email=..."
+-- FALLA EN SILENCIO si el email no coincide caracter a caracter o si el
+-- usuario aun no existe: no da error, simplemente no escribe nada. Ya paso
+-- una vez (2026-09-04): se ejecuto el insert antes de crear el usuario y
+-- parecio que habia ido bien.
+--
+-- Copiar los dos UUID de los pasos 1 y 2.
 insert into usuarios_restaurante (usuario_id, restaurante_id, rol)
-select u.id, r.id, 'admin'
-from auth.users u
-cross join restaurantes r
-where u.email = lower('EMAIL_DEL_RESTAURANTE')
-  and r.slug = 'SLUG_DEL_RESTAURANTE';
--- Debe decir "INSERT 0 1". Si dice "INSERT 0 0", el email o el slug no
--- coinciden: revisar los pasos 1 y 2.
+values ('UUID_DEL_USUARIO', 'UUID_DEL_RESTAURANTE', 'admin');
+-- Tiene que decir "INSERT 0 1".
 
 
 -- PASO 5 (comprobar). Como queda el restaurante: quien tiene acceso.
