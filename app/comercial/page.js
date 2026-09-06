@@ -57,12 +57,14 @@ export default function PanelComercial() {
 
       const { data: mio } = await supabase
         .from('comerciales')
-        .select('id, nombre')
+        .select('id, nombre, activo')
         .eq('usuario_id', session.user.id)
         .maybeSingle();
 
-      if (!mio) { setCargando(false); return; }
-      setComercial(mio);
+      setComercial(mio || null);
+      // Sin aprobar todavia: soy_comercial() es false, asi que no puede
+      // consultar ni registrar nada. Se lo decimos claro.
+      if (!mio || !mio.activo) { setCargando(false); return; }
       await Promise.all([cargarContactos(), cargarRanking()]);
       setCargando(false);
     }
@@ -133,6 +135,25 @@ export default function PanelComercial() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: ACCENT_HEX }} />
+      </div>
+    );
+  }
+
+  if (comercial && !comercial.activo) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-bg gap-3 px-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mb-1">
+          <Loader2 className="w-6 h-6" style={{ color: ACCENT_HEX }} />
+        </div>
+        <h1 className="text-xl font-semibold text-text">Tu solicitud está en revisión</h1>
+        <p className="text-text-muted max-w-sm">
+          Estamos revisando tu alta como comercial. En cuanto la aprobemos te avisamos
+          por email y podrás empezar a registrar restaurantes.
+        </p>
+        <div className="flex gap-2 mt-3">
+          <Link href="/comerciales" className="btn-secondary">Ver el material</Link>
+          <button onClick={salir} className="btn-ghost">Cerrar sesión</button>
+        </div>
       </div>
     );
   }

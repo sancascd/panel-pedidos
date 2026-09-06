@@ -9,7 +9,7 @@ import { parsearFechaUTC } from '@/lib/fechas';
 import {
   Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase
 } from 'lucide-react';
 import {
   infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade, ORDEN_PLANES
@@ -30,6 +30,7 @@ export default function PaginaAdmin() {
   const [planesData, setPlanesData] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
   const [editandoPlan, setEditandoPlan] = useState(null); // { id, nombre, plan, inicio }
+  const [comerciales, setComerciales] = useState([]);
 
   useEffect(() => {
     async function init() {
@@ -40,7 +41,7 @@ export default function PaginaAdmin() {
         router.push('/pedidos');
         return;
       }
-      await Promise.all([cargarRestaurantes(), cargarStatsGlobales(), cargarPlanes()]);
+      await Promise.all([cargarRestaurantes(), cargarStatsGlobales(), cargarPlanes(), cargarComerciales()]);
       setCargando(false);
     }
     init();
@@ -185,6 +186,21 @@ export default function PaginaAdmin() {
     avisar('Plan de ' + editandoPlan.nombre + ' actualizado a ' + infoPlan(editandoPlan.plan).nombre + '.');
     setEditandoPlan(null);
     await cargarPlanes();
+  }
+
+  async function cargarComerciales() {
+    const { data, error } = await supabase.rpc('listar_comerciales_admin');
+    if (error) { console.log('Error cargando comerciales:', error); return; }
+    setComerciales(data || []);
+  }
+
+  async function cambiarActivoComercial(c, activo) {
+    setProcesando(c.id);
+    const { error } = await supabase.rpc('activar_comercial', { p_id: c.id, p_activo: activo });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar(activo ? c.nombre + ' aprobado.' : c.nombre + ' desactivado.');
+    await cargarComerciales();
   }
 
   async function cargarRestaurantes() {
@@ -380,6 +396,7 @@ export default function PaginaAdmin() {
             { id: 'pendientes', label: 'Pendientes', count: pendientes.length, icon: Clock },
             { id: 'aprobados', label: 'Aprobados', count: aprobados.length, icon: Check },
             { id: 'rechazados', label: 'Rechazados', count: rechazados.length, icon: X },
+            { id: 'comerciales', label: 'Comerciales', count: comerciales.filter(c => !c.activo).length || undefined, icon: Briefcase },
           ].map(t => {
             const Icono = t.icon;
             return (
@@ -433,7 +450,110 @@ export default function PaginaAdmin() {
           />
         )}
 
-        {pestana !== 'dashboard' && pestana !== 'planes' && (
+        {pestana === 'comerciales' && (
+          <div className="space-y-6">
+            {(() => {
+              const pendientes = comerciales.filter(c => !c.activo);
+              const activos = comerciales.filter(c => c.activo);
+              return (
+                <>
+                  {pendientes.length > 0 && (
+                    <div>
+                      <h2 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-accent" />
+                        Solicitudes pendientes ({pendientes.length})
+                      </h2>
+                      <div className="space-y-3">
+                        {pendientes.map(c => (
+                          <div key={c.id} className="card p-4 flex items-center justify-between gap-4 flex-wrap">
+                            <div className="min-w-0">
+                              <p className="font-medium text-text">{c.nombre}</p>
+                              <p className="text-sm text-text-muted">
+                                {c.email}{c.telefono ? ' · ' + c.telefono : ''}
+                              </p>
+                              <p className="text-xs text-text-muted mt-0.5">
+                                Solicitado el {parsearFechaUTC(c.creado_en).toLocaleDateString('es-ES')}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => cambiarActivoComercial(c, true)}
+                              disabled={procesando === c.id}
+                              className="btn-primary"
+                            >
+                              {procesando === c.id
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <><Check className="w-4 h-4" />Aprobar</>}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h2 className="text-sm font-semibold text-text mb-3">
+                      Red comercial ({activos.length})
+                    </h2>
+                    {activos.length === 0 ? (
+                      <div className="card p-12 text-center">
+                        <Briefcase className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
+                        <p className="text-text-muted">Todavía no hay comerciales activos.</p>
+                      </div>
+                    ) : (
+                      <div className="card overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border text-text-muted text-left">
+                                <th className="px-4 py-3 font-medium">Comercial</th>
+                                <th className="px-4 py-3 font-medium">Contacto</th>
+                                <th className="px-4 py-3 font-medium text-right">Restaurantes</th>
+                                <th className="px-4 py-3 font-medium text-right">Cerrados</th>
+                                <th className="px-4 py-3 font-medium text-right">Comisión</th>
+                                <th className="px-4 py-3 font-medium"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {activos.map(c => (
+                                <tr key={c.id} className="border-b border-border last:border-0">
+                                  <td className="px-4 py-3 text-text font-medium">{c.nombre}</td>
+                                  <td className="px-4 py-3 text-text-muted">
+                                    {c.email}{c.telefono ? <><br />{c.telefono}</> : null}
+                                  </td>
+                                  <td className="px-4 py-3 text-right tabular-nums text-text-muted">{c.contactos}</td>
+                                  <td className="px-4 py-3 text-right tabular-nums font-semibold text-text">{c.cerrados}</td>
+                                  <td className="px-4 py-3 text-right tabular-nums text-text-muted">
+                                    {(c.cerrados * 90).toFixed(0)}€
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      onClick={() => cambiarActivoComercial(c, false)}
+                                      disabled={procesando === c.id}
+                                      className="btn-ghost text-xs"
+                                      title="Le quita el acceso, sin borrar su histórico"
+                                    >
+                                      Desactivar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-text-muted mt-3">
+                      La comisión es orientativa: 90 € por restaurante cerrado. No refleja
+                      lo que ya hayas pagado.
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {pestana !== 'dashboard' && pestana !== 'planes' && pestana !== 'comerciales' && (
           listaActual().length === 0 ? (
             <div className="card p-12 text-center">
               <Store className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />

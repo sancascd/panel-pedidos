@@ -339,7 +339,109 @@ notify pgrst, 'reload schema';
 
 
 -- ------------------------------------------------------------
--- 10) Dar de alta a un comercial (manual, como los restaurantes)
+-- 10) Alta desde /registro (queda PENDIENTE de aprobacion)
+-- ------------------------------------------------------------
+-- Cualquiera puede registrarse, pero entra con activo = false. Hasta que
+-- Comandi lo aprueba, soy_comercial() devuelve false y no puede reservar
+-- nombres de restaurantes ni ver el ranking del equipo.
+-- Mismo criterio que los restaurantes, que entran en estado 'pendiente'.
+
+create or replace function public.solicitar_alta_comercial(
+  p_nombre   text,
+  p_telefono text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if auth.uid() is null then
+    raise exception 'No hay usuario autenticado';
+  end if;
+  if coalesce(trim(p_nombre), '') = '' then
+    raise exception 'Escribe tu nombre';
+  end if;
+  if exists (select 1 from comerciales where usuario_id = auth.uid()) then
+    raise exception 'Esta cuenta ya tiene una solicitud de comercial';
+  end if;
+  -- Una cuenta es de un restaurante o de un comercial, no las dos cosas:
+  -- mi_restaurante_id() y mi_comercial_id() se pisarian.
+  if exists (select 1 from usuarios_restaurante where usuario_id = auth.uid()) then
+    raise exception 'Esta cuenta ya esta asociada a un restaurante';
+  end if;
+
+  insert into comerciales (usuario_id, nombre, telefono, email, activo)
+  select auth.uid(),
+         trim(p_nombre),
+         nullif(trim(coalesce(p_telefono, '')), ''),
+         u.email,
+         false
+    from auth.users u
+   where u.id = auth.uid();
+end;
+$function$;
+
+
+-- ------------------------------------------------------------
+-- 11) Gestion de comerciales por el superadmin
+-- ------------------------------------------------------------
+
+create or replace function public.listar_comerciales_admin()
+returns table (
+  id        uuid,
+  nombre    text,
+  email     text,
+  telefono  text,
+  activo    boolean,
+  creado_en timestamptz,
+  contactos integer,
+  cerrados  integer
+)
+language sql
+stable
+security definer
+set search_path = public
+as $function$
+  select c.id, c.nombre, c.email, c.telefono, c.activo, c.creado_en,
+         count(k.id)::integer,
+         count(k.id) filter (where k.estado = 'cerrado')::integer
+    from comerciales c
+    left join contactos_comerciales k on k.comercial_id = c.id
+   where soy_superadmin()
+   group by c.id
+   order by c.activo, c.creado_en desc;
+$function$;
+
+create or replace function public.activar_comercial(p_id uuid, p_activo boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if not soy_superadmin() then
+    raise exception 'Solo el superadmin puede aprobar comerciales';
+  end if;
+  update comerciales set activo = p_activo where id = p_id;
+  if not found then
+    raise exception 'Ese comercial no existe';
+  end if;
+end;
+$function$;
+
+revoke all on function public.solicitar_alta_comercial(text, text) from public, anon;
+revoke all on function public.listar_comerciales_admin()           from public, anon;
+revoke all on function public.activar_comercial(uuid, boolean)     from public, anon;
+grant execute on function public.solicitar_alta_comercial(text, text) to authenticated;
+grant execute on function public.listar_comerciales_admin()           to authenticated;
+grant execute on function public.activar_comercial(uuid, boolean)     to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- ------------------------------------------------------------
+-- 12) Alta manual (si prefieres crearlo tu directamente)
 -- ------------------------------------------------------------
 -- 1. Supabase > Authentication > Users > Add user, con "Auto Confirm User".
 -- 2. Copiar su UUID y ejecutar:

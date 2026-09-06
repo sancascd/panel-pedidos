@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
   MessageSquare, Loader2, ArrowRight, ArrowLeft,
-  AlertCircle, CheckCircle2, Mail, Lock, Store
+  AlertCircle, CheckCircle2, Mail, Lock, Store, Briefcase, User
 } from 'lucide-react';
 
 export default function PaginaRegistro() {
@@ -17,10 +17,16 @@ export default function PaginaRegistro() {
   const [completado, setCompletado] = useState(false);
   const [error, setError] = useState('');
 
+  // Una cuenta es de un restaurante O de un comercial, nunca las dos cosas:
+  // mi_restaurante_id() y mi_comercial_id() se pisarian.
+  const [tipo, setTipo] = useState(null); // 'restaurante' | 'comercial'
+
   const [datos, setDatos] = useState({
     email: '',
     password: '',
     nombreRestaurante: '',
+    nombreComercial: '',
+    telefono: '',
   });
 
   async function registrar(e) {
@@ -47,11 +53,18 @@ export default function PaginaRegistro() {
       });
       if (errLogin) throw errLogin;
 
-      // Registrar restaurante
-      const { error: errReg } = await supabase.rpc('registrar_restaurante', {
-        p_nombre: datos.nombreRestaurante.trim(),
-      });
-      if (errReg) throw errReg;
+      if (tipo === 'comercial') {
+        const { error: errCom } = await supabase.rpc('solicitar_alta_comercial', {
+          p_nombre: datos.nombreComercial.trim(),
+          p_telefono: datos.telefono.trim() || null,
+        });
+        if (errCom) throw errCom;
+      } else {
+        const { error: errReg } = await supabase.rpc('registrar_restaurante', {
+          p_nombre: datos.nombreRestaurante.trim(),
+        });
+        if (errReg) throw errReg;
+      }
 
       setCompletado(true);
     } catch (e) {
@@ -74,14 +87,80 @@ export default function PaginaRegistro() {
               </div>
               <h1 className="text-2xl font-bold text-text mb-2">¡Cuenta creada!</h1>
               <p className="text-text-muted mb-6">
-                Tu solicitud está siendo revisada. En cuanto se apruebe podrás empezar a usar Comandi.
-                Te avisaremos por email.
+                {tipo === 'comercial'
+                  ? 'Revisaremos tu solicitud y te avisaremos por email. En cuanto la aprobemos podrás entrar a tu panel y empezar a registrar restaurantes.'
+                  : 'Tu solicitud está siendo revisada. En cuanto se apruebe podrás empezar a usar Comandi. Te avisaremos por email.'}
               </p>
               <Link href="/" className="btn-primary w-full">
                 Volver al inicio
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Primero, quien eres. Una cuenta es de un restaurante O de un comercial,
+  // nunca las dos cosas.
+  if (!tipo) {
+    return (
+      <div className="min-h-screen flex flex-col bg-bg">
+        <div className="fixed inset-0 -z-10 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-accent/5 blur-3xl" />
+        </div>
+        <main className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-md animate-slide-up">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-accent/10 mb-4">
+                <MessageSquare className="w-6 h-6 text-accent" strokeWidth={2.5} />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-text">Crear cuenta en Comandi</h1>
+              <p className="text-sm text-text-muted mt-1">¿Qué quieres hacer?</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => setTipo('restaurante')}
+                className="card p-5 w-full text-left hover:border-accent/40 transition-colors flex items-start gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <Store className="w-5 h-5 text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text">Tengo un restaurante</p>
+                  <p className="text-sm text-text-muted mt-0.5">
+                    Quiero recibir mis pedidos por WhatsApp.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setTipo('comercial')}
+                className="card p-5 w-full text-left hover:border-accent/40 transition-colors flex items-start gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-5 h-5 text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text">Quiero ser comercial</p>
+                  <p className="text-sm text-text-muted mt-0.5">
+                    Quiero presentar Comandi a restaurantes y cobrar por cada alta.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <p className="text-center text-sm text-text-muted mt-6">
+              ¿Ya tienes cuenta?{' '}
+              <Link href="/login" className="text-accent hover:underline font-medium">Inicia sesión</Link>
+            </p>
+            <p className="text-center text-xs text-text-muted mt-3">
+              <Link href="/comerciales" className="hover:text-accent">
+                Ver en qué consiste ser comercial
+              </Link>
+            </p>
           </div>
         </main>
       </div>
@@ -101,11 +180,20 @@ export default function PaginaRegistro() {
               <MessageSquare className="w-6 h-6 text-accent" strokeWidth={2.5} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-text">
-              Crear cuenta en Comandi
+              {tipo === 'comercial' ? 'Solicitar ser comercial' : 'Crear cuenta en Comandi'}
             </h1>
             <p className="text-sm text-text-muted mt-1">
-              Empieza a recibir pedidos por WhatsApp
+              {tipo === 'comercial'
+                ? 'Revisamos tu solicitud y te damos acceso'
+                : 'Empieza a recibir pedidos por WhatsApp'}
             </p>
+            <button
+              onClick={() => { setTipo(null); setError(''); }}
+              className="text-xs text-text-muted hover:text-text transition-colors mt-3 inline-flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              No es lo que buscaba
+            </button>
           </div>
 
           <div className="card p-6">
@@ -117,20 +205,49 @@ export default function PaginaRegistro() {
             )}
 
             <form onSubmit={registrar} className="space-y-4">
-              <div>
-                <label className="label">Nombre de tu restaurante</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                  <input
-                    type="text"
-                    required
-                    value={datos.nombreRestaurante}
-                    onChange={(e) => setDatos({ ...datos, nombreRestaurante: e.target.value })}
-                    className="input pl-9"
-                    placeholder="Pizzería Bella Napoli"
-                  />
+              {tipo === 'comercial' ? (
+                <>
+                  <div>
+                    <label className="label">Tu nombre y apellidos</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                      <input
+                        type="text"
+                        required
+                        value={datos.nombreComercial}
+                        onChange={(e) => setDatos({ ...datos, nombreComercial: e.target.value })}
+                        className="input pl-9"
+                        placeholder="María García"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Teléfono</label>
+                    <input
+                      type="tel"
+                      value={datos.telefono}
+                      onChange={(e) => setDatos({ ...datos, telefono: e.target.value })}
+                      className="input"
+                      placeholder="600 00 00 00"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="label">Nombre de tu restaurante</label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                    <input
+                      type="text"
+                      required
+                      value={datos.nombreRestaurante}
+                      onChange={(e) => setDatos({ ...datos, nombreRestaurante: e.target.value })}
+                      className="input pl-9"
+                      placeholder="Pizzería Bella Napoli"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="label">Email</label>
