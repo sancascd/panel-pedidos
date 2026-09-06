@@ -51,7 +51,7 @@ export default function PaginaAdmin() {
     // Restaurantes aprobados con su plan + ancla de periodo
     const { data: rests } = await supabase
       .from('restaurantes')
-      .select('id, nombre, plan, plan_iniciado_en, estado')
+      .select('id, nombre, plan, plan_iniciado_en, estado, pedidos_incluidos')
       .eq('estado', 'aprobado');
 
     // Pedidos de los ultimos 32 dias (cubre el periodo de cualquier restaurante)
@@ -89,10 +89,12 @@ export default function PaginaAdmin() {
         pedidosPeriodo,
         diasTranscurridos: per.diasTranscurridos,
         diasTotales: per.diasTotales,
+        incluidosOverride: r.pedidos_incluidos,
       });
       const reco = recomendacionUpgrade({ planId: r.plan, proyeccion: consumo.proyeccion });
       return { id: r.id, nombre: r.nombre, plan: r.plan,
-               plan_iniciado_en: r.plan_iniciado_en, consumo, reco };
+               plan_iniciado_en: r.plan_iniciado_en,
+               pedidos_incluidos: r.pedidos_incluidos, consumo, reco };
     }).sort((a, b) => b.consumo.porcentaje - a.consumo.porcentaje);
 
     // Nombres para las solicitudes
@@ -167,12 +169,14 @@ export default function PaginaAdmin() {
       nombre: fila.nombre,
       plan: fila.plan || 'basico',
       inicio: aFechaInput(fila.plan_iniciado_en) || aFechaInput(new Date().toISOString()),
+      incluidos: fila.pedidos_incluidos ? String(fila.pedidos_incluidos) : '',
     });
   }
 
   async function guardarPlan() {
     if (!editandoPlan) return;
     setProcesando(editandoPlan.id);
+    const incluidos = editandoPlan.incluidos.trim();
     const { error } = await supabase.rpc('cambiar_plan_restaurante', {
       p_restaurante_id: editandoPlan.id,
       p_plan: editandoPlan.plan,
@@ -180,6 +184,8 @@ export default function PaginaAdmin() {
       p_inicio: editandoPlan.inicio
         ? new Date(editandoPlan.inicio + 'T00:00:00').toISOString()
         : null,
+      // Vacio = usar los pedidos del plan.
+      p_incluidos: incluidos === '' ? null : Number(incluidos),
     });
     setProcesando(null);
     if (error) { avisar('No se pudo guardar: ' + error.message, 'error'); return; }
@@ -702,6 +708,21 @@ export default function PaginaAdmin() {
               <p className="text-xs text-text-muted mt-1.5 mb-5">
                 Marca el dia de cada mes en que empieza el periodo. Si la cambias, el
                 contador de pedidos del periodo actual se recalcula.
+              </p>
+
+              <label className="label">Pedidos incluidos</label>
+              <input
+                type="number"
+                min="1"
+                value={editandoPlan.incluidos}
+                onChange={(e) => setEditandoPlan({ ...editandoPlan, incluidos: e.target.value })}
+                placeholder={String(infoPlan(editandoPlan.plan).pedidosIncluidos) + ' (los del plan)'}
+                className="input"
+              />
+              <p className="text-xs text-text-muted mt-1.5 mb-5">
+                Dejalo vacio para usar los del plan. Ponlo solo si has pactado otra
+                cantidad con este restaurante: manda sobre el plan en su panel y en
+                los avisos de consumo.
               </p>
 
               <div className="flex gap-2 justify-end">
