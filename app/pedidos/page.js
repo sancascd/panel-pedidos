@@ -343,7 +343,7 @@ export default function PaginaPedidos() {
       try {
         const { data: rest } = await supabase
           .from('restaurantes')
-          .select('plan, plan_iniciado_en')
+          .select('plan, plan_iniciado_en, pedidos_incluidos')
           .eq('id', restaurante.id)
           .maybeSingle();
         if (!rest || cancelado) return;
@@ -359,6 +359,7 @@ export default function PaginaPedidos() {
           pedidosPeriodo: count || 0,
           diasTranscurridos: per.diasTranscurridos,
           diasTotales: per.diasTotales,
+          incluidosOverride: rest.pedidos_incluidos,
         });
         if (!consumo.nivelAviso) { setAvisoPlan(null); return; }
         // Firma del aviso: periodo + nivel. Si el restaurante lo descartó,

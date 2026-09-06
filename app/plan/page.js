@@ -34,7 +34,7 @@ export default function PaginaPlan() {
 
       const { data: rest } = await supabase
         .from('restaurantes')
-        .select('id, nombre, plan, plan_iniciado_en')
+        .select('id, nombre, plan, plan_iniciado_en, pedidos_incluidos')
         .eq('id', restId)
         .maybeSingle();
       if (!rest) { setCargando(false); return; }
@@ -119,6 +119,7 @@ export default function PaginaPlan() {
     pedidosPeriodo,
     diasTranscurridos: periodo?.diasTranscurridos || 1,
     diasTotales: periodo?.diasTotales || 30,
+    incluidosOverride: restaurante.pedidos_incluidos,
   });
   const reco = recomendacionUpgrade({ planId: restaurante.plan, proyeccion: consumo.proyeccion });
 
