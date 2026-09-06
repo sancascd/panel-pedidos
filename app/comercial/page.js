@@ -117,6 +117,18 @@ export default function PanelComercial() {
     await Promise.all([cargarContactos(), cargarRanking()]);
   }
 
+  async function borrar(contacto) {
+    const ok = window.confirm(
+      'Eliminar "' + contacto.nombre_restaurante + '" de tu lista?' +
+      '\n\nQuedara libre para cualquiera.'
+    );
+    if (!ok) return;
+    const { error } = await supabase.rpc('borrar_contacto', { p_id: contacto.id });
+    if (error) { avisar(error.message, 'error'); return; }
+    avisar('Eliminado.');
+    await Promise.all([cargarContactos(), cargarRanking()]);
+  }
+
   async function cambiarEstado(contacto, estado) {
     const { error } = await supabase.rpc('actualizar_contacto', {
       p_id: contacto.id,
@@ -331,23 +343,45 @@ export default function PanelComercial() {
                           )}
                         </div>
                       </div>
-                      <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
+                        {c.estado === 'cerrado' && (
+                          <span className={'text-xs ' + (c.comision_pagada_en ? 'text-accent' : 'text-text-muted')}>
+                            {c.comision_pagada_en ? 'Comisión pagada' : 'Comisión pendiente'}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {c.estado !== 'cerrado' && c.estado !== 'descartado' && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-border flex-wrap">
-                        {c.estado === 'registrado' && (
-                          <button onClick={() => cambiarEstado(c, 'visitado')} className="btn-ghost text-xs">
-                            Marcar visitado
+                    {c.estado !== 'cerrado' && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-border flex-wrap items-center">
+                        {c.estado === 'descartado' ? (
+                          <button onClick={() => cambiarEstado(c, 'registrado')} className="btn-ghost text-xs">
+                            Recuperar
                           </button>
+                        ) : (
+                          <>
+                            {c.estado === 'registrado' && (
+                              <button onClick={() => cambiarEstado(c, 'visitado')} className="btn-ghost text-xs">
+                                Marcar visitado
+                              </button>
+                            )}
+                            {c.estado !== 'interesado' && (
+                              <button onClick={() => cambiarEstado(c, 'interesado')} className="btn-ghost text-xs">
+                                Está interesado
+                              </button>
+                            )}
+                            <button onClick={() => cambiarEstado(c, 'descartado')} className="btn-ghost text-xs">
+                              Descartar
+                            </button>
+                          </>
                         )}
-                        {c.estado !== 'interesado' && (
-                          <button onClick={() => cambiarEstado(c, 'interesado')} className="btn-ghost text-xs">
-                            Está interesado
-                          </button>
-                        )}
-                        <button onClick={() => cambiarEstado(c, 'descartado')} className="btn-ghost text-xs ml-auto">
-                          Descartar
+                        <button
+                          onClick={() => borrar(c)}
+                          className="btn-ghost text-xs ml-auto text-red-500 hover:text-red-600"
+                          title="Lo quita de tu lista y lo deja libre"
+                        >
+                          Eliminar
                         </button>
                       </div>
                     )}
@@ -357,8 +391,8 @@ export default function PanelComercial() {
             </div>
           )}
           <p className="text-xs text-text-muted mt-3">
-            El alta la confirmamos nosotros cuando el restaurante firma y paga. Ahí pasa a
-            &laquo;Cerrado&raquo; y se te abona la comisión.
+Cuando uno diga que sí, avísanos: el alta la confirmamos nosotros al firmar y
+            cobrar. Ahí pasa a &laquo;Cerrado&raquo; y se te abona la comisión.
           </p>
         </section>
 

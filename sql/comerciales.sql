@@ -269,10 +269,17 @@ begin
     raise exception 'El alta de un restaurante la confirma Comandi';
   end if;
 
+  -- Al recuperar un descartado se le devuelven los 30 dias: si no, quedaria
+  -- con la reserva caducada y no serviria de nada rescatarlo.
   update contactos_comerciales
-     set estado         = p_estado,
-         notas          = coalesce(nullif(trim(coalesce(p_notas, '')), ''), notas),
-         actualizado_en = now()
+     set estado          = p_estado,
+         notas           = coalesce(nullif(trim(coalesce(p_notas, '')), ''), notas),
+         reservado_hasta = case
+                             when estado = 'descartado' and p_estado <> 'descartado'
+                               then now() + interval '30 days'
+                             else reservado_hasta
+                           end,
+         actualizado_en  = now()
    where id = p_id
      and (comercial_id = v_yo or soy_superadmin());
 
@@ -441,7 +448,134 @@ notify pgrst, 'reload schema';
 
 
 -- ------------------------------------------------------------
--- 12) Alta manual (si prefieres crearlo tu directamente)
+-- 12) Borrar un contacto
+-- ------------------------------------------------------------
+-- El comercial puede borrar los suyos mientras no esten cerrados (para
+-- deshacer un error). Los cerrados solo los borra el superadmin: son la base
+-- de la comision.
+
+create or replace function public.borrar_contacto(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_yo     uuid := mi_comercial_id();
+  v_estado text;
+  v_duenyo uuid;
+begin
+  select estado, comercial_id into v_estado, v_duenyo
+    from contactos_comerciales where id = p_id;
+
+  if not found then
+    raise exception 'Ese contacto no existe';
+  end if;
+  if not soy_superadmin() then
+    if v_duenyo is distinct from v_yo then
+      raise exception 'Ese contacto no es tuyo';
+    end if;
+    if v_estado = 'cerrado' then
+      raise exception 'No puedes borrar un restaurante ya cerrado';
+    end if;
+  end if;
+
+  delete from contactos_comerciales where id = p_id;
+end;
+$function$;
+
+revoke all on function public.borrar_contacto(uuid) from public, anon;
+grant execute on function public.borrar_contacto(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- ------------------------------------------------------------
+-- 13) Pago de la comision
+-- ------------------------------------------------------------
+-- Se guarda tambien el IMPORTE, no solo la fecha: si algun dia cambia la
+-- comision, el historico tiene que seguir diciendo lo que se pago de verdad.
+
+alter table public.contactos_comerciales
+  add column if not exists comision_pagada_en timestamptz,
+  add column if not exists comision_importe   numeric(10,2);
+
+comment on column public.contactos_comerciales.comision_pagada_en is
+  'Cuando se le pago la comision al comercial. NULL = pendiente de pago.';
+
+create or replace function public.marcar_comision(
+  p_id      uuid,
+  p_pagada  boolean,
+  p_importe numeric default 90
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_estado text;
+begin
+  if not soy_superadmin() then
+    raise exception 'Solo Comandi puede marcar el pago de una comision';
+  end if;
+
+  select estado into v_estado from contactos_comerciales where id = p_id;
+  if not found then
+    raise exception 'Ese contacto no existe';
+  end if;
+  if p_pagada and v_estado <> 'cerrado' then
+    raise exception 'Solo se paga comision de un restaurante cerrado';
+  end if;
+
+  update contactos_comerciales
+     set comision_pagada_en = case when p_pagada then now() else null end,
+         comision_importe   = case when p_pagada then p_importe else null end,
+         actualizado_en     = now()
+   where id = p_id;
+end;
+$function$;
+
+revoke all on function public.marcar_comision(uuid, boolean, numeric) from public, anon;
+grant execute on function public.marcar_comision(uuid, boolean, numeric) to authenticated;
+
+
+-- El listado del admin, con lo pagado y lo pendiente
+create or replace function public.listar_comerciales_admin()
+returns table (
+  id                 uuid,
+  nombre             text,
+  email              text,
+  telefono           text,
+  activo             boolean,
+  creado_en          timestamptz,
+  contactos          integer,
+  cerrados           integer,
+  comision_pagada    numeric,
+  comision_pendiente numeric
+)
+language sql
+stable
+security definer
+set search_path = public
+as $function$
+  select c.id, c.nombre, c.email, c.telefono, c.activo, c.creado_en,
+         count(k.id)::integer,
+         count(k.id) filter (where k.estado = 'cerrado')::integer,
+         coalesce(sum(k.comision_importe) filter (where k.comision_pagada_en is not null), 0),
+         coalesce(sum(90) filter (where k.estado = 'cerrado' and k.comision_pagada_en is null), 0)
+    from comerciales c
+    left join contactos_comerciales k on k.comercial_id = c.id
+   where soy_superadmin()
+   group by c.id
+   order by c.activo, c.creado_en desc;
+$function$;
+
+notify pgrst, 'reload schema';
+
+
+-- ------------------------------------------------------------
+-- 14) Alta manual (si prefieres crearlo tu directamente)
 -- ------------------------------------------------------------
 -- 1. Supabase > Authentication > Users > Add user, con "Auto Confirm User".
 -- 2. Copiar su UUID y ejecutar:
