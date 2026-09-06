@@ -269,10 +269,17 @@ begin
     raise exception 'El alta de un restaurante la confirma Comandi';
   end if;
 
+  -- Al recuperar un descartado se le devuelven los 30 dias: si no, quedaria
+  -- con la reserva caducada y no serviria de nada rescatarlo.
   update contactos_comerciales
-     set estado         = p_estado,
-         notas          = coalesce(nullif(trim(coalesce(p_notas, '')), ''), notas),
-         actualizado_en = now()
+     set estado          = p_estado,
+         notas           = coalesce(nullif(trim(coalesce(p_notas, '')), ''), notas),
+         reservado_hasta = case
+                             when estado = 'descartado' and p_estado <> 'descartado'
+                               then now() + interval '30 days'
+                             else reservado_hasta
+                           end,
+         actualizado_en  = now()
    where id = p_id
      and (comercial_id = v_yo or soy_superadmin());
 
@@ -441,7 +448,50 @@ notify pgrst, 'reload schema';
 
 
 -- ------------------------------------------------------------
--- 12) Alta manual (si prefieres crearlo tu directamente)
+-- 12) Borrar un contacto
+-- ------------------------------------------------------------
+-- El comercial puede borrar los suyos mientras no esten cerrados (para
+-- deshacer un error). Los cerrados solo los borra el superadmin: son la base
+-- de la comision.
+
+create or replace function public.borrar_contacto(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  v_yo     uuid := mi_comercial_id();
+  v_estado text;
+  v_duenyo uuid;
+begin
+  select estado, comercial_id into v_estado, v_duenyo
+    from contactos_comerciales where id = p_id;
+
+  if not found then
+    raise exception 'Ese contacto no existe';
+  end if;
+  if not soy_superadmin() then
+    if v_duenyo is distinct from v_yo then
+      raise exception 'Ese contacto no es tuyo';
+    end if;
+    if v_estado = 'cerrado' then
+      raise exception 'No puedes borrar un restaurante ya cerrado';
+    end if;
+  end if;
+
+  delete from contactos_comerciales where id = p_id;
+end;
+$function$;
+
+revoke all on function public.borrar_contacto(uuid) from public, anon;
+grant execute on function public.borrar_contacto(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- ------------------------------------------------------------
+-- 13) Alta manual (si prefieres crearlo tu directamente)
 -- ------------------------------------------------------------
 -- 1. Supabase > Authentication > Users > Add user, con "Auto Confirm User".
 -- 2. Copiar su UUID y ejecutar:

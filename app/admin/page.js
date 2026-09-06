@@ -31,6 +31,8 @@ export default function PaginaAdmin() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [editandoPlan, setEditandoPlan] = useState(null); // { id, nombre, plan, inicio }
   const [comerciales, setComerciales] = useState([]);
+  const [comercialAbierto, setComercialAbierto] = useState(null);
+  const [contactosDe, setContactosDe] = useState({}); // { comercial_id: [contactos] }
 
   useEffect(() => {
     async function init() {
@@ -198,6 +200,49 @@ export default function PaginaAdmin() {
     const { data, error } = await supabase.rpc('listar_comerciales_admin');
     if (error) { console.log('Error cargando comerciales:', error); return; }
     setComerciales(data || []);
+  }
+
+  // El superadmin SI puede leer los contactos (politica de RLS), asi que
+  // aqui se consultan directos.
+  async function cargarContactosDe(comercialId) {
+    const { data, error } = await supabase
+      .from('contactos_comerciales')
+      .select('*')
+      .eq('comercial_id', comercialId)
+      .order('registrado_en', { ascending: false });
+    if (error) { avisar('Error cargando sus restaurantes: ' + error.message, 'error'); return; }
+    setContactosDe(prev => ({ ...prev, [comercialId]: data || [] }));
+  }
+
+  async function verContactos(c) {
+    if (comercialAbierto === c.id) { setComercialAbierto(null); return; }
+    setComercialAbierto(c.id);
+    await cargarContactosDe(c.id);
+  }
+
+  async function marcarCerrado(c, contacto) {
+    const ok = window.confirm(
+      'Marcar "' + contacto.nombre_restaurante + '" como CERRADO?' +
+      '\n\nCuenta como venta de ' + c.nombre + ' (90 EUR de comision).'
+    );
+    if (!ok) return;
+    setProcesando(contacto.id);
+    const { error } = await supabase.rpc('actualizar_contacto', {
+      p_id: contacto.id, p_estado: 'cerrado',
+    });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar('Cerrado. Comision de ' + c.nombre + '.');
+    await Promise.all([cargarContactosDe(c.id), cargarComerciales()]);
+  }
+
+  async function borrarContactoAdmin(c, contacto) {
+    if (!window.confirm('Eliminar "' + contacto.nombre_restaurante + '" de la lista de ' + c.nombre + '?')) return;
+    setProcesando(contacto.id);
+    const { error } = await supabase.rpc('borrar_contacto', { p_id: contacto.id });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    await Promise.all([cargarContactosDe(c.id), cargarComerciales()]);
   }
 
   async function cambiarActivoComercial(c, activo) {
@@ -520,7 +565,7 @@ export default function PaginaAdmin() {
                               </tr>
                             </thead>
                             <tbody>
-                              {activos.map(c => (
+                              {activos.flatMap(c => [
                                 <tr key={c.id} className="border-b border-border last:border-0">
                                   <td className="px-4 py-3 text-text font-medium">{c.nombre}</td>
                                   <td className="px-4 py-3 text-text-muted">
@@ -531,7 +576,13 @@ export default function PaginaAdmin() {
                                   <td className="px-4 py-3 text-right tabular-nums text-text-muted">
                                     {(c.cerrados * 90).toFixed(0)}€
                                   </td>
-                                  <td className="px-4 py-3 text-right">
+                                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                                    <button
+                                      onClick={() => verContactos(c)}
+                                      className="btn-ghost text-xs"
+                                    >
+                                      {comercialAbierto === c.id ? 'Ocultar' : 'Ver restaurantes'}
+                                    </button>
                                     <button
                                       onClick={() => cambiarActivoComercial(c, false)}
                                       disabled={procesando === c.id}
@@ -541,14 +592,62 @@ export default function PaginaAdmin() {
                                       Desactivar
                                     </button>
                                   </td>
+                                </tr>,
+                              comercialAbierto === c.id ? (
+                                <tr key={c.id + '-detalle'} className="border-b border-border last:border-0 bg-surface-2/40">
+                                  <td colSpan="6" className="px-4 py-3">
+                                    {(contactosDe[c.id] || []).length === 0 ? (
+                                      <p className="text-sm text-text-muted">
+                                        Todavía no ha registrado ningún restaurante.
+                                      </p>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        {(contactosDe[c.id] || []).map(k => (
+                                          <div key={k.id} className="flex items-center justify-between gap-3 flex-wrap">
+                                            <div className="min-w-0">
+                                              <span className="text-text font-medium">{k.nombre_restaurante}</span>
+                                              {k.poblacion ? <span className="text-text-muted"> · {k.poblacion}</span> : null}
+                                              {k.telefono ? <span className="text-text-muted"> · {k.telefono}</span> : null}
+                                              <span className="text-xs text-text-muted ml-2">
+                                                ({k.estado})
+                                              </span>
+                                            </div>
+                                            <div className="flex gap-1 flex-shrink-0">
+                                              {k.estado !== 'cerrado' && (
+                                                <button
+                                                  onClick={() => marcarCerrado(c, k)}
+                                                  disabled={procesando === k.id}
+                                                  className="btn-ghost text-xs"
+                                                  title="Cuenta como venta suya"
+                                                >
+                                                  <Check className="w-3.5 h-3.5" />
+                                                  Marcar cerrado
+                                                </button>
+                                              )}
+                                              <button
+                                                onClick={() => borrarContactoAdmin(c, k)}
+                                                disabled={procesando === k.id}
+                                                className="btn-ghost text-xs text-red-500 hover:text-red-600"
+                                              >
+                                                Eliminar
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
                                 </tr>
-                              ))}
+                              ) : null,
+                              ])}
                             </tbody>
                           </table>
                         </div>
                       </div>
                     )}
                     <p className="text-xs text-text-muted mt-3">
+                      Cuando un restaurante firme y pague, ábrelo con &laquo;Ver restaurantes&raquo;
+                      y márcalo como cerrado: ahí es cuando cuenta como venta suya.
                       La comisión es orientativa: 90 € por restaurante cerrado. No refleja
                       lo que ya hayas pagado.
                     </p>
