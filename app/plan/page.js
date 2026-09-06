@@ -179,7 +179,7 @@ export default function PaginaPlan() {
               <p className="text-xs text-text-muted uppercase tracking-wide">Plan actual</p>
               <div className="flex items-baseline gap-2 mt-1">
                 <h2 className="text-2xl font-bold text-text">{plan.nombre}</h2>
-                <span className="text-text-muted text-sm tabular-nums">{plan.precio}€/mes + IVA</span>
+                <span className="text-text-muted text-sm tabular-nums">{plan.precio}€/mes, IVA incl.</span>
               </div>
             </div>
             <div className="text-right">
@@ -320,7 +320,7 @@ export default function PaginaPlan() {
 
         <p className="text-xs text-text-muted text-center">
           El periodo se cuenta desde la fecha de alta de tu plan. Los pedidos por encima del límite
-          se facturan a {plan.overage.toFixed(2)}€ cada uno. Precios sin IVA.
+          se facturan a {plan.overage.toFixed(2)}€ cada uno. Precios con IVA incluido.
         </p>
       </main>
     </div>

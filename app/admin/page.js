@@ -563,7 +563,7 @@ export default function PaginaAdmin() {
                       }`}
                     >
                       <span className="block text-sm font-semibold">{p.nombre}</span>
-                      <span className="block text-xs mt-0.5 tabular-nums">{p.precio}&euro;/mes + IVA</span>
+                      <span className="block text-xs mt-0.5 tabular-nums">{p.precio}&euro;/mes IVA incl.</span>
                       <span className="block text-xs text-text-muted mt-0.5 tabular-nums">
                         {p.pedidosIncluidos} pedidos
                       </span>
