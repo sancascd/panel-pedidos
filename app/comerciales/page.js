@@ -267,6 +267,12 @@ export default function Comerciales() {
           <p className="text-xs text-text-muted mt-5">
             info@comandi.es · Comandi es una marca de SCD TECH SL (NIF B88886437), Córdoba.
           </p>
+          <p className="text-sm text-text-muted mt-6 pt-5 border-t border-border no-imprimir">
+            ¿Ya colaboras con nosotros?{' '}
+            <Link href="/login" className="font-medium hover:underline" style={{ color: ACCENT_HEX }}>
+              Entra en tu panel
+            </Link>
+          </p>
         </section>
 
       </main>
