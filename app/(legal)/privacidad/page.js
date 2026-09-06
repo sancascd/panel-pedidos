@@ -81,7 +81,6 @@ export default function Privacidad() {
             <li><strong className="text-text">Postmark</strong> (ActiveCampaign LLC) — envío de correos electrónicos transaccionales. Servidores en la <strong className="text-text">Unión Europea (Irlanda)</strong>.</li>
             <li><strong className="text-text">Anthropic, PBC</strong> (Estados Unidos) — procesamiento por IA de los mensajes para entender pedidos. No utiliza los datos para entrenar sus modelos.</li>
             <li><strong className="text-text">Meta Platforms Ireland Ltd.</strong> (Irlanda, Unión Europea) — canal de mensajería de WhatsApp (WhatsApp Business Cloud API). Datos almacenados en la <strong className="text-text">Unión Europea</strong>.</li>
-            <li><strong className="text-text">Twilio Inc.</strong> (Estados Unidos) — pasarela de mensajería de WhatsApp utilizada como alternativa o respaldo en algunos casos.</li>
             <li><strong className="text-text">Vercel Inc.</strong> (Estados Unidos / Unión Europea) — alojamiento del panel web.</li>
             <li><strong className="text-text">Railway Corp.</strong> (Estados Unidos) — alojamiento del servicio del bot.</li>
           </ul>
