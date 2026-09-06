@@ -56,6 +56,9 @@ export default function PaginaLogin() {
     if (!restId) {
       const { data: admin } = await supabase.rpc('soy_superadmin');
       if (admin === true) { router.push('/admin'); return; }
+      // Los comerciales tampoco tienen restaurante: su sitio es /comercial.
+      const { data: comercial } = await supabase.rpc('soy_comercial');
+      if (comercial === true) { router.push('/comercial'); return; }
     }
     router.push('/pedidos');
   }

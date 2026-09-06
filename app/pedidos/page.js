@@ -446,6 +446,10 @@ export default function PaginaPedidos() {
       const { data: restId } = await supabase.rpc('mi_restaurante_id');
       // Superadmin sin restaurante: su sitio es /admin, aqui solo veria vacio.
       if (!restId && admin === true) { router.push('/admin'); return; }
+      if (!restId) {
+        const { data: comercial } = await supabase.rpc('soy_comercial');
+        if (comercial === true) { router.push('/comercial'); return; }
+      }
       let restCargado = null;
       if (restId) {
         const { data: rest } = await supabase
