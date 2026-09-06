@@ -236,6 +236,19 @@ export default function PaginaAdmin() {
     await Promise.all([cargarContactosDe(c.id), cargarComerciales()]);
   }
 
+  async function pagarComision(c, contacto, pagada) {
+    setProcesando(contacto.id);
+    const { error } = await supabase.rpc('marcar_comision', {
+      p_id: contacto.id, p_pagada: pagada, p_importe: 90,
+    });
+    setProcesando(null);
+    if (error) { avisar('Error: ' + error.message, 'error'); return; }
+    avisar(pagada
+      ? 'Comision de ' + contacto.nombre_restaurante + ' marcada como pagada.'
+      : 'Marcada como pendiente otra vez.');
+    await Promise.all([cargarContactosDe(c.id), cargarComerciales()]);
+  }
+
   async function borrarContactoAdmin(c, contacto) {
     if (!window.confirm('Eliminar "' + contacto.nombre_restaurante + '" de la lista de ' + c.nombre + '?')) return;
     setProcesando(contacto.id);
@@ -573,8 +586,19 @@ export default function PaginaAdmin() {
                                   </td>
                                   <td className="px-4 py-3 text-right tabular-nums text-text-muted">{c.contactos}</td>
                                   <td className="px-4 py-3 text-right tabular-nums font-semibold text-text">{c.cerrados}</td>
-                                  <td className="px-4 py-3 text-right tabular-nums text-text-muted">
-                                    {(c.cerrados * 90).toFixed(0)}€
+                                  <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                                    {Number(c.comision_pendiente) > 0 ? (
+                                      <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                        {Number(c.comision_pendiente).toFixed(0)}€ pendiente
+                                      </span>
+                                    ) : (
+                                      <span className="text-text-muted">Al día</span>
+                                    )}
+                                    {Number(c.comision_pagada) > 0 && (
+                                      <span className="block text-xs text-text-muted">
+                                        {Number(c.comision_pagada).toFixed(0)}€ pagados
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="px-4 py-3 text-right whitespace-nowrap">
                                     <button
@@ -613,7 +637,7 @@ export default function PaginaAdmin() {
                                               </span>
                                             </div>
                                             <div className="flex gap-1 flex-shrink-0">
-                                              {k.estado !== 'cerrado' && (
+                                              {k.estado !== 'cerrado' ? (
                                                 <button
                                                   onClick={() => marcarCerrado(c, k)}
                                                   disabled={procesando === k.id}
@@ -622,6 +646,25 @@ export default function PaginaAdmin() {
                                                 >
                                                   <Check className="w-3.5 h-3.5" />
                                                   Marcar cerrado
+                                                </button>
+                                              ) : k.comision_pagada_en ? (
+                                                <button
+                                                  onClick={() => pagarComision(c, k, false)}
+                                                  disabled={procesando === k.id}
+                                                  className="btn-ghost text-xs text-accent"
+                                                  title={'Pagada el ' + parsearFechaUTC(k.comision_pagada_en).toLocaleDateString('es-ES') + '. Pulsa para deshacer.'}
+                                                >
+                                                  <Euro className="w-3.5 h-3.5" />
+                                                  Comisión pagada
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  onClick={() => pagarComision(c, k, true)}
+                                                  disabled={procesando === k.id}
+                                                  className="btn-secondary text-xs"
+                                                >
+                                                  <Euro className="w-3.5 h-3.5" />
+                                                  Marcar comisión pagada
                                                 </button>
                                               )}
                                               <button

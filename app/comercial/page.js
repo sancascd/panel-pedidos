@@ -343,7 +343,14 @@ export default function PanelComercial() {
                           )}
                         </div>
                       </div>
-                      <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
+                        {c.estado === 'cerrado' && (
+                          <span className={'text-xs ' + (c.comision_pagada_en ? 'text-accent' : 'text-text-muted')}>
+                            {c.comision_pagada_en ? 'Comisión pagada' : 'Comisión pendiente'}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {c.estado !== 'cerrado' && (
