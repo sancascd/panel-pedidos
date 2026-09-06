@@ -162,7 +162,7 @@ function MockupChat() {
 
   useEffect(() => {
     const duraciones = {
-      0: 600,   // arranque
+      0: 800,   // arranque
       1: 900,   // usuario 1
       2: 1400,  // escribiendo
       3: 2200,  // bot 1
@@ -549,13 +549,13 @@ function DemoPlan() {
       <div className="max-w-md rounded-xl border border-border bg-surface-2 p-4">
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="font-semibold text-text">Plan Básico</span>
-          <span className="text-text-muted tabular-nums">438 / 600 pedidos</span>
+          <span className="text-text-muted tabular-nums">584 / 800 pedidos</span>
         </div>
         <div className="h-3 rounded-full bg-border overflow-hidden">
           <div className="h-full rounded-full bg-accent" style={{ width: '73%' }} />
         </div>
         <p className="mt-3 text-[11px] text-text-muted leading-relaxed">
-          Vas al 73% del plan. A este ritmo llegarás a ~600. Te avisaremos si te conviene subir a Pro.
+          Vas al 73% del plan. A este ritmo llegarás a ~800. Te avisaremos si te conviene subir a Pro.
         </p>
       </div>
     </div>
@@ -957,7 +957,7 @@ export default function PaginaLanding() {
           <PlanCard
             nombre="Básico"
             precio="99"
-            pedidos="600"
+            pedidos="800"
             recomendado={false}
             features={[
               'Bot de WhatsApp con IA',
@@ -1103,7 +1103,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué pasa si paso de los pedidos incluidos en mi plan?"
-            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 600 pedidos), si haces 700 pedidos serían 99€ + (100 × 0,20€) = 119€ (mas IVA, como todos nuestros precios). En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
+            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 800 pedidos), si haces 900 pedidos serían 99€ + (100 × 0,20€) = 119€, IVA incluido. En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
           />
           <FAQItem
             pregunta="¿Puedo subir o bajar de plan cuando quiera?"
