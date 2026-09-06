@@ -35,23 +35,42 @@ export default function PaginaRegistro() {
     setError('');
 
     try {
-      // Crear cuenta
+      // 1. Crear la cuenta
       const { data: signUpData, error: errSignUp } = await supabase.auth.signUp({
-        email: datos.email,
+        email: datos.email.trim(),
         password: datos.password,
       });
       if (errSignUp) throw errSignUp;
-      if (!signUpData.user) throw new Error('No se pudo crear el usuario.');
+      if (!signUpData.user) throw new Error('No se pudo crear la cuenta. Prueba con otro correo.');
 
-      // Confirmar email automáticamente
-      await supabase.rpc('confirmar_email_usuario', { p_email: datos.email });
+      // 2. Confirmar el email.
+      // OJO: esto se llama SIN sesion (todavia no hemos entrado), y
+      // supabase.rpc() NO lanza excepciones: devuelve { error }. Antes esto
+      // estaba dentro de un try/catch vacio, asi que si fallaba nos
+      // quedabamos con la cuenta creada pero sin confirmar, el login de
+      // abajo reventaba y el usuario veia un error incomprensible. Si falla,
+      // seguimos: puede que el proyecto no exija confirmacion.
+      const { error: errConfirmar } = await supabase
+        .rpc('confirmar_email_usuario', { p_email: datos.email.trim() });
+      if (errConfirmar) console.log('No se pudo confirmar el email:', errConfirmar.message);
 
-      // Iniciar sesión
-      const { error: errLogin } = await supabase.auth.signInWithPassword({
-        email: datos.email,
-        password: datos.password,
-      });
-      if (errLogin) throw errLogin;
+      // 3. Iniciar sesion. Si signUp ya devolvio sesion, no hace falta.
+      if (!signUpData.session) {
+        const { error: errLogin } = await supabase.auth.signInWithPassword({
+          email: datos.email.trim(),
+          password: datos.password,
+        });
+        if (errLogin) {
+          // El caso tipico: el email no ha quedado confirmado.
+          if (/confirm/i.test(errLogin.message)) {
+            throw new Error(
+              'Tu cuenta se ha creado, pero falta confirmar el correo y no hemos podido hacerlo automaticamente. ' +
+              'Escribenos a info@comandi.es y te activamos el acceso en un momento.'
+            );
+          }
+          throw errLogin;
+        }
+      }
 
       if (tipo === 'comercial') {
         const { error: errCom } = await supabase.rpc('solicitar_alta_comercial', {
