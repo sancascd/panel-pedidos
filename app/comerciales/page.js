@@ -9,7 +9,7 @@ const ACCENT_HEX = '#10B981';
 export const metadata = {
   title: 'Trabaja con Comandi — comerciales',
   description:
-    'Comandi busca comerciales autónomos para presentar su servicio de pedidos por WhatsApp a restaurantes. Qué es, cómo funciona y por qué se vende.',
+    'Comandi busca comerciales para presentar su servicio de pedidos por WhatsApp a restaurantes. Qué es, cómo funciona y por qué se vende.',
 };
 
 function Paso({ n, titulo, texto }) {
@@ -80,9 +80,9 @@ export default function Comerciales() {
             Presenta Comandi a los restaurantes de tu zona
           </h1>
           <p className="text-lg text-text-muted leading-relaxed">
-            Buscamos comerciales autónomos que quieran llevar Comandi a bares y
-            restaurantes. Trabajas por tu cuenta, a tu ritmo, y cobras por cada
-            restaurante que se da de alta.
+            Buscamos comerciales que quieran llevar Comandi a bares y restaurantes
+            de su zona. Tú organizas tu tiempo, y cobras por cada restaurante que se
+            da de alta.
           </p>
           <p className="text-sm text-text-muted leading-relaxed mt-4">
             Esta página explica qué es el producto y por qué se vende. Las condiciones
