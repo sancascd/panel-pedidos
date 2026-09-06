@@ -6,7 +6,7 @@ export default function robots() {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/login', '/registro', '/recuperar-contrasena', '/aviso-legal', '/privacidad', '/contacto'],
+        allow: ['/', '/login', '/registro', '/recuperar-contrasena', '/aviso-legal', '/privacidad', '/contacto', '/comerciales'],
         disallow: [
           '/pedidos',
           '/clientes',

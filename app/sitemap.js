@@ -43,6 +43,12 @@ export default function sitemap() {
       priority: 0.3,
     },
     {
+      url: base + '/comerciales',
+      lastModified: lastMod,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
       url: base + '/contacto',
       lastModified: lastMod,
       changeFrequency: 'monthly',

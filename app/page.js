@@ -1180,6 +1180,7 @@ export default function PaginaLanding() {
               <Link href="/contacto" className="text-text-muted hover:text-text transition-colors">Contacto</Link>
               <Link href="/aviso-legal" className="text-text-muted hover:text-text transition-colors">Aviso legal</Link>
               <Link href="/privacidad" className="text-text-muted hover:text-text transition-colors">Política de privacidad</Link>
+              <Link href="/comerciales" className="text-text-muted hover:text-text transition-colors">Trabaja con nosotros</Link>
               <Link href="/login" className="text-text-muted hover:text-text transition-colors">Acceso clientes</Link>
             </div>
           </div>
