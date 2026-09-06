@@ -27,7 +27,10 @@ const LINKS_NAV = [
   { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
 ];
 
-export default function MenuNav({ esAdmin: esAdminProp }) {
+// `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa
+// /admin). Asi la cabecera no acumula dos filas de navegacion.
+//   secciones: [{ id, label, icono, contador }]
+export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva, onSeccion }) {
   const pathname = usePathname();
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -123,6 +126,31 @@ export default function MenuNav({ esAdmin: esAdminProp }) {
             aria-hidden
           />
           <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
+            {secciones && secciones.length > 0 && (
+              <>
+                {secciones.map(({ id, label, icono: Icono, contador }) => (
+                  <button
+                    key={id}
+                    onClick={() => { setAbierto(false); onSeccion(id); }}
+                    role="menuitem"
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      seccionActiva === id
+                        ? 'bg-accent/10 text-accent'
+                        : 'text-text-muted hover:text-text hover:bg-surface-2'
+                    }`}
+                  >
+                    <Icono className="w-4 h-4 flex-shrink-0" />
+                    {label}
+                    {contador ? (
+                      <span className="ml-auto tabular-nums text-xs px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
+                        {contador}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+                <div className="my-1.5 border-t border-border" />
+              </>
+            )}
             {dentroDeUnRestaurante && (
               <>
                 <button

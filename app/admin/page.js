@@ -17,6 +17,17 @@ import {
 
 const DIAS_INACTIVIDAD = 7;
 
+// Las secciones viven en el desplegable, no en una barra de pestanas: con seis
+// pestanas la cabecera era todo ruido. "Rechazados" desaparece como seccion y
+// pasa a ser un filtro dentro de Restaurantes, que es donde se busca.
+const SECCIONES = [
+  { id: 'dashboard',    label: 'Dashboard',    icono: BarChart3 },
+  { id: 'planes',       label: 'Planes',       icono: Gauge },
+  { id: 'pendientes',   label: 'Pendientes',   icono: Clock },
+  { id: 'restaurantes', label: 'Restaurantes', icono: Store },
+  { id: 'comerciales',  label: 'Comerciales',  icono: Briefcase },
+];
+
 export default function PaginaAdmin() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -33,6 +44,7 @@ export default function PaginaAdmin() {
   const [comerciales, setComerciales] = useState([]);
   const [comercialAbierto, setComercialAbierto] = useState(null);
   const [contactosDe, setContactosDe] = useState({}); // { comercial_id: [contactos] }
+  const [verRechazados, setVerRechazados] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -412,8 +424,9 @@ export default function PaginaAdmin() {
 
   function listaActual() {
     if (pestana === 'pendientes') return pendientes;
-    if (pestana === 'aprobados') return aprobados;
-    if (pestana === 'rechazados') return rechazados;
+    // Los rechazados no son una seccion propia: apenas se consultan. Viven
+    // como un filtro dentro de Restaurantes.
+    if (pestana === 'restaurantes') return verRechazados ? rechazados : aprobados;
     return [];
   }
 
@@ -443,48 +456,22 @@ export default function PaginaAdmin() {
           <div className="flex items-center gap-2">
             <BotonTema />
             <div className="h-6 w-px bg-border mx-1" />
-            <MenuNav />
+            <MenuNav
+            secciones={SECCIONES.map(sec => ({
+              ...sec,
+              contador: sec.id === 'planes' ? (solicitudes.length || undefined)
+                      : sec.id === 'pendientes' ? (pendientes.length || undefined)
+                      : sec.id === 'restaurantes' ? aprobados.length
+                      : sec.id === 'comerciales' ? (comerciales.filter(c => !c.activo).length || undefined)
+                      : undefined,
+            }))}
+            seccionActiva={pestana}
+            onSeccion={setPestana}
+          />
           </div>
         </div>
       </header>
 
-      {/* Pestañas */}
-      <div className="border-b border-border bg-bg">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            // El contador de Planes son SOLICITUDES DE UPGRADE pendientes, no
-            // restaurantes. Un "0" ahi se lee como "no hay planes" y confunde:
-            // se muestra solo cuando hay alguna que atender.
-            { id: 'planes', label: 'Planes', count: solicitudes.length || undefined, icon: Gauge },
-            { id: 'pendientes', label: 'Pendientes', count: pendientes.length, icon: Clock },
-            { id: 'aprobados', label: 'Aprobados', count: aprobados.length, icon: Check },
-            { id: 'rechazados', label: 'Rechazados', count: rechazados.length, icon: X },
-            { id: 'comerciales', label: 'Comerciales', count: comerciales.filter(c => !c.activo).length || undefined, icon: Briefcase },
-          ].map(t => {
-            const Icono = t.icon;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setPestana(t.id)}
-                className={`inline-flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
-                  pestana === t.id
-                    ? 'border-accent text-text'
-                    : 'border-transparent text-text-muted hover:text-text'
-                }`}
-              >
-                <Icono className="w-4 h-4" />
-                {t.label}
-                {t.count !== undefined && (
-                  <span className="tabular-nums text-xs px-1.5 py-0.5 rounded-md bg-surface-2 text-text-muted">
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {mensaje.texto && (
@@ -701,12 +688,42 @@ export default function PaginaAdmin() {
           </div>
         )}
 
-        {pestana !== 'dashboard' && pestana !== 'planes' && pestana !== 'comerciales' && (
+        {pestana === 'restaurantes' && (
+          <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-text-muted">
+              {verRechazados
+                ? rechazados.length + (rechazados.length === 1 ? ' restaurante rechazado' : ' restaurantes rechazados')
+                : aprobados.length + (aprobados.length === 1 ? ' restaurante activo' : ' restaurantes activos')}
+            </p>
+            <div className="flex gap-1 p-1 rounded-lg bg-surface-2">
+              <button
+                onClick={() => setVerRechazados(false)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  !verRechazados ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                onClick={() => setVerRechazados(true)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  verRechazados ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'
+                }`}
+              >
+                Rechazados{rechazados.length ? ' (' + rechazados.length + ')' : ''}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(pestana === 'pendientes' || pestana === 'restaurantes') && (
           listaActual().length === 0 ? (
             <div className="card p-12 text-center">
               <Store className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
               <p className="text-text-muted">
-                No hay restaurantes {pestana === 'pendientes' ? 'pendientes' : pestana === 'aprobados' ? 'aprobados' : 'rechazados'}.
+                {pestana === 'pendientes'
+                  ? 'No hay solicitudes pendientes.'
+                  : verRechazados ? 'No has rechazado ninguno.' : 'Todavía no hay restaurantes activos.'}
               </p>
             </div>
           ) : (
@@ -751,6 +768,33 @@ export default function PaginaAdmin() {
                       </div>
                     )}
                   </div>
+
+                  {/* Su plan y consumo, cruzado con lo que ya calcula la
+                      seccion de Planes. Asi esta ficha sirve de directorio. */}
+                  {(() => {
+                    const p = (planesData || []).find(x => x.id === r.id);
+                    if (!p) return null;
+                    return (
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border text-sm flex-wrap">
+                        <span className="text-text-muted">
+                          Plan <strong className="text-text">{infoPlan(p.plan).nombre}</strong>
+                        </span>
+                        <span className="text-text-muted tabular-nums">
+                          {p.consumo.consumidos}/{p.consumo.incluidos} pedidos
+                        </span>
+                        {p.consumo.overageCoste > 0 && (
+                          <span className="text-red-500 tabular-nums">
+                            +{p.consumo.overageCoste.toFixed(2)}€ de exceso
+                          </span>
+                        )}
+                        {p.plan_iniciado_en && (
+                          <span className="text-text-muted text-xs">
+                            Desde el {parsearFechaUTC(p.plan_iniciado_en).toLocaleDateString('es-ES')}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex gap-2 mt-4 pt-4 border-t border-border">
                     <button
