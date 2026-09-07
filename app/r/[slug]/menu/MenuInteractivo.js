@@ -53,6 +53,14 @@ const ANTELACION_MIN = 45;
 
 function cuandoSePuede(menu, horarios, momento) {
   const dias = menu.dias_semana || [];
+  // Sin horarios configurados no hay forma de saber en que turno estamos, y
+  // escondiendo por si acaso no se enseñaba NINGUN menu. Mejor fallar del lado
+  // de enseñarlos: es lo mismo que hace el bot dando por abierto un
+  // restaurante que no ha rellenado su horario.
+  if (!horarios || horarios.length === 0) {
+    if (dias.includes(momento.dia)) return 'ahora';
+    return dias.includes((momento.dia % 7) + 1) ? 'manana' : null;
+  }
   const aMin = (t) => {
     if (!t) return null;
     const [a, b] = String(t).split(':');
