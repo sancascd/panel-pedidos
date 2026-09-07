@@ -76,6 +76,7 @@ export default async function MenusPublicos({ params }) {
             menus={menus}
             whatsapp={datos.whatsapp}
             textosDias={menus.map((m) => textoDias(m.dias_semana))}
+            horarios={datos.horarios || []}
           />
         )}
 

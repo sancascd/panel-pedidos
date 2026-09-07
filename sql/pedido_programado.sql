@@ -26,4 +26,10 @@ alter table conversaciones
 -- Aqui es especialmente critico: una hora de entrega mal interpretada son dos
 -- horas de diferencia en verano.
 
+-- Quien entra por "Ver la carta" se salta el paso del "para cuando", asi que
+-- hay que preguntarselo mas tarde (al elegir la entrega). Sin esta marca no
+-- habria forma de saber si ya se le pregunto, y ese cliente no podria encargar.
+alter table conversaciones
+  add column if not exists cuando_preguntado boolean not null default false;
+
 notify pgrst, 'reload schema';

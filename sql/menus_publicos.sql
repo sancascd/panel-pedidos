@@ -19,6 +19,20 @@ as $$
     'nombre',   r.nombre,
     'slug',     r.slug,
     'whatsapp', r.whatsapp_numero,
+    -- Los horarios hacen falta para saber en que turno estamos: sin ellos la
+    -- pagina enseñaba TODOS los menus a cualquier hora, aunque el menu dijera
+    -- "solo a mediodia".
+    'horarios', coalesce((
+      select json_agg(json_build_object(
+        'dia_semana',      h.dia_semana,
+        'cerrado',         h.cerrado,
+        'manana_apertura', h.manana_apertura,
+        'manana_cierre',   h.manana_cierre,
+        'noche_apertura',  h.noche_apertura,
+        'noche_cierre',    h.noche_cierre
+      ) order by h.dia_semana)
+      from horarios h where h.restaurante_id = r.id
+    ), '[]'::json),
     'menus', coalesce((
       select json_agg(m order by m_orden)
       from (
