@@ -93,7 +93,7 @@ datos(menu, grupo, og, subgrupo, ord, nombre, busca, precio) as (values
 
   ('Menú Gran Selección','Segundo plato',2,null,1,'Tallarines fritos con tres delicias','Tallarines fritos con tres delicias',null),
   ('Menú Gran Selección','Segundo plato',2,null,2,'Arroz frito con tres delicias',      'Arroz frito con tres delicias',      null),
-  ('Menú Gran Selección','Segundo plato',2,null,3,'Arroz frito de la Casa',             'Arroz frito de la Casa',             null),
+  ('Menú Gran Selección','Segundo plato',2,null,3,'Arroz frito de la Casa',             'especial de la Casa',                null),
   ('Menú Gran Selección','Segundo plato',2,null,4,'Fideos de arroz con tres delicias',  'Fideos de arroz con tres delicias',  null),
   ('Menú Gran Selección','Segundo plato',2,null,5,'Fideos transparentes con tres delicias','Fideos transparentes',            null),
 
@@ -110,7 +110,7 @@ datos(menu, grupo, og, subgrupo, ord, nombre, busca, precio) as (values
   ('Menú Gran Selección','Tercer plato',3,'Pato',  11,'Pato a la piña',              'Pato a la piña',          null),
   ('Menú Gran Selección','Tercer plato',3,'Pato',  12,'Pato crujiente cantonés',     'Pato crujiente',          null),
   ('Menú Gran Selección','Tercer plato',3,'Pato',  13,'Pato a la salsa de naranja',  'Pato a la salsa de naranja',null),
-  ('Menú Gran Selección','Tercer plato',3, null,   14,'Calamares con salsa picante', 'Calamares',               null),
+  ('Menú Gran Selección','Tercer plato',3, null,   14,'Calamares con salsa picante', 'Calamares con salsa picante', null),
   ('Menú Gran Selección','Tercer plato',3, null,   15,'Filete de pollo almendrado',  'Filete de pollo almendrado',null),
   ('Menú Gran Selección','Tercer plato',3, null,   16,'Cerdo con bambú y setas',     'Cerdo con bambú',         null),
   ('Menú Gran Selección','Tercer plato',3, null,   17,'Selección de verduras al wok','verduras al wok',         null),
