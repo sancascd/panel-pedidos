@@ -1265,7 +1265,12 @@ export default function PaginaPedidos() {
     // Pedidos olvidados: +30 min en estado 'recibido'
     // Usamos parseo robusto (lib/fechas.js) que normaliza el formato de Postgres
     // y evita el bug de timezone que daba +2h al instante.
-    const minutos = minutosDesde(p.creado_en);
+    //
+    // En un PROGRAMADO la cuenta arranca en su hora, no en cuando lo pidieron:
+    // uno encargado hoy para manana se pasa la tarde en 'recibido' y saldria en
+    // rojo parpadeando como si llevara catorce horas olvidado.
+    const prog = p.programado_para ? textoProgramado(p) : null;
+    const minutos = minutosDesde(prog ? p.programado_para : p.creado_en);
     const olvidado = p.estado === 'recibido' && minutos >= 30;
 
     return (
@@ -1291,11 +1296,21 @@ export default function PaginaPedidos() {
           }`}>
             {olvidado
               ? 'Hace ' + (minutos < 60 ? minutos + ' min' : Math.floor(minutos / 60) + 'h ' + (minutos % 60) + 'min')
+              : prog
+              ? 'Pedido ' + formatearHora(p.creado_en)
               : formatearHora(p.creado_en)}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          {/* Primera de la fila: hasta ahora esto solo se sabia abriendo el
+              ticket, y un programado no se cocina como uno de ahora. */}
+          {prog && (
+            <span className="badge bg-accent/15 text-accent border border-accent/30 font-bold">
+              <Clock className="w-3 h-3" />
+              {prog.dia} {prog.hora}
+            </span>
+          )}
           <span className="badge bg-surface-2 text-text-muted border border-border">
             <IconoEntrega className="w-3 h-3" />
             {textoEntrega(p)}
@@ -2319,6 +2334,19 @@ export default function PaginaPedidos() {
                         </a>
                       </div>
                     </div>
+
+                    {seleccionado.programado_para && (() => {
+                      const t = textoProgramado(seleccionado);
+                      return (
+                        <div className="flex items-start gap-3 p-2.5 -mx-1 rounded-lg bg-accent/10 border border-accent/25">
+                          <Clock className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-accent font-semibold">Pedido programado</p>
+                            <p className="text-sm font-bold text-text">{t.dia} a las {t.hora}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex items-start gap-3">
                       <UtensilsCrossed className="w-4 h-4 text-text-muted mt-0.5 flex-shrink-0" />
