@@ -36,17 +36,57 @@ function momentoAhora(horarios) {
     if (manana[0] !== null && minutos >= manana[0] && minutos < manana[1]) turno = 'manana';
     if (noche[0] !== null && minutos >= noche[0] && minutos < noche[1]) turno = 'noche';
   }
-  return { dia, turno };
+  return { dia, turno, minutos };
 }
 
-function seSirveAhora(menu, momento) {
-  if (!(menu.dias_semana || []).includes(momento.dia)) return false;
-  if (!menu.turno) return true;
-  return menu.turno === momento.turno;
+// Cuando se le puede servir este menu al que esta mirando la pagina:
+//   'ahora'  -> estamos en su turno
+//   'hoy'    -> hoy es su dia y aun queda un turno suyo por delante
+//   'manana' -> manana es su dia
+//   null     -> no hay forma en los proximos dos dias: no se enseña
+//
+// No basta con "se sirve ahora": quien abre la pagina a las once de la noche
+// puede querer encargarlo para mañana, y eso el bot ya sabe programarlo. Pero
+// tampoco vale enseñar el menu del dia un viernes por la noche, porque mañana
+// es sabado y no lo hay: seria prometer algo que no se puede cumplir.
+const ANTELACION_MIN = 45;
+
+function cuandoSePuede(menu, horarios, momento) {
+  const dias = menu.dias_semana || [];
+  const aMin = (t) => {
+    if (!t) return null;
+    const [a, b] = String(t).split(':');
+    return parseInt(a, 10) * 60 + parseInt(b, 10);
+  };
+  const turnosDe = (dia) => {
+    const h = (horarios || []).find((x) => x.dia_semana === dia);
+    if (!h || h.cerrado) return [];
+    return [
+      { clave: 'manana', ap: aMin(h.manana_apertura), ci: aMin(h.manana_cierre) },
+      { clave: 'noche', ap: aMin(h.noche_apertura), ci: aMin(h.noche_cierre) },
+    ].filter((t) => t.ap !== null && t.ci !== null && t.ci > t.ap)
+     .filter((t) => !menu.turno || menu.turno === t.clave);
+  };
+
+  if (dias.includes(momento.dia)) {
+    if ((!menu.turno || menu.turno === momento.turno) && momento.turno) return 'ahora';
+    // Hoy es su dia pero aun no toca: ¿queda algun turno suyo por delante?
+    if (turnosDe(momento.dia).some((t) => t.ci > momento.minutos + ANTELACION_MIN)) return 'hoy';
+  }
+
+  const manana = (momento.dia % 7) + 1;
+  if (dias.includes(manana) && turnosDe(manana).length > 0) return 'manana';
+
+  return null;
 }
 
 export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios }) {
   const momento = momentoAhora(horarios);
+  // Solo los que se pueden servir de verdad. Elegir cinco platos para que al
+  // final te digan que no hay menu es peor que no verlo.
+  const disponibles = menus
+    .map((m, i) => ({ m, i, cuando: cuandoSePuede(m, horarios, momento) }))
+    .filter((x) => x.cuando !== null);
   const [abierto, setAbierto] = useState(menus.length === 1 ? 0 : null);
   const [elegido, setElegido] = useState({});   // "iMenu-iGrupo" -> nombre
   const [notas, setNotas] = useState({});       // "iMenu-iGrupo" -> texto
@@ -104,9 +144,31 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios 
 
   const digitos = String(whatsapp || '').replace(/\D/g, '');
 
+  // Puede quedarse sin ninguno: un viernes por la noche el menu del dia ya no
+  // se puede servir ni hoy ni mañana (sabado). Hay que decir cuando si.
+  if (disponibles.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+        <p className="text-sm text-text mb-2">Ahora mismo no hay menús que podamos servirte.</p>
+        <ul className="text-xs text-text-muted space-y-0.5">
+          {menus.map((m, i) => (
+            <li key={m.id}>
+              <span className="font-semibold">{m.nombre}</span>
+              {textosDias[i] ? ': ' + textosDias[i] : ''}
+              {m.turno === 'manana' ? ' a mediodía' : m.turno === 'noche' ? ' por la noche' : ''}
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-text-muted mt-4">
+          Puedes pedir de la carta a cualquier hora.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {menus.map((menu, im) => {
+      {disponibles.map(({ m: menu, i: im, cuando }) => {
         const pendientes = faltan(im);
         const listo = pendientes.length === 0;
         const url = digitos && listo
@@ -132,9 +194,10 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios 
                 )}
                 {/* No se esconde: se puede encargar para cuando toque, y el bot
                     ya sabe programarlo. Pero hay que decirlo antes de elegir. */}
-                {!seSirveAhora(menu, momento) && (
+                {cuando !== 'ahora' && (
                   <p className="text-xs text-accent mt-1.5">
-                    Ahora no se sirve. Puedes pedirlo y te lo dejamos encargado.
+                    Ahora no se sirve. Te lo dejamos encargado
+                    {cuando === 'manana' ? ' para mañana.' : ' para mas tarde.'}
                   </p>
                 )}
               </div>
