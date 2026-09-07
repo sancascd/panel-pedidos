@@ -83,4 +83,11 @@ alter table lineas_pedido
   add column if not exists menu_id        uuid references menus(id) on delete set null,
   add column if not exists menu_elecciones jsonb;
 
+-- ---------- Lo que el cliente lleva elegido a mitad de la conversacion ----------
+-- El menu se elige en varios pasos (un grupo por mensaje) y tiene que
+-- sobrevivir a todos ellos. Un solo jsonb en vez de cuatro columnas sueltas:
+-- { menu_id, grupo, sub, elecciones: [{grupo, nombre, producto_id, suplemento}] }
+alter table conversaciones
+  add column if not exists menu_estado jsonb;
+
 notify pgrst, 'reload schema';
