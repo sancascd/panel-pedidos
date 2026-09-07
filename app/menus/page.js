@@ -169,6 +169,25 @@ export default function PaginaMenus() {
     await cargarTodo();
   }
 
+  // Hay platos que solo existen DENTRO del menú: el tiramisú, la macedonia, el
+  // café… Muchos restaurantes no los venden sueltos, así que no están en la
+  // carta y no habría forma de meterlos. Van sin producto_id (y por tanto sin
+  // número de plato), pero salen en el ticket igual.
+  async function anadirOpcionLibre(grupoId) {
+    const nombre = busqueda.trim();
+    if (!nombre) return;
+    const orden = (opciones[grupoId] || []).length + 1;
+    const { error } = await supabase.from('menu_opciones').insert({
+      grupo_id: grupoId, restaurante_id: restauranteId,
+      producto_id: null, nombre,
+      subgrupo: subgrupoNuevo.trim() || null,
+      orden,
+    });
+    if (error) { avisar('Error: ' + error.message); return; }
+    setBusqueda('');
+    await cargarTodo();
+  }
+
   async function borrarOpcion(o) {
     const { error } = await supabase.from('menu_opciones').delete().eq('id', o.id);
     if (error) { avisar('Error: ' + error.message); return; }
@@ -397,6 +416,11 @@ export default function PaginaMenus() {
                                   </span>
                                 )}
                                 <span className="text-text truncate">{o.nombre}</span>
+                                {!o.producto_id && (
+                                  <span className="badge bg-surface-2 text-text-muted border border-border shrink-0" title="No está en la carta: solo existe dentro del menú">
+                                    solo menú
+                                  </span>
+                                )}
                                 <input
                                   className="input w-20 ml-auto text-xs shrink-0"
                                   defaultValue={Number(o.suplemento) === 0 ? '' : Number(o.suplemento).toFixed(2)}
@@ -449,11 +473,18 @@ export default function PaginaMenus() {
                                   ))}
                                 </ul>
                               )}
-                              {busqueda.trim() !== '' && productosFiltrados.length === 0 && (
-                                <p className="text-xs text-text-muted px-1">
-                                  Ningún plato de la carta se llama así. Los platos del menú se eligen de la carta,
-                                  para que el ticket salga con su número.
-                                </p>
+                              {busqueda.trim() !== '' && (
+                                <button
+                                  onClick={() => anadirOpcionLibre(g.id)}
+                                  className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-border hover:border-accent/40 text-sm"
+                                >
+                                  <span className="text-text">
+                                    Añadir <strong>&ldquo;{busqueda.trim()}&rdquo;</strong> como plato solo del menú
+                                  </span>
+                                  <span className="block text-xs text-text-muted mt-0.5">
+                                    Para lo que no se vende suelto (postres, café…). Sin número de plato.
+                                  </span>
+                                </button>
                               )}
                             </div>
                           ) : (
