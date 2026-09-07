@@ -59,7 +59,7 @@ export default function PaginaAnaliticas() {
     // los separamos en JS. Sirve para comparar tendencia.
     const { data: pedidosTodos } = await supabase
       .from('pedidos')
-      .select('id, total, creado_en, entregado_en, estado, tipo_entrega, metodo_pago, cliente_telefono')
+      .select('id, total, creado_en, entregado_en, estado, tipo_entrega, metodo_pago, cliente_telefono, programado_para')
       .eq('restaurante_id', restaurante.id)
       .gte('creado_en', desdeAnterior.toISOString())
       .neq('estado', 'cancelado');
@@ -203,6 +203,11 @@ function calcularStats(pedidos, lineas, diasRango, pedidosAnterior, resenas) {
   const domicilio = pedidos.filter(p => p.tipo_entrega === 'domicilio').length;
   const pctRecogida = totalPedidos > 0 ? Math.round((recogida / totalPedidos) * 100) : 0;
 
+  // Pedidos encargados para una hora concreta. Sirve para decidir si algun dia
+  // hace falta poner un tope por franja: hoy no hay ninguno, a proposito.
+  const programados = pedidos.filter(p => p.programado_para).length;
+  const pctProgramados = totalPedidos > 0 ? Math.round((programados / totalPedidos) * 100) : 0;
+
   // Por método de pago
   const efectivo = pedidos.filter(p => p.metodo_pago === 'efectivo').length;
   const tarjeta = pedidos.filter(p => p.metodo_pago === 'tarjeta').length;
@@ -319,6 +324,7 @@ function calcularStats(pedidos, lineas, diasRango, pedidosAnterior, resenas) {
   return {
     totalPedidos, ingresosTotales, ticketMedio,
     recogida, domicilio, pctRecogida,
+    programados, pctProgramados,
     efectivo, tarjeta, pagoLocal,
     topProductos, topProductosIngresos, peoresProductos,
     pedidosPorDia, porHora, porDiaSemana,
@@ -643,6 +649,14 @@ function SeccionInsights({ stats }) {
         )}
         {stats.tiempoMedioPrep !== null && (
           <InsightItem icon={Clock} label="Tiempo medio de preparación" valor={stats.tiempoMedioPrep + ' min'} descripcion="De recibido a entregado" />
+        )}
+        {stats.programados > 0 && (
+          <InsightItem
+            icon={Clock}
+            label="Pedidos programados"
+            valor={String(stats.programados)}
+            descripcion={`${stats.pctProgramados}% de los pedidos se encargan para una hora concreta`}
+          />
         )}
         <InsightItem
           icon={stats.pctRecogida > 50 ? Store : Home}
