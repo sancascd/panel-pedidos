@@ -8,7 +8,45 @@ import { useState } from 'react';
 //
 // El texto que se manda tiene que ser EXACTAMENTE el que entiende
 // parsearMenuEstructurado() en el bot.
-export default function MenuInteractivo({ menus, whatsapp, textosDias }) {
+// En que turno estamos AHORA, en hora de Madrid. Sin esto la pagina enseñaba
+// todos los menus a cualquier hora, aunque el menu dijera "solo a mediodia".
+function momentoAhora(horarios) {
+  const f = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Madrid', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const dias = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  let dia = 1, hh = 0, mm = 0;
+  for (const p of f) {
+    if (p.type === 'weekday') dia = dias[p.value] || 1;
+    if (p.type === 'hour') hh = parseInt(p.value, 10);
+    if (p.type === 'minute') mm = parseInt(p.value, 10);
+  }
+  const minutos = hh * 60 + mm;
+
+  const h = (horarios || []).find((x) => x.dia_semana === dia);
+  const aMin = (t) => {
+    if (!t) return null;
+    const [a, b] = String(t).split(':');
+    return parseInt(a, 10) * 60 + parseInt(b, 10);
+  };
+  let turno = null;
+  if (h && !h.cerrado) {
+    const manana = [aMin(h.manana_apertura), aMin(h.manana_cierre)];
+    const noche = [aMin(h.noche_apertura), aMin(h.noche_cierre)];
+    if (manana[0] !== null && minutos >= manana[0] && minutos < manana[1]) turno = 'manana';
+    if (noche[0] !== null && minutos >= noche[0] && minutos < noche[1]) turno = 'noche';
+  }
+  return { dia, turno };
+}
+
+function seSirveAhora(menu, momento) {
+  if (!(menu.dias_semana || []).includes(momento.dia)) return false;
+  if (!menu.turno) return true;
+  return menu.turno === momento.turno;
+}
+
+export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios }) {
+  const momento = momentoAhora(horarios);
   const [abierto, setAbierto] = useState(menus.length === 1 ? 0 : null);
   const [elegido, setElegido] = useState({});   // "iMenu-iGrupo" -> nombre
   const [notas, setNotas] = useState({});       // "iMenu-iGrupo" -> texto
@@ -91,6 +129,13 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias }) {
                 )}
                 {menu.descripcion && (
                   <p className="text-xs text-text-muted mt-0.5">{menu.descripcion}</p>
+                )}
+                {/* No se esconde: se puede encargar para cuando toque, y el bot
+                    ya sabe programarlo. Pero hay que decirlo antes de elegir. */}
+                {!seSirveAhora(menu, momento) && (
+                  <p className="text-xs text-accent mt-1.5">
+                    Ahora no se sirve. Puedes pedirlo y te lo dejamos encargado.
+                  </p>
                 )}
               </div>
               <span className="text-lg font-bold text-accent tabular-nums shrink-0">
