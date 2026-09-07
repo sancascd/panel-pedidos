@@ -34,7 +34,10 @@ const HORA_INICIO_DIA = 6;
 // "Empezar preparación" para no confundir (en domicilio 'listo' = comida en
 // cocina, todavía quedan pasos; no es el final como en recogida).
 const FLUJO_DOMICILIO = {
-  recibido:   { label: 'Pedido recibido', tone: 'amber',  siguiente: 'listo',      siguienteLabel: 'Empezar preparación' },
+  // Un solo paso hasta el reparto: en el restaurante no van a estar pendientes
+  // de marcar cuando el pedido entra en cocina, asi que ese boton solo estorba.
+  // 'listo' se mantiene en la tabla para los pedidos antiguos que ya lo tengan.
+  recibido:   { label: 'Pedido recibido', tone: 'amber',  siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
   listo:      { label: 'En preparación',  tone: 'yellow', siguiente: 'en_reparto', siguienteLabel: 'Marcar en reparto' },
   en_reparto: { label: 'En reparto',      tone: 'blue',   siguiente: 'entregado',  siguienteLabel: 'Marcar como entregado' },
   entregado:  { label: 'Entregado',       tone: 'green',  siguiente: null,         siguienteLabel: null },
@@ -102,9 +105,51 @@ function inicioDiaTrabajo() {
   return inicio.getTime();
 }
 
+// Un pedido PROGRAMADO pertenece al dia en que hay que servirlo, no al dia en
+// que lo pidieron. Sin esto, lo que se encarga hoy para manana desaparece del
+// tablero justo manana, que es cuando hace falta.
+function fechaRelevante(pedido) {
+  return pedido.programado_para || pedido.creado_en;
+}
+
+// Como se escribe la hora programada en pantalla y en el ticket. SIEMPRE lleva
+// el dia: un ticket que solo pone "21:00" y se imprimio ayer es un pedido
+// cocinado 24 horas antes.
+function textoProgramado(pedido) {
+  const d = parsearFechaUTC(pedido.programado_para);
+  if (!d) return '';
+  const soloDia = (f) => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(f);
+  const hora = new Intl.DateTimeFormat('es-ES', {
+    timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hour12: false
+  }).format(d);
+  const dias = Math.round((Date.parse(soloDia(d)) - Date.parse(soloDia(new Date()))) / 86400000);
+  if (dias === 0) return { dia: 'HOY', hora };
+  if (dias === 1) return { dia: 'MAÑANA', hora };
+  if (dias === -1) return { dia: 'AYER', hora };
+  return {
+    dia: new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric' })
+      .format(d).toUpperCase(),
+    hora,
+  };
+}
+
+// Programado que todavia importa: no cancelado, no entregado y con la hora sin
+// pasar de largo. Lo de "sin pasar de largo" evita que al abrir el panel salga
+// un ticket de hace tres dias que se quedo sin imprimir.
+function esProgramadoVigente(pedido) {
+  if (!pedido.programado_para) return false;
+  if (pedido.estado === 'cancelado' || pedido.estado === 'entregado') return false;
+  const d = parsearFechaUTC(pedido.programado_para);
+  if (!d) return false;
+  return d.getTime() > Date.now() - 3 * 60 * 60 * 1000;
+}
+
 function esDelDiaActual(pedido) {
-  if (!pedido.creado_en) return false;
-  const d = parsearFechaUTC(pedido.creado_en);
+  const cuando = fechaRelevante(pedido);
+  if (!cuando) return false;
+  const d = parsearFechaUTC(cuando);
   if (!d) {
     // Si no podemos parsear, asumimos del dia actual (mejor mostrar que ocultar).
     return true;
@@ -133,6 +178,20 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   const hayNumeros = lineas.some(l => numeroDe(l) !== '');
   const numero = '#' + pedido.id.slice(-4).toUpperCase();
   const esRecogida = pedido.tipo_entrega === 'recogida';
+  // Un pedido programado se imprime al llegar, asi que el papel puede pasarse
+  // horas (o un dia) en el rail antes de tocar. Va marcado arriba Y abajo: si
+  // el ticket esta doblado o pinchado, tiene que verse igual.
+  const prog = pedido.programado_para ? textoProgramado(pedido) : null;
+  const avisoProgramado = prog ? (
+    <>
+      <p className="prog-aviso">**** PROGRAMADO ****</p>
+      <p className="prog-dia">{prog.dia}</p>
+      <p className="prog-hora">{prog.hora}</p>
+    </>
+  ) : null;
+  const recordatorioProgramado = prog ? (
+    <p className="prog-hora" style={{ marginTop: '3mm' }}>**** {prog.hora} ****</p>
+  ) : null;
 
   const pagoTexto = (() => {
     if (pedido.metodo_pago === 'tarjeta') return 'TARJETA';
@@ -152,6 +211,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
     const totalArticulos = lineas.reduce((n, l) => n + Number(l.cantidad || 0), 0);
     return (
       <div className="ticket ticket-cocina">
+        {avisoProgramado}
         <p className="etiqueta">* * *  C O C I N A  * * *</p>
         <h1>{numero}</h1>
         <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
@@ -180,6 +240,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
         {/* El nombre permite casar este ticket con el de la bolsa */}
         <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
         <p><strong>Articulos:</strong> {totalArticulos}</p>
+        {recordatorioProgramado}
       </div>
     );
   }
@@ -187,6 +248,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   // ---------- TICKET PARA LA BOLSA ----------
   return (
     <div className="ticket">
+      {avisoProgramado}
       <h1>PEDIDO {numero}</h1>
       <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
       {restaurante?.nombre && (
@@ -234,6 +296,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
       <p><strong>Pago:</strong> {pagoTexto}</p>
       <div className="separador"></div>
       <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
+      {recordatorioProgramado}
     </div>
   );
 }
@@ -265,6 +328,12 @@ export default function PaginaPedidos() {
   const [permisoNotif, setPermisoNotif] = useState('default');
   // Estado para impresión en lote (varios pedidos a la vez)
   const [imprimiendoLote, setImprimiendoLote] = useState(false);
+  // Plegado por defecto: no puede comerle sitio al tablero de ahora.
+  const [verProgramados, setVerProgramados] = useState(false);
+  // Aviso de una sola vez al abrir el panel: si estaban cerrados cuando entro
+  // el encargo, tienen que enterarse ahora, no al ver salir el papel.
+  const [avisoProgramados, setAvisoProgramados] = useState(0);
+  const avisadoProgRef = useRef(false);
   const [pedidosLote, setPedidosLote] = useState([]);
   const [lineasLote, setLineasLote] = useState({}); // { pedidoId: [lineas] }
   // Ajustes de impresion POR DISPOSITIVO (localStorage): la impresora esta en
@@ -522,10 +591,23 @@ export default function PaginaPedidos() {
       !vistosImprRef.current.has(p.id) &&
       !p.impreso_en &&
       p.estado !== 'cancelado' &&
-      esDelDiaActual(p)
+      // Los programados salen EN CUANTO LLEGAN, aunque sean para manana: es lo
+      // que permite al restaurante organizarse. Si el panel estaba cerrado,
+      // salen al abrirlo.
+      (esDelDiaActual(p) || esProgramadoVigente(p))
     );
     pedidos.forEach(p => vistosImprRef.current.add(p.id));
     if (nuevos.length > 0) encolarImpresion(nuevos);
+  }, [pedidos, cargando]);
+
+  useEffect(() => {
+    if (cargando || avisadoProgRef.current) return;
+    const pendientes = pedidos.filter(esProgramadoVigente).filter(p => p.estado === 'recibido');
+    avisadoProgRef.current = true;
+    if (pendientes.length > 0) {
+      setAvisoProgramados(pendientes.length);
+      setVerProgramados(true);
+    }
   }, [pedidos, cargando]);
 
   // AVISO DE SATURACION
@@ -1159,6 +1241,15 @@ export default function PaginaPedidos() {
   // Pedidos del dia (los cancelados no se muestran, pero siguen en la BD).
   const pedidosDia = pedidos.filter(esDelDiaActual).filter(p => p.estado !== 'cancelado');
 
+  // Programados que aun no toca servir. Van aparte del tablero: si se mezclaran
+  // con lo de ahora, el turno se leeria mal. Pero el papel llega tarde para
+  // organizarse (seis pedidos a las 21:00 hay que verlos a las 19:00), asi que
+  // hay que poder consultarlos de un vistazo.
+  const programados = pedidos
+    .filter(esProgramadoVigente)
+    .filter(p => p.estado === 'recibido')
+    .sort((a, b) => String(a.programado_para).localeCompare(String(b.programado_para)));
+
   // Tablero por TIPO DE ENTREGA: una columna de recogida y otra de reparto.
   // Los terminados van aparte, debajo (ya no requieren accion).
   const activos = pedidosDia.filter(p => columnaDe(p) !== 'finalizados');
@@ -1286,6 +1377,10 @@ export default function PaginaPedidos() {
           .ticket { font-family: 'Courier New', monospace; font-size: 16pt; line-height: 1.35; font-weight: bold; }
           .ticket h1 { font-size: 28pt; text-align: center; margin: 0 0 4mm 0; }
           .ticket .separador { border-top: 2px dashed #000; margin: 3mm 0; }
+          /* Un programado tiene que cantar desde el otro lado de la cocina. */
+          .ticket .prog-aviso { text-align: center; font-size: 20pt; margin: 0 0 1mm 0; }
+          .ticket .prog-dia   { text-align: center; font-size: 24pt; margin: 0; }
+          .ticket .prog-hora  { text-align: center; font-size: 34pt; margin: 0 0 3mm 0; }
           .ticket .grande { font-size: 20pt; font-weight: bold; }
           .ticket table { width: 100%; border-collapse: collapse; }
           .ticket table th, .ticket table td { text-align: left; padding: 1.5mm 0; font-size: 17pt; vertical-align: top; }
@@ -1355,6 +1450,25 @@ export default function PaginaPedidos() {
       </header>
 
       {/* Banner de aviso de plan (80/100/120%) */}
+      {avisoProgramados > 0 && (
+        <div className="no-imprimir border-b border-accent/30 bg-accent/10">
+          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
+            <Clock className="w-4 h-4 text-accent shrink-0" />
+            <p className="text-sm text-text flex-1">
+              Tienes <strong>{avisoProgramados}</strong>{' '}
+              {avisoProgramados === 1 ? 'pedido programado' : 'pedidos programados'} pendientes.
+              {' '}Sus tickets ya han salido por la impresora.
+            </p>
+            <button
+              onClick={() => setAvisoProgramados(0)}
+              className="text-xs text-text-muted hover:text-text shrink-0"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {avisoPlan && (() => {
         const c = avisoPlan.consumo;
         const nombre = avisoPlan.plan.nombre;
@@ -1618,6 +1732,56 @@ export default function PaginaPedidos() {
 
         {pestana === 'hoy' && (
           <>
+            {/* PROGRAMADOS: plegado, una linea. El papel ya salio al llegar el
+                pedido; esto es para ver como viene el turno de un vistazo. */}
+            {programados.length > 0 && (
+              <div className="mb-4 rounded-xl border border-accent/30 bg-accent/5">
+                <button
+                  onClick={() => setVerProgramados(v => !v)}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-text">
+                    <Clock className="w-4 h-4 text-accent" />
+                    Programados
+                    <span className="px-2 py-0.5 rounded-lg bg-accent/15 text-accent tabular-nums">
+                      {programados.length}
+                    </span>
+                  </span>
+                  <span className="text-xs text-text-muted">
+                    {verProgramados ? 'Ocultar' : 'Ver'}
+                  </span>
+                </button>
+                {verProgramados && (
+                  <ul className="px-4 pb-3 divide-y divide-border">
+                    {programados.map(p => {
+                      const t = textoProgramado(p);
+                      return (
+                        <li key={p.id}>
+                          <button
+                            onClick={() => setSeleccionado(p)}
+                            className="w-full flex items-center gap-3 py-2 text-left text-sm"
+                          >
+                            <span className="font-bold tabular-nums text-accent w-28 shrink-0">
+                              {t.dia === 'HOY' ? t.hora : t.dia.slice(0, 3) + ' ' + t.hora}
+                            </span>
+                            <span className="font-semibold text-text">
+                              #{p.id.slice(-4).toUpperCase()}
+                            </span>
+                            <span className="text-text-muted truncate">
+                              {p.cliente_nombre || 'Sin nombre'}
+                            </span>
+                            <span className="ml-auto text-xs text-text-muted shrink-0">
+                              {p.tipo_entrega === 'recogida' ? 'Recogida' : 'Domicilio'}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+
             {/* Tablero por TIPO DE ENTREGA: cada flujo en su columna.
                 En movil se apilan (recogida arriba, reparto debajo). */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
