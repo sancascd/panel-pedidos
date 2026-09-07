@@ -115,8 +115,21 @@ export default function PaginaCarta() {
   }
 
   async function borrarCategoria(catId) {
-    if (!confirm('¿Borrar esta categoría con todos sus productos?')) return;
-    await supabase.from('productos').delete().eq('categoria_id', catId);
+    const cuantos = (productosPorCategoria[catId] || []).length;
+    const aviso = cuantos > 0
+      ? '¿Borrar esta categoría y sus ' + cuantos + ' platos?\n\n' +
+        'Los pedidos antiguos se conservan, pero dejarás de poder filtrarlos por esos platos. ' +
+        'Si solo quieres que desaparezcan de la carta, es mejor marcarlos como no disponibles.'
+      : '¿Borrar esta categoría?';
+    if (!confirm(aviso)) return;
+
+    // Antes no se miraba el error de este borrado: si fallaba, el mensaje que
+    // veías era el de la categoría, que no decía cuál era el problema real.
+    const { error: errProd } = await supabase.from('productos').delete().eq('categoria_id', catId);
+    if (errProd) {
+      avisar('No se han podido borrar los platos: ' + errProd.message);
+      return;
+    }
     const { error } = await supabase.from('categorias').delete().eq('id', catId);
     if (error) { avisar('Error: ' + error.message); return; }
     await cargarCategorias(restauranteId);
