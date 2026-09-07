@@ -9,7 +9,7 @@ import { parsearFechaUTC } from '@/lib/fechas';
 import {
   Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase, LogOut
 } from 'lucide-react';
 import {
   infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade, ORDEN_PLANES
@@ -440,6 +440,13 @@ export default function PaginaAdmin() {
     return <span className="badge bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"><X className="w-3 h-3" /> Rechazado</span>;
   }
 
+  // Confirmacion: es facil pulsarlo sin querer y perder la pantalla.
+  async function cerrarSesion() {
+    if (!window.confirm('¿Seguro que quieres cerrar sesión?')) return;
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
+
   return (
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-md border-b border-border">
@@ -468,6 +475,13 @@ export default function PaginaAdmin() {
             seccionActiva={pestana}
             onSeccion={setPestana}
           />
+            <button
+              onClick={cerrarSesion}
+              className="btn-ghost p-2.5"
+              title="Cerrar sesión"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
