@@ -7,6 +7,7 @@ import { parsearFechaUTC, minutosDesde } from '@/lib/fechas';
 import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import MenuNav from '@/components/MenuNav';
+import { COMANDO_KIOSK } from '@/lib/impresion';
 import BotonTema from '@/components/BotonTema';
 import {
   LogOut, UtensilsCrossed,
@@ -18,9 +19,7 @@ import {
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
 // La INTERNAL_API_KEY vive solo en el server, nunca en el bundle del navegador.
-// Acceso directo de Chrome que imprime sin cuadro de dialogo (ver ayuda del panel).
-const COMANDO_KIOSK =
-  String.raw`"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing https://comandi.es/pedidos`;
+
 
 // Minutos que se pueden anunciar cuando el local va saturado. Por debajo de
 // 45 no tiene sentido: es el estimado normal a domicilio.

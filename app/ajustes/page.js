@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
+import { COMANDO_KIOSK, PASOS_KIOSK, PRUEBA_KIOSK } from '@/lib/impresion';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, History
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, History, Printer, Copy
 } from 'lucide-react';
 
 // Helpers para construir los mensajes completos del bot
@@ -75,6 +76,17 @@ export default function PaginaAjustes() {
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  // El portapapeles falla en http y en navegadores viejos; el comando sigue
+  // seleccionable a mano, asi que basta con no romper nada.
+  async function copiarComando() {
+    try {
+      await navigator.clipboard.writeText(COMANDO_KIOSK);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (e) { /* que lo copie a mano */ }
+  }
   const [subiendoLogo, setSubiendoLogo] = useState(false);
   const [subiendoPdf, setSubiendoPdf] = useState(false);
   const [restaurante, setRestaurante] = useState(null);
@@ -687,6 +699,60 @@ export default function PaginaAjustes() {
           {!datos.acepta_efectivo && !datos.acepta_tarjeta && (
             <p className="text-xs text-red-500 mt-3">Debes aceptar al menos un método de pago.</p>
           )}
+        </div>
+
+        {/* Impresion de tickets. No se guarda nada: es el comando que hay que
+            copiar en el ordenador del local. Vive aqui para tenerlo a mano en
+            cualquier restaurante, sin buscarlo en ningun sitio. */}
+        <div className="card p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <Printer className="w-4 h-4 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text">Imprimir tickets sin pulsar nada</h2>
+              <p className="text-sm text-text-muted mt-1">
+                Chrome no imprime sin enseñar el cuadro de dialogo, salvo que se abra de una
+                forma concreta. Esto se hace <strong>una vez</strong>, en el ordenador del local.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-surface-2 border border-border p-3">
+            <code className="block text-xs font-mono text-text break-all leading-relaxed">
+              {COMANDO_KIOSK}
+            </code>
+          </div>
+          <button
+            onClick={copiarComando}
+            className="btn-secondary text-sm mt-2"
+          >
+            {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copiado ? 'Copiado' : 'Copiar comando'}
+          </button>
+
+          <ol className="mt-4 space-y-3">
+            {PASOS_KIOSK.map((paso, i) => (
+              <li key={paso.titulo} className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-surface-2 border border-border text-xs font-semibold text-text-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="text-sm text-text font-medium">{paso.titulo}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{paso.detalle}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <p className="text-xs text-text-muted mt-4 pt-3 border-t border-border">
+            {PRUEBA_KIOSK}
+          </p>
+
+          <p className="text-xs text-text-muted mt-3">
+            Si Chrome esta instalado en otra carpeta, cambia la ruta del principio.
+            Suele ser <code className="font-mono">Program Files (x86)</code> en equipos antiguos.
+          </p>
         </div>
 
         <div className="sticky bottom-4">
