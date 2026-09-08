@@ -155,7 +155,11 @@ export default function PaginaAdmin() {
   // la cuenta de admin a ese restaurante (RPC guardada por soy_superadmin) y
   // a partir de ahi el panel funciona igual que para ellos. Se sale desde el
   // menu, que muestra "Salir del panel" mientras estas dentro.
-  async function entrarEnPanel(rest) {
+  // Entrar y caer DIRECTAMENTE donde hace falta. Antes siempre aterrizabas en
+  // el tablero y desde /admin no habia forma de ir a la carta o a los menus:
+  // como la cuenta de plataforma no esta vinculada a ningun restaurante, el
+  // desplegable solo ofrece el propio /admin.
+  async function entrarEnPanel(rest, destino) {
     const ok = window.confirm(
       'Vas a entrar en el panel de "' + (rest.nombre || 'este restaurante') + '".' +
       '\n\nVeras y podras modificar sus datos como si fueras ellos. ' +
@@ -166,7 +170,7 @@ export default function PaginaAdmin() {
     const { error } = await supabase.rpc('entrar_en_restaurante', { p_restaurante_id: rest.id });
     setProcesando(null);
     if (error) { avisar('No se pudo entrar: ' + error.message, 'error'); return; }
-    router.push('/pedidos');
+    router.push(destino || '/pedidos');
   }
 
   // Fecha de un TIMESTAMPTZ para un <input type="date">.
@@ -810,16 +814,32 @@ export default function PaginaAdmin() {
                     );
                   })()}
 
-                  <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-                    <button
-                      onClick={() => entrarEnPanel(r)}
-                      disabled={procesando === r.id}
-                      className="btn-secondary text-sm"
-                      title="Ver y gestionar su panel para ayudarles"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      Entrar en su panel
-                    </button>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-xs text-text-muted mb-2">
+                      Entrar en su panel para ayudarles:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        ['Tablero', '/pedidos'],
+                        ['Carta', '/carta'],
+                        ['Menús', '/menus'],
+                        ['Horarios', '/horarios'],
+                        ['Clientes', '/clientes'],
+                        ['Reseñas', '/resenas'],
+                        ['Analíticas', '/analiticas'],
+                        ['Ajustes', '/ajustes'],
+                      ].map(([etiqueta, ruta]) => (
+                        <button
+                          key={ruta}
+                          onClick={() => entrarEnPanel(r, ruta)}
+                          disabled={procesando === r.id}
+                          className="btn-secondary text-xs px-2.5 py-1.5"
+                        >
+                          {etiqueta === 'Tablero' && <LogIn className="w-3.5 h-3.5" />}
+                          {etiqueta}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {r.estado === 'pendiente' && (
