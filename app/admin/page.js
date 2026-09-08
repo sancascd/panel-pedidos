@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
+import PuestaEnMarcha from '@/components/PuestaEnMarcha';
+import { avance } from '@/lib/puestaEnMarcha';
 import BotonTema from '@/components/BotonTema';
 import { parsearFechaUTC } from '@/lib/fechas';
 import {
   Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase, LogOut
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase, LogOut, ClipboardList
 } from 'lucide-react';
 import {
   infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade, ORDEN_PLANES
@@ -30,6 +32,9 @@ const SECCIONES = [
 
 export default function PaginaAdmin() {
   const router = useRouter();
+  // Avance del alta por restaurante: { restauranteId: [pasos hechos] }
+  const [altas, setAltas] = useState({});
+  const [altaAbierta, setAltaAbierta] = useState(null);
   const supabase = crearClienteSupabase();
 
   const [cargando, setCargando] = useState(true);
@@ -159,6 +164,20 @@ export default function PaginaAdmin() {
   // el tablero y desde /admin no habia forma de ir a la carta o a los menus:
   // como la cuenta de plataforma no esta vinculada a ningun restaurante, el
   // desplegable solo ofrece el propio /admin.
+  // Una sola consulta para todos: en el listado hace falta el contador de cada
+  // uno, y una consulta por restaurante seria una cascada tonta.
+  async function cargarAltas() {
+    const { data } = await supabase
+      .from('puesta_en_marcha').select('restaurante_id, paso').eq('hecho', true);
+    const mapa = {};
+    (data || []).forEach((f) => {
+      (mapa[f.restaurante_id] = mapa[f.restaurante_id] || []).push(f.paso);
+    });
+    setAltas(mapa);
+  }
+
+  useEffect(() => { cargarAltas(); }, []);
+
   async function entrarEnPanel(rest, destino) {
     const ok = window.confirm(
       'Vas a entrar en el panel de "' + (rest.nombre || 'este restaurante') + '".' +
@@ -809,6 +828,42 @@ export default function PaginaAdmin() {
                           <span className="text-text-muted text-xs">
                             Desde el {parsearFechaUTC(p.plan_iniciado_en).toLocaleDateString('es-ES')}
                           </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Puesta en marcha: en que punto esta el alta. Con un
+                      cliente se lleva de memoria; con cinco a medias, no. */}
+                  {(() => {
+                    const a = avance(altas[r.id] || []);
+                    const abierta = altaAbierta === r.id;
+                    return (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <button
+                          onClick={() => setAltaAbierta(abierta ? null : r.id)}
+                          className="w-full flex items-center gap-2 text-left"
+                        >
+                          <ClipboardList className={`w-4 h-4 shrink-0 ${a.completo ? 'text-accent' : 'text-text-muted'}`} />
+                          <span className="text-sm font-semibold text-text">Puesta en marcha</span>
+                          <span className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md ${
+                            a.completo ? 'bg-accent/15 text-accent' : 'bg-surface-2 text-text-muted'
+                          }`}>
+                            {a.hechos}/{a.total}
+                          </span>
+                          {a.criticosPendientes > 0 && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                              {a.criticosPendientes} sin saltar
+                            </span>
+                          )}
+                          <span className="ml-auto text-xs text-text-muted">
+                            {abierta ? 'Ocultar' : 'Ver'}
+                          </span>
+                        </button>
+                        {abierta && (
+                          <div className="mt-3">
+                            <PuestaEnMarcha restauranteId={r.id} onCambio={cargarAltas} />
+                          </div>
                         )}
                       </div>
                     );
