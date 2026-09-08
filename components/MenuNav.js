@@ -1,5 +1,7 @@
 'use client';
 
+import { createPortal } from 'react-dom';
+
 // Menú de navegación compartido del panel (botón hamburguesa + desplegable).
 // Se usa en todas las páginas para no duplicar la navegación. Resalta la
 // sección activa y muestra "Admin" solo a superadmins.
@@ -42,6 +44,10 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   // completo solo.
   const [sinRestaurante, setSinRestaurante] = useState(false);
   const [nombreRestaurante, setNombreRestaurante] = useState('');
+  // La barra de 'estas dentro de un restaurante' se pinta FUERA de la cabecera
+  // (ver mas abajo el porque); para eso hace falta saber que ya hay document.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => { setMontado(true); }, []);
 
   // Si la página no nos dice si es admin, lo consultamos nosotros.
   useEffect(() => {
@@ -89,7 +95,14 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
       {/* Barra fija mientras el superadmin esta dentro del panel de un
           restaurante. Estaba solo en el menu desplegable y se olvidaba:
           volvias a entrar al dia siguiente y seguias dentro sin darte cuenta. */}
-      {dentroDeUnRestaurante && (
+      {/* BUG que escondia la cabecera entera: esta barra es `fixed`, pero vivia
+          dentro de la cabecera, que lleva `backdrop-blur`. Un filtro de fondo
+          crea un marco de referencia propio, asi que el `fixed` dejaba de
+          posicionarse respecto a la ventana y lo hacia respecto a la cabecera:
+          se pintaba justo encima, tapando el logo, los botones y este mismo
+          menu. Solo se veia siendo superadmin dentro de un restaurante, que es
+          cuando aparece la barra. Se saca del arbol con un portal. */}
+      {montado && dentroDeUnRestaurante && createPortal(
         <div className="fixed bottom-0 left-0 right-0 z-[60] no-imprimir bg-amber-500 text-black shadow-lift">
           <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-medium min-w-0">
@@ -104,7 +117,8 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
               Salir
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     <div className="relative">
