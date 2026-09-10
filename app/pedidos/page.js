@@ -173,6 +173,18 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   if (!pedido) return null;
   const esCocina = variante === 'cocina';
   const numeroDe = (l) => (l.producto_id && numerosProd[l.producto_id]) || '';
+  // Los platos de un menu. Van en la linea como JSON (menu_elecciones) porque
+  // un menu es UNA linea con su precio cerrado, pero cocina necesita ver que
+  // lleva dentro: sin esto el ticket ponia "1x Menu del dia" y ya esta.
+  //
+  // El numero se guarda al hacer el pedido, no se busca ahora: si el
+  // restaurante renumera la carta manana, este ticket tiene que seguir
+  // diciendo lo que se pidio.
+  const platosDelMenu = (l) => {
+    const e = l.menu_elecciones;
+    if (!Array.isArray(e)) return [];
+    return e.filter((x) => x && x.nombre);
+  };
   // Si ningun plato tiene numero no pintamos la columna: no dejamos un hueco.
   const hayNumeros = lineas.some(l => numeroDe(l) !== '');
   const numero = '#' + pedido.id.slice(-4).toUpperCase();
@@ -226,6 +238,15 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
                   {hayNumeros && <td className="col-num">{numeroDe(l)}</td>}
                   <td className="col-prod">{l.nombre_producto}</td>
                 </tr>
+                {platosDelMenu(l).map((p, i) => (
+                  <tr key={'m' + i}>
+                    <td className="col-cant"></td>
+                    {hayNumeros && <td className="col-num">{p.numero || ''}</td>}
+                    <td className="col-prod">
+                      &rarr; {p.nombre}{p.notas ? ' (' + p.notas + ')' : ''}
+                    </td>
+                  </tr>
+                ))}
                 {l.notas && l.notas.trim() !== '' && (
                   <tr>
                     <td colSpan={hayNumeros ? 3 : 2} className="nota">&rarr; {l.notas}</td>
@@ -280,6 +301,16 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
                 </td>
                 <td className="col-tot">{(l.cantidad * Number(l.precio_unitario)).toFixed(2)}&euro;</td>
               </tr>
+              {platosDelMenu(l).map((p, i) => (
+                <tr key={'m' + i}>
+                  <td className="col-cant"></td>
+                  <td className="col-prod nota">
+                    &rarr; {p.numero ? p.numero + '. ' : ''}{p.nombre}
+                    {p.notas ? ' (' + p.notas + ')' : ''}
+                  </td>
+                  <td className="col-tot"></td>
+                </tr>
+              ))}
               {l.notas && l.notas.trim() !== '' && (
                 <tr>
                   <td colSpan="3" className="nota">&rarr; {l.notas}</td>
