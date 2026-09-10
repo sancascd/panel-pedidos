@@ -14,7 +14,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
-  Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList
+  Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
+  Briefcase, Presentation
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -28,6 +29,7 @@ const LINKS_NAV = [
   { href: '/plan',       icono: Gauge,           label: 'Plan' },
   { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
   { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
+  { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
 ];
 
 // `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa
@@ -44,6 +46,15 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   // completo solo.
   const [sinRestaurante, setSinRestaurante] = useState(false);
   const [nombreRestaurante, setNombreRestaurante] = useState('');
+  // Los comerciales tambien tienen desplegable: lo suyo, mas la demostracion.
+  const [esComercial, setEsComercial] = useState(false);
+  // El restaurante en el que se esta es el de demostraciones. Cambia el texto
+  // de la barra y, sobre todo, POR DONDE se sale: salir_del_restaurante()
+  // exige superadmin, asi que un comercial se quedaria dentro sin salida.
+  const [esDemo, setEsDemo] = useState(false);
+  // El numero al que tiene que escribir el cliente que estas visitando. Es lo
+  // primero que hace falta en una demostracion, asi que va en la propia barra.
+  const [numeroDemo, setNumeroDemo] = useState('');
   // La barra de 'estas dentro de un restaurante' se pinta FUERA de la cabecera
   // (ver mas abajo el porque); para eso hace falta saber que ya hay document.
   const [montado, setMontado] = useState(false);
@@ -66,28 +77,62 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   useEffect(() => {
     let activo = true;
     const supabase = crearClienteSupabase();
+    supabase.rpc('soy_comercial')
+      .then(({ data }) => { if (activo) setEsComercial(data === true); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, []);
+
+  useEffect(() => {
+    let activo = true;
+    const supabase = crearClienteSupabase();
     supabase.rpc('mi_restaurante_id')
       .then(async ({ data }) => {
         if (!activo) return;
         setSinRestaurante(!data);
-        if (!data) { setNombreRestaurante(''); return; }
+        if (!data) { setNombreRestaurante(''); setEsDemo(false); return; }
         const { data: rest } = await supabase
-          .from('restaurantes').select('nombre').eq('id', data).maybeSingle();
-        if (activo) setNombreRestaurante(rest?.nombre || '');
+          .from('restaurantes').select('nombre, es_demo, whatsapp_numero').eq('id', data).maybeSingle();
+        if (!activo) return;
+        setNombreRestaurante(rest?.nombre || '');
+        setEsDemo(rest?.es_demo === true);
+        setNumeroDemo(rest?.es_demo ? (rest.whatsapp_numero || '') : '');
       })
       .catch(() => {});
     return () => { activo = false; };
   }, []);
 
-  // Solo aparece cuando un superadmin esta DENTRO del panel de un
-  // restaurante (entro desde /admin). Deshace el vinculo temporal.
-  const dentroDeUnRestaurante = esAdmin && !sinRestaurante;
+  // Solo aparece cuando alguien SIN restaurante propio esta dentro del panel
+  // de uno: la superadmin (entro desde /admin) o un comercial (entro en la
+  // demostracion). Deshace el vinculo temporal.
+  const dentroDeUnRestaurante = (esAdmin || esComercial) && !sinRestaurante;
+  const puedeDemostrar = esAdmin || esComercial;
+
+  // La cuenta de plataforma y la de un comercial no tienen restaurante propio:
+  // sin vinculo no hay tablero ni carta que abrir, solo lo suyo. En cuanto
+  // entran en uno (un cliente o la demo) les vuelve el menu completo.
+  const soloLoSuyo = puedeDemostrar && sinRestaurante;
+  const linksVisibles = LINKS_NAV.filter(l => {
+    if (l.soloAdmin && !esAdmin) return false;
+    if (l.soloComercial && !esComercial) return false;
+    if (soloLoSuyo && !l.soloAdmin && !l.soloComercial) return false;
+    return true;
+  });
 
   async function salirDelPanel() {
     const supabase = crearClienteSupabase();
-    const { error } = await supabase.rpc('salir_del_restaurante');
+    // salir_del_restaurante() exige superadmin; salir_de_la_demo() no, porque
+    // solo puede deshacer vinculos con restaurantes de demostracion.
+    const { error } = await supabase.rpc(esDemo ? 'salir_de_la_demo' : 'salir_del_restaurante');
     if (error) { alert('No se pudo salir: ' + error.message); return; }
-    window.location.href = '/admin';
+    window.location.href = esAdmin ? '/admin' : '/comercial';
+  }
+
+  async function entrarEnDemo() {
+    const supabase = crearClienteSupabase();
+    const { error } = await supabase.rpc('entrar_en_demo');
+    if (error) { alert('No se pudo entrar en la demostracion: ' + error.message); return; }
+    window.location.href = '/pedidos';
   }
 
   return (
@@ -106,8 +151,14 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
         <div className="fixed bottom-0 left-0 right-0 z-[60] no-imprimir bg-amber-500 text-black shadow-lift">
           <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-medium min-w-0">
-              Estas viendo el panel de{' '}
-              <strong>{nombreRestaurante || 'un restaurante'}</strong> como administradora
+              {esDemo ? (
+                <>Estas en la <strong>demostracion</strong>
+                  {numeroDemo ? <> — que escriban al <strong>{numeroDemo}</strong></> : null}
+                </>
+              ) : (
+                <>Estas viendo el panel de{' '}
+                <strong>{nombreRestaurante || 'un restaurante'}</strong> como administradora</>
+              )}
             </p>
             <button
               onClick={salirDelPanel}
@@ -174,31 +225,39 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4 flex-shrink-0" />
-                  Salir del panel
+                  {esDemo ? 'Salir de la demostracion' : 'Salir del panel'}
                 </button>
                 <div className="my-1.5 border-t border-border" />
               </>
             )}
-            {(esAdmin && sinRestaurante
-              ? LINKS_NAV.filter(l => l.soloAdmin)
-              : LINKS_NAV
-            ).map(({ href, icono: Icono, label, soloAdmin }) => (
-              (!soloAdmin || esAdmin) && (
-                <a
-                  key={href}
-                  href={href}
+            {puedeDemostrar && !esDemo && (
+              <>
+                <button
+                  onClick={() => { setAbierto(false); entrarEnDemo(); }}
                   role="menuitem"
-                  onClick={() => setAbierto(false)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === href
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-text-muted hover:text-text hover:bg-surface-2'
-                  }`}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
                 >
-                  <Icono className="w-4 h-4 flex-shrink-0" />
-                  {label}
-                </a>
-              )
+                  <Presentation className="w-4 h-4 flex-shrink-0" />
+                  Demostracion
+                </button>
+                <div className="my-1.5 border-t border-border" />
+              </>
+            )}
+            {linksVisibles.map(({ href, icono: Icono, label }) => (
+              <a
+                key={href}
+                href={href}
+                role="menuitem"
+                onClick={() => setAbierto(false)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  pathname === href
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-text-muted hover:text-text hover:bg-surface-2'
+                }`}
+              >
+                <Icono className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </a>
             ))}
           </div>
         </>

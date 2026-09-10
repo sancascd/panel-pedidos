@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { crearClienteSupabase } from '@/lib/supabase';
 import BotonTema from '@/components/BotonTema';
+import MenuNav from '@/components/MenuNav';
 import {
   MessageSquare, Search, Plus, Loader2, Check, X, LogOut,
   Trophy, MapPin, Phone, AlertCircle, CheckCircle2,
@@ -202,6 +203,7 @@ export default function PanelComercial() {
           </div>
           <div className="flex items-center gap-2">
             <BotonTema />
+            <MenuNav />
             <button onClick={salir} className="btn-ghost p-2.5" title="Cerrar sesión">
               <LogOut className="w-4 h-4" />
             </button>
