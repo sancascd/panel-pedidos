@@ -97,6 +97,7 @@ export default function PaginaAjustes() {
     descripcion: '',
     telefono: '',
     direccion: '',
+    pedido_minimo: '',
     email_contacto: '',
     carta_url: '',
     carta_tipo: 'comandi',
@@ -124,6 +125,7 @@ export default function PaginaAjustes() {
           descripcion: rest.descripcion || '',
           telefono: rest.telefono || '',
           direccion: rest.direccion || '',
+          pedido_minimo: rest.pedido_minimo == null ? '' : String(rest.pedido_minimo),
           email_contacto: rest.email_contacto || '',
           carta_url: rest.carta_url || '',
           // Si no hay preferencia guardada, inferir la efectiva actual.
@@ -161,6 +163,11 @@ export default function PaginaAjustes() {
         descripcion: datos.descripcion.trim() || null,
         telefono: datos.telefono.trim() || null,
         direccion: datos.direccion.trim() || null,
+        // Vacio = sin minimo. Se guarda null, no 0, para que la diferencia
+        // entre 'no tiene' y 'tiene cero' no dependa de como se lea luego.
+        pedido_minimo: datos.pedido_minimo.trim() === ''
+          ? null
+          : Number(String(datos.pedido_minimo).replace(',', '.')),
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
         carta_tipo: datos.carta_tipo || null,
@@ -346,6 +353,23 @@ export default function PaginaAjustes() {
                 className="input"
                 placeholder="Calle Mayor 5, Córdoba"
               />
+            </div>
+            <div>
+              <label className="label">Pedido mínimo a domicilio</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={datos.pedido_minimo}
+                onChange={(e) => setDatos({ ...datos, pedido_minimo: e.target.value })}
+                className="input"
+                placeholder="Sin mínimo"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                Si el pedido no llega, el bot lo avisa antes de pedir la dirección y ofrece
+                recogerlo en el local. Déjalo vacío si repartes sin mínimo. La recogida nunca
+                tiene mínimo.
+              </p>
             </div>
           </div>
         </div>
