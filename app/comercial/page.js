@@ -15,7 +15,7 @@ import BotonTema from '@/components/BotonTema';
 import MenuNav from '@/components/MenuNav';
 import {
   MessageSquare, Search, Plus, Loader2, Check, X, LogOut,
-  Trophy, MapPin, Phone, AlertCircle, CheckCircle2,
+  Trophy, MapPin, Phone, AlertCircle, CheckCircle2, FileText,
 } from 'lucide-react';
 
 const ACCENT_HEX = '#10B981';
@@ -335,6 +335,23 @@ export default function PanelComercial() {
             <span>{aviso.texto}</span>
           </div>
         )}
+
+        {/* El dosier, a mano: es lo que se enseña en la visita, asi que no
+            deberia haber que ir a buscarlo al desplegable. */}
+        <a
+          href="/material/comandi-como-funciona.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card p-4 flex items-center gap-3 hover:border-accent transition-colors"
+        >
+          <FileText className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT_HEX }} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text">Material para el cliente</p>
+            <p className="text-xs text-text-muted">
+              El dosier de cómo funciona Comandi, para enseñar en la visita o mandarlo después.
+            </p>
+          </div>
+        </a>
 
         {/* Registrar */}
         <section className="card p-5">
