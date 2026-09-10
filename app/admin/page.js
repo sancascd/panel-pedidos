@@ -67,11 +67,13 @@ export default function PaginaAdmin() {
   }, []);
 
   async function cargarPlanes() {
-    // Restaurantes aprobados con su plan + ancla de periodo
+    // Restaurantes aprobados con su plan + ancla de periodo.
+    // Los demos quedan fuera: no son clientes y no se les factura nada.
     const { data: rests } = await supabase
       .from('restaurantes')
       .select('id, nombre, plan, plan_iniciado_en, estado, pedidos_incluidos')
-      .eq('estado', 'aprobado');
+      .eq('estado', 'aprobado')
+      .eq('es_demo', false);
 
     // Pedidos de los ultimos 32 dias (cubre el periodo de cualquier restaurante)
     const desde = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000).toISOString();
@@ -322,14 +324,18 @@ export default function PaginaAdmin() {
         .gte('creado_en', inicioMes.toISOString())
         .neq('estado', 'cancelado'),
       supabase.from('restaurantes')
-        .select('id, nombre, estado'),
+        .select('id, nombre, estado, es_demo'),
       supabase.from('rate_limits')
         .select('telefono, bloqueado_hasta, motivo_bloqueo, llamadas_ia_dia, contador_dia')
     ]);
 
-    const pedidos = pedidosResp.data || [];
-    const todosRestaurantes = restResp.data || [];
     const limits = limitsResp.data || [];
+
+    // Los restaurantes de demostración no son clientes: ni ellos ni sus pedidos
+    // de prueba deben aparecer en las cifras del negocio.
+    const demos = new Set((restResp.data || []).filter(r => r.es_demo).map(r => r.id));
+    const todosRestaurantes = (restResp.data || []).filter(r => !r.es_demo);
+    const pedidos = (pedidosResp.data || []).filter(p => !demos.has(p.restaurante_id));
 
     // Filtrar por estado
     const aprobados = todosRestaurantes.filter(r => r.estado === 'aprobado');
