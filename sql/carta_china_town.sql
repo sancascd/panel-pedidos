@@ -310,7 +310,7 @@ Bebida y postre incluidos', 79.00, true, '{1,2,3,4,5,6,7}'::smallint[], null, 6)
 
   -- Menú 1 del mediodía
   insert into menus (restaurante_id, nombre, descripcion, precio, activo, dias_semana, turno, orden)
-  values (v_rest, 'Menú 1 del mediodía', 'De lunes a viernes, excepto festivos.', 11.00, true, '{1,2,3,4,5}'::smallint[], 'manana', 7) returning id into v_menu;
+  values (v_rest, 'Menú 1 del mediodía', 'Excepto festivos.', 11.00, true, '{1,2,3,4,5}'::smallint[], 'manana', 7) returning id into v_menu;
   insert into menu_grupos (menu_id, restaurante_id, nombre, orden)
   values (v_menu, v_rest, 'Primero', 1) returning id into v_grupo;
   insert into menu_opciones (grupo_id, restaurante_id, producto_id, nombre, suplemento, orden) values
@@ -357,7 +357,7 @@ Bebida y postre incluidos', 79.00, true, '{1,2,3,4,5,6,7}'::smallint[], null, 6)
 
   -- Menú 2 del mediodía
   insert into menus (restaurante_id, nombre, descripcion, precio, activo, dias_semana, turno, orden)
-  values (v_rest, 'Menú 2 del mediodía', 'De lunes a viernes, excepto festivos.', 13.00, true, '{1,2,3,4,5}'::smallint[], 'manana', 8) returning id into v_menu;
+  values (v_rest, 'Menú 2 del mediodía', 'Excepto festivos.', 13.00, true, '{1,2,3,4,5}'::smallint[], 'manana', 8) returning id into v_menu;
   insert into menu_grupos (menu_id, restaurante_id, nombre, orden)
   values (v_menu, v_rest, 'Primero', 1) returning id into v_grupo;
   insert into menu_opciones (grupo_id, restaurante_id, producto_id, nombre, suplemento, orden) values
