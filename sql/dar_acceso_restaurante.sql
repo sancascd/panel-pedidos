@@ -18,6 +18,72 @@
 -- ============================================================
 
 
+-- ============================================================
+-- FORMA RECOMENDADA: de una vez y con red
+-- ============================================================
+-- Rellena las dos lineas de abajo y ejecuta SOLO este bloque. Hace las
+-- comprobaciones el solo y se para sin escribir nada si algo no cuadra.
+-- Los pasos sueltos que vienen despues siguen aqui para diagnosticar cuando
+-- algo falla, pero para el alta normal basta con esto.
+
+do $$
+declare
+  -- ----- RELLENAR -----
+  c_email text := 'RELLENAR';   -- el email con el que va a entrar el cliente
+  c_slug  text := 'RELLENAR';   -- 'china-town', por ejemplo
+  -- --------------------
+  v_usuario    uuid;
+  v_rest       uuid;
+  v_confirmado timestamptz;
+  v_nombre     text;
+begin
+  if 'RELLENAR' in (c_email, c_slug) then
+    raise exception 'Rellena el email y el slug arriba';
+  end if;
+
+  select id, email_confirmed_at into v_usuario, v_confirmado
+    from auth.users where email = lower(c_email);
+
+  if v_usuario is null then
+    raise exception 'No hay ningun usuario con el email %. Crealo primero en Authentication > Users.', c_email;
+  end if;
+
+  -- Sin confirmar no pueden entrar, y el error del login no menciona esto:
+  -- parece otro problema completamente distinto. Es la casilla "Auto Confirm
+  -- User" que se olvida al crear el usuario.
+  if v_confirmado is null then
+    raise exception 'El usuario % existe pero tiene el email SIN CONFIRMAR: no podra entrar. Confirmalo antes.', c_email;
+  end if;
+
+  select id, nombre into v_rest, v_nombre from restaurantes where slug = c_slug;
+  if v_rest is null then
+    raise exception 'No existe ningun restaurante con el slug %', c_slug;
+  end if;
+
+  -- mi_restaurante_id() hace LIMIT 1 SIN ORDER BY: con dos vinculos, el panel
+  -- de esa persona apuntaria a uno cualquiera de los dos, y cambiando.
+  if exists (select 1 from usuarios_restaurante where usuario_id = v_usuario) then
+    raise exception 'Ese usuario ya esta vinculado a un restaurante. Desvinculalo antes en vez de acumular filas.';
+  end if;
+
+  insert into usuarios_restaurante (usuario_id, restaurante_id, rol)
+  values (v_usuario, v_rest, 'admin');
+
+  raise notice 'Vinculado % a % (%)', c_email, v_nombre, c_slug;
+end $$;
+
+-- Quien tiene acceso ahora a ese restaurante:
+select u.email, ur.rol, r.nombre
+  from usuarios_restaurante ur
+  join auth.users u   on u.id = ur.usuario_id
+  join restaurantes r on r.id = ur.restaurante_id
+ where r.slug = 'RELLENAR';
+
+
+-- ============================================================
+-- PASOS SUELTOS (para diagnosticar si algo falla)
+-- ============================================================
+
 -- PASO 1 (comprobar). El restaurante existe y esta aprobado?
 select id, nombre, slug, estado, plan, meta_phone_number_id
 from restaurantes
