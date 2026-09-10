@@ -30,7 +30,12 @@ declare
   v_confirmado timestamptz;
   v_id uuid;
 begin
-  if not soy_superadmin() then
+  -- Desde la APLICACION solo puede llamarla la superadmin. Desde el editor SQL
+  -- de Supabase no hay sesion -auth.uid() es nulo- y ahi la conexion ya es de
+  -- dueña de la base de datos, asi que la guarda no aporta nada y solo
+  -- estorbaria. No abre ningun hueco: mas abajo se revoca el permiso de
+  -- ejecucion a `anon`, que es el unico rol que llega sin sesion por la API.
+  if auth.uid() is not null and not soy_superadmin() then
     raise exception 'Solo la administradora puede dar de alta comerciales';
   end if;
   if coalesce(trim(p_nombre), '') = '' then
