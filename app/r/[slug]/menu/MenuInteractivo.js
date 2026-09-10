@@ -197,8 +197,18 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios 
                     {menu.turno === 'manana' ? ' a mediodía' : menu.turno === 'noche' ? ' por la noche' : ''}
                   </p>
                 )}
+                {/* En un menú cerrado la descripción no es un adorno: ES el
+                    menú, lo único que dice de qué va. Así que ahí se pinta como
+                    una lista legible y no como la línea gris de detalle. */}
                 {menu.descripcion && (
-                  <p className="text-xs text-text-muted mt-0.5">{menu.descripcion}</p>
+                  (menu.grupos || []).length === 0 ? (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Incluye</p>
+                      <p className="text-sm text-text mt-1 whitespace-pre-line">{menu.descripcion}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-muted mt-0.5 whitespace-pre-line">{menu.descripcion}</p>
+                  )
                 )}
                 {/* No se esconde: se puede encargar para cuando toque, y el bot
                     ya sabe programarlo. Pero hay que decirlo antes de elegir. */}
