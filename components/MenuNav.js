@@ -15,7 +15,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
-  Briefcase, Presentation
+  Briefcase, Presentation, FileText
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -30,6 +30,10 @@ const LINKS_NAV = [
   { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
   { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
   { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
+  // Se abre en otra pestana: es un PDF para enseñar o mandar, no una pagina
+  // del panel. Lo ven la administradora y los comerciales, nadie mas.
+  { href: '/material/comandi-como-funciona.pdf', icono: FileText,
+    label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true },
 ];
 
 // `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa
@@ -115,7 +119,8 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   const linksVisibles = LINKS_NAV.filter(l => {
     if (l.soloAdmin && !esAdmin) return false;
     if (l.soloComercial && !esComercial) return false;
-    if (soloLoSuyo && !l.soloAdmin && !l.soloComercial) return false;
+    if (l.soloEquipo && !puedeDemostrar) return false;
+    if (soloLoSuyo && !l.soloAdmin && !l.soloComercial && !l.soloEquipo) return false;
     return true;
   });
 
@@ -243,11 +248,13 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                 <div className="my-1.5 border-t border-border" />
               </>
             )}
-            {linksVisibles.map(({ href, icono: Icono, label }) => (
+            {linksVisibles.map(({ href, icono: Icono, label, nuevaPestana }) => (
               <a
                 key={href}
                 href={href}
                 role="menuitem"
+                target={nuevaPestana ? '_blank' : undefined}
+                rel={nuevaPestana ? 'noopener noreferrer' : undefined}
                 onClick={() => setAbierto(false)}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   pathname === href
