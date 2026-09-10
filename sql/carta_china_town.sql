@@ -176,12 +176,12 @@ begin
     (v_rest, v_cat, '62', 'Pollo con almendras', 6.95, true),
     (v_rest, v_cat, '63', 'Pollo con curry', 6.95, true),
     (v_rest, v_cat, '64', 'Pollo agridulce', 6.95, true),
-    (v_rest, v_cat, '65', 'Alitas de pollo fritas', 7.95, true),
-    (v_rest, v_cat, '66', 'Pollo con bambú y setas chinas', 6.95, true),
+    (v_rest, v_cat, '65', 'Alitas de pollo fritas', 6.95, true),
+    (v_rest, v_cat, '66', 'Pollo con bambú y setas chinas', 7.95, true),
     (v_rest, v_cat, '67', 'Pollo con salsa picante', 6.95, true),
     (v_rest, v_cat, '68', 'Pollo con champiñón', 6.95, true),
-    (v_rest, v_cat, '69', 'Pollo frito troceado con patatas fritas', 8.75, true),
-    (v_rest, v_cat, '70', 'Pollo teriyaki', 6.95, true);
+    (v_rest, v_cat, '69', 'Pollo frito troceado con patatas fritas', 6.95, true),
+    (v_rest, v_cat, '70', 'Pollo teriyaki', 8.75, true);
 
   -- ----- Pato -----
   insert into categorias (restaurante_id, nombre, orden)
