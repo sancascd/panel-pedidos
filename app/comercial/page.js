@@ -34,6 +34,40 @@ function diasQueQuedan(reservadoHasta) {
   return Math.max(0, Math.ceil(ms / 86400000));
 }
 
+// Estados en los que el restaurante todavia se trabaja. Los otros dos
+// (cerrado y descartado) ya no se visitan, asi que bajan al final.
+const EN_MARCHA = ['registrado', 'visitado', 'interesado'];
+const SIN_POBLACION = 'Sin población';
+
+// Agrupa por poblacion para poder recorrer una ciudad de una sentada, que es
+// como se sale a visitar. Alfabetico, y los que no tienen poblacion al final:
+// eso es un dato que falta, no un sitio al que ir.
+function porPoblacion(lista) {
+  const mapa = new Map();
+  for (const c of lista) {
+    const donde = (c.poblacion || '').trim() || SIN_POBLACION;
+    if (!mapa.has(donde)) mapa.set(donde, []);
+    mapa.get(donde).push(c);
+  }
+  return [...mapa.entries()].sort(([a], [b]) => {
+    if (a === SIN_POBLACION) return 1;
+    if (b === SIN_POBLACION) return -1;
+    return a.localeCompare(b, 'es');
+  });
+}
+
+// La lista de trabajo arriba, por ciudades; lo terminado abajo. Dentro de
+// cerrados y descartados no hacen falta cabeceras de ciudad (no se visitan),
+// pero se ordenan igual para que los del mismo sitio queden juntos.
+function agruparContactos(contactos) {
+  const porCiudad = (l) => porPoblacion(l).flatMap(([, cs]) => cs);
+  return {
+    ciudades:    porPoblacion(contactos.filter(c => EN_MARCHA.includes(c.estado))),
+    cerrados:    porCiudad(contactos.filter(c => c.estado === 'cerrado')),
+    descartados: porCiudad(contactos.filter(c => c.estado === 'descartado')),
+  };
+}
+
 export default function PanelComercial() {
   const router = useRouter();
   const supabase = crearClienteSupabase();
@@ -144,6 +178,81 @@ export default function PanelComercial() {
     router.push('/login');
   }
 
+  // Una ficha de restaurante. Se saca del JSX porque ahora se pinta desde
+  // varios sitios: cada ciudad, los cerrados y los descartados.
+  function tarjeta(c) {
+    const dias = diasQueQuedan(c.reservado_hasta);
+    const caducado = c.estado !== 'cerrado' && dias === 0;
+    const est = ESTADOS[c.estado] || ESTADOS.registrado;
+    return (
+      <div key={c.id} className="card p-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="font-medium text-text">{c.nombre_restaurante}</p>
+            <div className="flex items-center gap-3 mt-1 text-xs text-text-muted flex-wrap">
+              {c.poblacion && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />{c.poblacion}
+                </span>
+              )}
+              {c.telefono && (
+                <a href={'tel:' + c.telefono} className="inline-flex items-center gap-1 hover:text-accent">
+                  <Phone className="w-3 h-3" />{c.telefono}
+                </a>
+              )}
+              {c.estado !== 'cerrado' && c.estado !== 'descartado' && (
+                <span className={caducado ? 'text-red-500' : ''}>
+                  {caducado ? 'Reserva caducada' : 'Reservado ' + dias + ' días más'}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
+            {c.estado === 'cerrado' && (
+              <span className={'text-xs ' + (c.comision_pagada_en ? 'text-accent' : 'text-text-muted')}>
+                {c.comision_pagada_en ? 'Comisión pagada' : 'Comisión pendiente'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {c.estado !== 'cerrado' && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border flex-wrap items-center">
+            {c.estado === 'descartado' ? (
+              <button onClick={() => cambiarEstado(c, 'registrado')} className="btn-ghost text-xs">
+                Recuperar
+              </button>
+            ) : (
+              <>
+                {c.estado === 'registrado' && (
+                  <button onClick={() => cambiarEstado(c, 'visitado')} className="btn-ghost text-xs">
+                    Marcar visitado
+                  </button>
+                )}
+                {c.estado !== 'interesado' && (
+                  <button onClick={() => cambiarEstado(c, 'interesado')} className="btn-ghost text-xs">
+                    Está interesado
+                  </button>
+                )}
+                <button onClick={() => cambiarEstado(c, 'descartado')} className="btn-ghost text-xs">
+                  Descartar
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => borrar(c)}
+              className="btn-ghost text-xs ml-auto text-red-500 hover:text-red-600"
+              title="Lo quita de tu lista y lo deja libre"
+            >
+              Eliminar
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (cargando) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -184,6 +293,7 @@ export default function PanelComercial() {
 
   const cerrados = contactos.filter(c => c.estado === 'cerrado').length;
   const activos = contactos.filter(c => !['cerrado', 'descartado'].includes(c.estado)).length;
+  const grupos = agruparContactos(contactos);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -317,79 +427,36 @@ export default function PanelComercial() {
               <p className="text-text-muted">Todavía no has registrado ninguno.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {contactos.map(c => {
-                const dias = diasQueQuedan(c.reservado_hasta);
-                const caducado = c.estado !== 'cerrado' && dias === 0;
-                const est = ESTADOS[c.estado] || ESTADOS.registrado;
-                return (
-                  <div key={c.id} className="card p-4">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
-                        <p className="font-medium text-text">{c.nombre_restaurante}</p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-text-muted flex-wrap">
-                          {c.poblacion && (
-                            <span className="inline-flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />{c.poblacion}
-                            </span>
-                          )}
-                          {c.telefono && (
-                            <a href={'tel:' + c.telefono} className="inline-flex items-center gap-1 hover:text-accent">
-                              <Phone className="w-3 h-3" />{c.telefono}
-                            </a>
-                          )}
-                          {c.estado !== 'cerrado' && c.estado !== 'descartado' && (
-                            <span className={caducado ? 'text-red-500' : ''}>
-                              {caducado ? 'Reserva caducada' : 'Reservado ' + dias + ' días más'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className={'badge text-xs px-2 py-1 rounded-md ' + est.clase}>{est.label}</span>
-                        {c.estado === 'cerrado' && (
-                          <span className={'text-xs ' + (c.comision_pagada_en ? 'text-accent' : 'text-text-muted')}>
-                            {c.comision_pagada_en ? 'Comisión pagada' : 'Comisión pendiente'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {c.estado !== 'cerrado' && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-border flex-wrap items-center">
-                        {c.estado === 'descartado' ? (
-                          <button onClick={() => cambiarEstado(c, 'registrado')} className="btn-ghost text-xs">
-                            Recuperar
-                          </button>
-                        ) : (
-                          <>
-                            {c.estado === 'registrado' && (
-                              <button onClick={() => cambiarEstado(c, 'visitado')} className="btn-ghost text-xs">
-                                Marcar visitado
-                              </button>
-                            )}
-                            {c.estado !== 'interesado' && (
-                              <button onClick={() => cambiarEstado(c, 'interesado')} className="btn-ghost text-xs">
-                                Está interesado
-                              </button>
-                            )}
-                            <button onClick={() => cambiarEstado(c, 'descartado')} className="btn-ghost text-xs">
-                              Descartar
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => borrar(c)}
-                          className="btn-ghost text-xs ml-auto text-red-500 hover:text-red-600"
-                          title="Lo quita de tu lista y lo deja libre"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    )}
+            <div className="space-y-6">
+              {grupos.ciudades.map(([ciudad, lista]) => (
+                <div key={ciudad}>
+                  <div className="flex items-baseline gap-2 mb-2 px-1">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">{ciudad}</h3>
+                    <span className="text-xs text-text-muted tabular-nums">{lista.length}</span>
                   </div>
-                );
-              })}
+                  <div className="space-y-2">{lista.map(tarjeta)}</div>
+                </div>
+              ))}
+
+              {grupos.cerrados.length > 0 && (
+                <div>
+                  <div className="flex items-baseline gap-2 mb-2 px-1">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-accent">Cerrados</h3>
+                    <span className="text-xs text-text-muted tabular-nums">{grupos.cerrados.length}</span>
+                  </div>
+                  <div className="space-y-2">{grupos.cerrados.map(tarjeta)}</div>
+                </div>
+              )}
+
+              {grupos.descartados.length > 0 && (
+                <div>
+                  <div className="flex items-baseline gap-2 mb-2 px-1">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted">Descartados</h3>
+                    <span className="text-xs text-text-muted tabular-nums">{grupos.descartados.length}</span>
+                  </div>
+                  <div className="space-y-2">{grupos.descartados.map(tarjeta)}</div>
+                </div>
+              )}
             </div>
           )}
           <p className="text-xs text-text-muted mt-3">
