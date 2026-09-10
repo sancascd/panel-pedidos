@@ -14,7 +14,11 @@
 
 do $$
 declare
+  -- Poner en true SOLO para rehacer la carta desde cero. Ojo: se lleva por
+  -- delante cualquier correccion hecha a mano en el panel.
+  c_rehacer boolean := false;
   v_rest uuid;
+  v_platos int;
   v_cat  uuid;
   v_menu uuid;
   v_grupo uuid;
@@ -22,6 +26,14 @@ begin
   select id into v_rest from restaurantes where slug = 'china-town';
   if v_rest is null then
     raise exception 'No existe el restaurante china-town';
+  end if;
+
+  -- Este script BORRA la carta y la vuelve a crear. Una vez cargada, los
+  -- precios se corrigen en el panel contra la carta de verdad, y volver a
+  -- ejecutarlo aqui los machaca sin avisar. Paso dos veces el 2026-09-10.
+  select count(*) into v_platos from productos where restaurante_id = v_rest;
+  if v_platos > 0 and not c_rehacer then
+    raise exception 'Este restaurante ya tiene % platos cargados. Si de verdad quieres rehacer la carta entera, pon c_rehacer := true arriba.', v_platos;
   end if;
 
   -- ---------- Direccion del local ----------
