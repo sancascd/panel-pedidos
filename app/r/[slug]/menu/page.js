@@ -48,11 +48,19 @@ export default async function MenusPublicos({ params }) {
   const datos = await obtenerMenus(params.slug);
   if (!datos) notFound();
 
-  // Un menú sin grupos o con grupos vacíos no se puede pedir: dejaría al
-  // cliente a medias. Mejor no enseñarlo.
+  // Ojo con la diferencia, que no es la misma cosa:
+  //  - Un menú SIN grupos es un menú cerrado: precio fijo y nada que elegir.
+  //    Se pide tal cual y hay que enseñarlo. (Los menús para 2, 3, 4, 5 y 6
+  //    personas de China Town desaparecían por caer en el filtro de abajo.)
+  //  - Un menú CON grupos donde ninguno tiene opciones está a medio montar en
+  //    el editor: ese sí se esconde, porque el cliente vería huecos vacíos.
   const menus = (datos.menus || [])
-    .map((m) => ({ ...m, grupos: (m.grupos || []).filter((g) => (g.opciones || []).length > 0) }))
-    .filter((m) => m.grupos.length > 0);
+    .map((m) => {
+      const declarados = (m.grupos || []).length;
+      const grupos = (m.grupos || []).filter((g) => (g.opciones || []).length > 0);
+      return { ...m, grupos, aMedias: declarados > 0 && grupos.length === 0 };
+    })
+    .filter((m) => !m.aMedias);
 
   return (
     <main className="min-h-screen bg-bg text-text">

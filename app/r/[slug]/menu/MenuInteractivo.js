@@ -215,7 +215,7 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios 
                 {cuando !== 'ahora' && (
                   <p className="text-xs text-accent mt-1.5">
                     Ahora no se sirve. Te lo dejamos encargado
-                    {cuando === 'manana' ? ' para mañana.' : ' para mas tarde.'}
+                    {cuando === 'manana' ? ' para mañana.' : ' para más tarde.'}
                   </p>
                 )}
               </div>
