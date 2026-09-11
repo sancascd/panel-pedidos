@@ -187,7 +187,10 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
     return e.filter((x) => x && x.nombre);
   };
   // Si ningun plato tiene numero no pintamos la columna: no dejamos un hueco.
-  const hayNumeros = lineas.some(l => numeroDe(l) !== '');
+  // Tambien los platos de un menu cuentan: un pedido que solo lleva un menu no
+  // tiene ninguna linea con producto, y sin esto la columna de numeros ni se
+  // pintaba, asi que los platos del menu salian sin numero aunque lo tuvieran.
+  const hayNumeros = lineas.some(l => numeroDe(l) !== '' || platosDelMenu(l).some(p => p.numero));
   const numero = '#' + pedido.id.slice(-4).toUpperCase();
   const esRecogida = pedido.tipo_entrega === 'recogida';
   // Un pedido programado se imprime al llegar, asi que el papel puede pasarse
@@ -244,7 +247,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
                     <td className="col-cant"></td>
                     {hayNumeros && <td className="col-num">{p.numero || ''}</td>}
                     <td className="col-prod">
-                      &rarr; {p.nombre}{p.notas ? ' (' + p.notas + ')' : ''}
+                      &rarr; {Number(p.cantidad) > 1 ? p.cantidad + 'x ' : ''}{p.nombre}{p.notas ? ' (' + p.notas + ')' : ''}
                     </td>
                   </tr>
                 ))}
@@ -306,7 +309,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
                 <tr key={'m' + i}>
                   <td className="col-cant"></td>
                   <td className="col-prod nota">
-                    &rarr; {p.numero ? p.numero + '. ' : ''}{p.nombre}
+                    &rarr; {Number(p.cantidad) > 1 ? p.cantidad + 'x ' : ''}{p.numero ? p.numero + '. ' : ''}{p.nombre}
                     {p.notas ? ' (' + p.notas + ')' : ''}
                   </td>
                   <td className="col-tot"></td>

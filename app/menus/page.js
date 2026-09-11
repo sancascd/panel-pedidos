@@ -33,6 +33,7 @@ export default function PaginaMenus() {
   const [menus, setMenus] = useState([]);
   const [grupos, setGrupos] = useState({});      // menu_id -> [grupo]
   const [opciones, setOpciones] = useState({});  // grupo_id -> [opcion]
+  const [platos, setPlatos] = useState({});      // menu_id -> [plato fijo]
   const [productos, setProductos] = useState([]);
   const [mensaje, setMensaje] = useState('');
 
@@ -78,12 +79,19 @@ export default function PaginaMenus() {
     const { data: os } = await supabase
       .from('menu_opciones').select('*').eq('restaurante_id', id).order('orden');
 
-    const porMenu = {}; const porGrupo = {};
+    // Lo que incluye cada menú cerrado. Si la tabla aún no existe viene error y
+    // se sigue sin platos fijos, como antes.
+    const { data: ps } = await supabase
+      .from('menu_platos').select('*').eq('restaurante_id', id).order('orden');
+
+    const porMenu = {}; const porGrupo = {}; const platosPorMenu = {};
     (gs || []).forEach(g => { (porMenu[g.menu_id] = porMenu[g.menu_id] || []).push(g); });
     (os || []).forEach(o => { (porGrupo[o.grupo_id] = porGrupo[o.grupo_id] || []).push(o); });
+    (ps || []).forEach(p => { (platosPorMenu[p.menu_id] = platosPorMenu[p.menu_id] || []).push(p); });
     setMenus(ms || []);
     setGrupos(porMenu);
     setOpciones(porGrupo);
+    setPlatos(platosPorMenu);
   }
 
   // ---------- menús ----------
@@ -201,6 +209,40 @@ export default function PaginaMenus() {
     await cargarTodo();
   }
 
+  // ---------- lo que incluye un menú cerrado ----------
+  // Un menú sin grupos no tiene nada que elegir, pero cocina tiene que saber
+  // qué lleva y con qué número de plato: por eso cada plato se enlaza a la
+  // carta. Lo que no está en la carta (bebida, postre) va sin número.
+  async function anadirPlato(menuId, producto) {
+    const nombre = producto ? producto.nombre : busqueda.trim();
+    if (!nombre) return;
+    const orden = (platos[menuId] || []).length + 1;
+    const { error } = await supabase.from('menu_platos').insert({
+      menu_id: menuId, restaurante_id: restauranteId,
+      producto_id: producto ? producto.id : null, nombre,
+      cantidad: 1, orden,
+    });
+    if (error) { avisar('Error: ' + error.message); return; }
+    setBusqueda('');
+    await cargarTodo();
+  }
+
+  async function borrarPlato(p) {
+    const { error } = await supabase.from('menu_platos').delete().eq('id', p.id);
+    if (error) { avisar('Error: ' + error.message); return; }
+    await cargarTodo();
+  }
+
+  async function cambiarCantidad(p, valor) {
+    const n = Math.min(99, Math.max(1, parseInt(valor, 10) || 1));
+    if (n === Number(p.cantidad)) return;
+    const { error } = await supabase.from('menu_platos').update({ cantidad: n }).eq('id', p.id);
+    if (error) { avisar('Error: ' + error.message); return; }
+    await cargarTodo();
+  }
+
+  const numeroDeProducto = (id) => (id && productos.find(p => p.id === id)?.numero) || '';
+
   // Cómo se le va a enseñar el grupo al cliente por WhatsApp.
   function diagnosticoGrupo(g) {
     const ops = opciones[g.id] || [];
@@ -221,7 +263,11 @@ export default function PaginaMenus() {
 
   const productosFiltrados = busqueda.trim() === ''
     ? []
-    : productos.filter(p => (p.nombre || '').toLowerCase().includes(busqueda.trim().toLowerCase())).slice(0, 8);
+    // También por número de carta, que es como piensa la cocina ("el 15").
+    : productos.filter(p => {
+        const q = busqueda.trim().toLowerCase();
+        return (p.nombre || '').toLowerCase().includes(q) || String(p.numero || '').toLowerCase() === q;
+      }).slice(0, 8);
 
   if (cargando) {
     return (
@@ -373,7 +419,8 @@ export default function PaginaMenus() {
                         {!m.activo && <span className="ml-2 badge bg-surface-2 text-text-muted border border-border">Desactivado</span>}
                       </p>
                       <p className="text-xs text-text-muted">
-                        {Number(m.precio).toFixed(2)} € · {gs.length} grupos ·{' '}
+                        {Number(m.precio).toFixed(2)} € ·{' '}
+                        {gs.length > 0 ? gs.length + ' grupos' : (platos[m.id] || []).length + ' platos incluidos'} ·{' '}
                         {(m.dias_semana || []).map(n => DIAS.find(d => d.num === n)?.corto).join('')}
                         {m.turno === 'manana' ? ' mediodía' : m.turno === 'noche' ? ' noche' : ''}
                       </p>
@@ -392,6 +439,96 @@ export default function PaginaMenus() {
 
                 {abierto && (
                   <div className="border-t border-border px-4 py-3 space-y-3">
+                    {gs.length === 0 && (() => {
+                      const pls = platos[m.id] || [];
+                      const clave = 'incluye:' + m.id;
+                      const sinNumero = pls.filter(p => !p.producto_id).length;
+                      return (
+                        <div className="rounded-lg border border-border p-3">
+                          <p className="text-sm font-semibold text-text mb-1">Qué incluye</p>
+                          <p className={`text-xs mb-2 ${pls.length > 0 ? 'text-text-muted' : 'text-amber-600 dark:text-amber-400'}`}>
+                            {pls.length === 0
+                              ? 'Menú cerrado sin platos enlazados: el ticket de cocina sacará solo la descripción, sin números.'
+                              : 'Menú cerrado: cocina verá estos platos con su número' +
+                                (sinNumero > 0 ? ' (' + sinNumero + ' sin número, no están en la carta).' : '.')}
+                          </p>
+
+                          <ul className="space-y-1 mb-2">
+                            {pls.map(p => (
+                              <li key={p.id + ':' + p.cantidad} className="flex items-center gap-2 text-sm">
+                                <input
+                                  className="input w-14 text-xs shrink-0 tabular-nums"
+                                  inputMode="numeric"
+                                  defaultValue={p.cantidad}
+                                  title="Cantidad"
+                                  onBlur={e => cambiarCantidad(p, e.target.value)}
+                                />
+                                {numeroDeProducto(p.producto_id) && (
+                                  <span className="text-xs text-text-muted tabular-nums shrink-0">{numeroDeProducto(p.producto_id)}</span>
+                                )}
+                                <span className="text-text truncate">{p.nombre}</span>
+                                {!p.producto_id && (
+                                  <span className="badge bg-surface-2 text-text-muted border border-border shrink-0" title="No está enlazado a la carta: sale en el ticket sin número">
+                                    sin número
+                                  </span>
+                                )}
+                                <button onClick={() => borrarPlato(p)} className="btn-ghost p-1.5 ml-auto shrink-0">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {anadiendoEn === clave ? (
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <input
+                                  className="input flex-1" autoFocus
+                                  placeholder="Buscar plato por nombre o número…"
+                                  value={busqueda}
+                                  onChange={e => setBusqueda(e.target.value)}
+                                />
+                                <button onClick={() => { setAnadiendoEn(null); setBusqueda(''); }} className="btn-ghost p-2">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              {productosFiltrados.length > 0 && (
+                                <ul className="rounded-lg border border-border divide-y divide-border">
+                                  {productosFiltrados.map(p => (
+                                    <li key={p.id}>
+                                      <button
+                                        onClick={() => anadirPlato(m.id, p)}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2 flex items-center gap-2"
+                                      >
+                                        {p.numero && <span className="text-xs text-text-muted tabular-nums">{p.numero}</span>}
+                                        <span className="text-text">{p.nombre}</span>
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {busqueda.trim() !== '' && (
+                                <button
+                                  onClick={() => anadirPlato(m.id, null)}
+                                  className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-border hover:border-accent/40 text-sm"
+                                >
+                                  <span className="text-text">
+                                    Añadir <strong>&ldquo;{busqueda.trim()}&rdquo;</strong> sin número
+                                  </span>
+                                  <span className="block text-xs text-text-muted mt-0.5">
+                                    Para lo que no está en la carta: bebida, postre…
+                                  </span>
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <button onClick={() => { setAnadiendoEn(clave); setBusqueda(''); setSubgrupoNuevo(''); }} className="btn-ghost text-xs">
+                              <Plus className="w-3.5 h-3.5" /> Añadir plato
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {gs.map(g => {
                       const ops = opciones[g.id] || [];
                       const diag = diagnosticoGrupo(g);
@@ -414,6 +551,9 @@ export default function PaginaMenus() {
                                   <span className="badge bg-surface-2 text-text-muted border border-border shrink-0">
                                     {o.subgrupo}
                                   </span>
+                                )}
+                                {numeroDeProducto(o.producto_id) && (
+                                  <span className="text-xs text-text-muted tabular-nums shrink-0">{numeroDeProducto(o.producto_id)}</span>
                                 )}
                                 <span className="text-text truncate">{o.nombre}</span>
                                 {!o.producto_id && (

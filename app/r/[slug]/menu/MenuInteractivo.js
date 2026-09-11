@@ -200,7 +200,18 @@ export default function MenuInteractivo({ menus, whatsapp, textosDias, horarios 
                 {/* En un menú cerrado la descripción no es un adorno: ES el
                     menú, lo único que dice de qué va. Así que ahí se pinta como
                     una lista legible y no como la línea gris de detalle. */}
-                {menu.descripcion && (
+                {/* Si el menu cerrado tiene sus platos enlazados, la lista sale
+                    de ahi (con cantidades). Si no, de la descripcion. */}
+                {(menu.grupos || []).length === 0 && (menu.platos || []).length > 0 ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Incluye</p>
+                    <ul className="text-sm text-text mt-1 space-y-0.5">
+                      {menu.platos.map((p, i) => (
+                        <li key={i}>{Number(p.cantidad) > 1 ? p.cantidad + ' × ' : ''}{p.nombre}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : menu.descripcion && (
                   (menu.grupos || []).length === 0 ? (
                     <div className="mt-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Incluye</p>
