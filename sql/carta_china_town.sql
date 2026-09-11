@@ -319,7 +319,7 @@ Bebida y postre incluidos', 79.00, true, '{1,2,3,4,5,6,7}'::smallint[], null, 6)
     (v_grupo, v_rest, (select p.id from productos p where p.restaurante_id = v_rest and lower(p.nombre) = lower('Rollo de primavera') limit 1), 'Rollo de primavera', 0, 4),
     (v_grupo, v_rest, (select p.id from productos p where p.restaurante_id = v_rest and lower(p.nombre) = lower('Ensalada china') limit 1), 'Ensalada china', 0, 5),
     (v_grupo, v_rest, (select p.id from productos p where p.restaurante_id = v_rest and lower(p.nombre) = lower('Pan chino frito o al vapor') limit 1), 'Pan chino frito o al vapor', 0, 6),
-    (v_grupo, v_rest, (select p.id from productos p where p.restaurante_id = v_rest and lower(p.nombre) = lower('Pan de gambas') limit 1), 'Pan de gambas', 0, 7);
+    (v_grupo, v_rest, (select p.id from productos p where p.restaurante_id = v_rest and p.numero = '17' limit 1), 'Pan de gambas', 0, 7);  -- el 17, Hoja de gambas chinas (confirmado 2026-09-11)
   insert into menu_grupos (menu_id, restaurante_id, nombre, orden)
   values (v_menu, v_rest, 'Segundo', 2) returning id into v_grupo;
   insert into menu_opciones (grupo_id, restaurante_id, producto_id, nombre, suplemento, orden) values
