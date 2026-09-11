@@ -299,7 +299,7 @@ function PlanCard({ nombre, precio, pedidos, recomendado, features }) {
         <h3 className="text-lg font-semibold text-text">{nombre}</h3>
         <div className="mt-2 md:mt-3 flex items-baseline gap-1">
           <span className="text-3xl md:text-4xl font-bold text-text tabular-nums">{precio}€</span>
-          <span className="text-text-muted text-sm">/mes + IVA</span>
+          <span className="text-text-muted text-sm">/mes, IVA incluido</span>
         </div>
         <p className="text-sm text-text-muted mt-1.5">
           Hasta <strong className="text-text tabular-nums">{pedidos}</strong> pedidos al mes
@@ -549,13 +549,13 @@ function DemoPlan() {
       <div className="max-w-md rounded-xl border border-border bg-surface-2 p-4">
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="font-semibold text-text">Plan Básico</span>
-          <span className="text-text-muted tabular-nums">584 / 800 pedidos</span>
+          <span className="text-text-muted tabular-nums">730 / 1.000 pedidos</span>
         </div>
         <div className="h-3 rounded-full bg-border overflow-hidden">
           <div className="h-full rounded-full bg-accent" style={{ width: '73%' }} />
         </div>
         <p className="mt-3 text-[11px] text-text-muted leading-relaxed">
-          Vas al 73% del plan. A este ritmo llegarás a ~800. Te avisaremos si te conviene subir a Pro.
+          Vas al 73% del plan. A este ritmo llegarás a ~1.000. Te avisaremos si te conviene subir a Pro.
         </p>
       </div>
     </div>
@@ -957,7 +957,7 @@ export default function PaginaLanding() {
           <PlanCard
             nombre="Básico"
             precio="99"
-            pedidos="800"
+            pedidos="1.000"
             recomendado={false}
             features={[
               'Bot de WhatsApp con IA',
@@ -1021,7 +1021,7 @@ export default function PaginaLanding() {
         </Reveal>
 
         <p className="text-xs text-text-muted text-center mt-6">
-          Precios sin IVA. Paga al año y ahorra un 10%.
+          Mensualidades con IVA incluido. Paga al año y ahorra un 10%.
           Sin permanencia: cambia de plan o date de baja cuando quieras.
         </p>
       </section>
@@ -1103,7 +1103,7 @@ export default function PaginaLanding() {
           />
           <FAQItem
             pregunta="¿Qué pasa si paso de los pedidos incluidos en mi plan?"
-            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 800 pedidos), si haces 900 pedidos serían 99€ + (100 × 0,20€) = 119€, IVA incluido. En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
+            respuesta="Los pedidos de más se cobran por unidad, y cuanto mayor es tu plan, más barato el extra: 0,20€ en Básico, 0,12€ en Pro y 0,08€ en Premium. Por ejemplo, en Básico (99€/mes hasta 1.000 pedidos), si haces 1.100 pedidos serían 99€ + (100 × 0,20€) = 119€, IVA incluido. En tu panel ves tu consumo en todo momento y te avisamos antes de pasarte, para que pases al plan que te salga más a cuenta."
           />
           <FAQItem
             pregunta="¿Puedo subir o bajar de plan cuando quiera?"
