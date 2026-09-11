@@ -1282,7 +1282,20 @@ export default function PaginaPedidos() {
 
   // Tablero por TIPO DE ENTREGA: una columna de recogida y otra de reparto.
   // Los terminados van aparte, debajo (ya no requieren accion).
-  const activos = pedidosDia.filter(p => columnaDe(p) !== 'finalizados');
+  // Orden de PRIORIDAD, no de llegada: por la hora a la que hay que tenerlo.
+  // En uno de "cuanto antes" es la de llegada; en un encargo, la hora que pidio.
+  // Antes todo iba por llegada, y un encargo para manana hecho a las 20:00 se
+  // colaba entre los de ahora mismo. Asi los encargos se van colocando solos
+  // en su hora, y uno cuya hora llega se pone en su sitio entre los de ahora.
+  // Se parsea con parsearFechaUTC y no se comparan los textos: Postgres no
+  // siempre devuelve la fecha en el mismo formato.
+  const horaDeTenerlo = (p) => {
+    const d = parsearFechaUTC(fechaRelevante(p));
+    return d ? d.getTime() : 0;
+  };
+  const activos = pedidosDia
+    .filter(p => columnaDe(p) !== 'finalizados')
+    .sort((a, b) => horaDeTenerlo(a) - horaDeTenerlo(b));
   const columnas = {
     recogida: activos.filter(p => p.tipo_entrega === 'recogida'),
     reparto: activos.filter(p => p.tipo_entrega !== 'recogida'),
