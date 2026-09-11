@@ -15,7 +15,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
-  Briefcase, Presentation, FileText, BookOpen
+  Briefcase, Presentation, FileText, BookOpen, Trophy
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -30,6 +30,9 @@ const LINKS_NAV = [
   { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
   { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
   { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
+  // Solo cifras del equipo (ranking, ciudades, avance): nunca los
+  // restaurantes de otro comercial. Lo ven los comerciales y la administradora.
+  { href: '/equipo',     icono: Trophy,          label: 'Cómo va el equipo', soloEquipo: true },
   // Se abre en otra pestana: es un PDF para enseñar o mandar, no una pagina
   // del panel. Lo ven la administradora y los comerciales, nadie mas.
   { href: '/material/comandi-como-funciona.pdf', icono: FileText,

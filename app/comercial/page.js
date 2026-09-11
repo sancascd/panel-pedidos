@@ -75,7 +75,6 @@ export default function PanelComercial() {
   const [cargando, setCargando] = useState(true);
   const [comercial, setComercial] = useState(null);
   const [contactos, setContactos] = useState([]);
-  const [ranking, setRanking] = useState([]);
 
   const [nombre, setNombre] = useState('');
   const [poblacion, setPoblacion] = useState('');
@@ -105,7 +104,7 @@ export default function PanelComercial() {
       // Sin aprobar todavia: soy_comercial() es false, asi que no puede
       // consultar ni registrar nada. Se lo decimos claro.
       if (!mio || !mio.activo) { setCargando(false); return; }
-      await Promise.all([cargarContactos(), cargarRanking()]);
+      await cargarContactos();
       setCargando(false);
     }
     init();
@@ -117,11 +116,6 @@ export default function PanelComercial() {
       .select('*')
       .order('registrado_en', { ascending: false });
     setContactos(data || []);
-  }
-
-  async function cargarRanking() {
-    const { data } = await supabase.rpc('ranking_comerciales');
-    setRanking(data || []);
   }
 
   function avisar(texto, tipo = 'ok') {
@@ -391,6 +385,22 @@ export default function PanelComercial() {
           </a>
         </div>
 
+        {/* El ranking estaba al final de esta pagina y se perdia: ahora tiene
+            su propia pagina, con las cifras del equipo. */}
+        <Link
+          href="/equipo"
+          className="card p-4 flex items-center gap-3 hover:border-accent transition-colors"
+        >
+          <Trophy className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT_HEX }} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-text">Cómo va el equipo</p>
+            <p className="text-xs text-text-muted">
+              El ranking, los restaurantes por ciudad y cómo avanza la red.
+            </p>
+          </div>
+          <span className="text-xs font-semibold flex-shrink-0" style={{ color: ACCENT_HEX }}>Ver</span>
+        </Link>
+
         {/* Registrar */}
         <section className="card p-5">
           <h2 className="font-semibold text-text mb-1">¿Vas a visitar un restaurante?</h2>
@@ -561,44 +571,6 @@ Cuando uno diga que sí, avísanos: el alta la confirmamos nosotros al firmar y
             cobrar. Ahí pasa a &laquo;Cerrado&raquo; y se te abona la comisión.
           </p>
         </section>
-
-        {/* Ranking */}
-        {ranking.length > 1 && (
-          <section>
-            <h2 className="font-semibold text-text mb-3 flex items-center gap-2">
-              <Trophy className="w-4 h-4" style={{ color: ACCENT_HEX }} />
-              Cómo va el equipo
-            </h2>
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-text-muted text-left">
-                    <th className="px-4 py-2.5 font-medium">Comercial</th>
-                    <th className="px-4 py-2.5 font-medium text-right">Contactos</th>
-                    <th className="px-4 py-2.5 font-medium text-right">Visitados</th>
-                    <th className="px-4 py-2.5 font-medium text-right">Cerrados</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ranking.map((r, i) => (
-                    <tr
-                      key={r.comercial_id}
-                      className={'border-b border-border last:border-0 ' + (r.soy_yo ? 'bg-accent/5' : '')}
-                    >
-                      <td className="px-4 py-2.5 text-text">
-                        <span className="text-text-muted tabular-nums mr-2">{i + 1}.</span>
-                        {r.nombre}{r.soy_yo ? ' (tú)' : ''}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">{r.contactos}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-text-muted">{r.visitados}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-text">{r.cerrados}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
 
         <p className="text-center text-xs text-text-muted pt-2">
           <Link href="/comerciales" className="hover:text-accent">Material de venta</Link>

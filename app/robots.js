@@ -16,6 +16,7 @@ export default function robots() {
           '/admin',
           '/resenas',
           '/comercial',           // panel privado del comercial
+          '/equipo',              // cifras de la red comercial
           '/cambiar-contrasena',  // requiere token de email
         ],
       },
