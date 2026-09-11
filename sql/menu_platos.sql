@@ -155,14 +155,13 @@ datos(menu, ord, cant, num, libre) as (values
 
   ('Menú para 4 personas', 1, 4, '15', null),
   ('Menú para 4 personas', 2, 1, '10', null),
-  ('Menú para 4 personas', 3, 1, '24', null),
+  -- En la carta impresa pone "fideos fritos con 3 delicias", pero el
+  -- restaurante confirma (2026-09-11) que es un segundo arroz frito.
+  ('Menú para 4 personas', 3, 2, '24', null),
   ('Menú para 4 personas', 4, 1, '41', null),
   ('Menú para 4 personas', 5, 1, '62', null),
   ('Menú para 4 personas', 6, 1, '90', null),
-  -- En la carta pone "Fideos fritos con 3 delicias", que puede ser el 22
-  -- (tallarines) o el 39 (fideos de soja). Sin numero hasta que lo confirmen.
-  ('Menú para 4 personas', 7, 1, null, 'Fideos fritos con tres delicias'),
-  ('Menú para 4 personas', 8, 1, null, 'Bebida y postre'),
+  ('Menú para 4 personas', 7, 1, null, 'Bebida y postre'),
 
   ('Menú para 5 personas', 1, 5, '15', null),
   ('Menú para 5 personas', 2, 2, '10', null),

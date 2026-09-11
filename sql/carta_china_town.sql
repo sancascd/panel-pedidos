@@ -276,11 +276,10 @@ Bebida y postre incluidos', 37.00, true, '{1,2,3,4,5,6,7}'::smallint[], null, 3)
   insert into menus (restaurante_id, nombre, descripcion, precio, activo, dias_semana, turno, orden)
   values (v_rest, 'Menú para 4 personas', '4 rollos de primavera
 1 ensalada china
-1 arroz frito tres delicias
+2 arroces fritos tres delicias
 1 ternera con salsa de ostras
 1 pollo con almendras
 1 familia feliz
-1 fideos fritos con tres delicias
 Bebida y postre incluidos', 49.00, true, '{1,2,3,4,5,6,7}'::smallint[], null, 4) returning id into v_menu;
 
   -- Menú para 5 personas
