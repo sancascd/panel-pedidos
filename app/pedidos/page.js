@@ -8,6 +8,7 @@ import { periodoActual, calcularConsumo, infoPlan } from '@/lib/planes';
 import { escaparComodinesLike, valorContienePostgrest } from '@/lib/busqueda';
 import MenuNav from '@/components/MenuNav';
 import { COMANDO_KIOSK } from '@/lib/impresion';
+import { aperturaDelTurno } from '@/lib/turnos';
 import BotonTema from '@/components/BotonTema';
 import {
   LogOut, UtensilsCrossed,
@@ -348,6 +349,8 @@ export default function PaginaPedidos() {
 
   const [usuario, setUsuario] = useState(null);
   const [restaurante, setRestaurante] = useState(null);
+  // Para saber cuando abre el turno de cada encargo, que es cuando se imprime.
+  const [horarios, setHorarios] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [seleccionado, setSeleccionado] = useState(null);
   const [lineas, setLineas] = useState([]);
@@ -382,6 +385,10 @@ export default function PaginaPedidos() {
   const colaImprRef = useRef([]);        // trabajos pendientes: array de arrays
   const imprimiendoRef = useRef(false);  // hay un window.print() en curso
   const vistosImprRef = useRef(null);    // ids ya evaluados (null = sin inicializar)
+  // Ids ya mandados a la impresora en esta sesion. El pedido se marca
+  // impreso_en al imprimir, pero la cola es asincrona: sin esto, el reloj de
+  // los programados podia volver a encolar uno que ya estaba en camino.
+  const encoladosRef = useRef(new Set());
 
   const [pestana, setPestana] = useState('hoy');
   // El restaurante puede pedir empezar cada dia limpio (ajuste
@@ -567,6 +574,11 @@ export default function PaginaPedidos() {
       // asi que cargarPedidos no puede leer restaurante.id del closure todavia.
       await cargarPedidos(restCargado?.id);
       await cargarNumerosProductos(restCargado?.id);
+      if (restCargado?.id) {
+        const { data: hs } = await supabase
+          .from('horarios').select('*').eq('restaurante_id', restCargado.id);
+        setHorarios(hs || []);
+      }
       setCargando(false);
     }
     init();
@@ -617,18 +629,57 @@ export default function PaginaPedidos() {
       return;
     }
 
+    const ahoraMs = Date.now();
     const nuevos = pedidos.filter(p =>
       !vistosImprRef.current.has(p.id) &&
       !p.impreso_en &&
       p.estado !== 'cancelado' &&
-      // Los programados salen EN CUANTO LLEGAN, aunque sean para manana: es lo
-      // que permite al restaurante organizarse. Si el panel estaba cerrado,
-      // salen al abrirlo.
-      (esDelDiaActual(p) || esProgramadoVigente(p))
+      (esDelDiaActual(p) || esProgramadoVigente(p)) &&
+      // Un encargo cuyo turno aun no ha abierto NO sale al llegar: lo imprime
+      // el reloj de abajo cuando abra. Antes salian todos en cuanto llegaban,
+      // y uno pedido a mediodia para la noche se pasaba la tarde en el rail.
+      // Si su turno ya esta abierto, sale ya, como siempre.
+      !esperaASuTurno(p, ahoraMs)
     );
     pedidos.forEach(p => vistosImprRef.current.add(p.id));
+    nuevos.forEach(p => encoladosRef.current.add(p.id));
     if (nuevos.length > 0) encolarImpresion(nuevos);
-  }, [pedidos, cargando]);
+  }, [pedidos, cargando, horarios]);
+
+  // PROGRAMADOS: salen en papel al ABRIR SU TURNO. Uno pedido a mediodia para
+  // las 21:30 imprime cuando abre la noche, que es cuando la cocina empieza a
+  // trabajarlo. Revisa cada minuto, y tambien al abrir el panel: si estaba
+  // cerrado cuando abrio el turno, sale en cuanto se abre.
+  // Solo los que siguen en 'recibido': si alguien ya lo ha movido, ya lo ha visto.
+  useEffect(() => {
+    if (cargando) return;
+    function revisar() {
+      if (!ajustesImprRef.current.auto) return;
+      const ahoraMs = Date.now();
+      const listos = pedidos.filter(p =>
+        p.programado_para &&
+        !p.impreso_en &&
+        p.estado === 'recibido' &&
+        esProgramadoVigente(p) &&
+        !encoladosRef.current.has(p.id) &&
+        !esperaASuTurno(p, ahoraMs)
+      );
+      if (listos.length === 0) return;
+      listos.forEach(p => encoladosRef.current.add(p.id));
+      encolarImpresion(listos);
+    }
+    revisar();
+    const reloj = setInterval(revisar, 60 * 1000);
+    return () => clearInterval(reloj);
+  }, [pedidos, cargando, horarios]);
+
+  // ¿Es un encargo cuyo turno todavia no ha abierto? Sin horarios, o si la
+  // hora cae fuera de los turnos, no espera: mejor que salga pronto que nunca.
+  function esperaASuTurno(p, ahoraMs) {
+    if (!p.programado_para) return false;
+    const apertura = aperturaDelTurno(parsearFechaUTC(p.programado_para), horarios);
+    return !!apertura && apertura.getTime() > ahoraMs;
+  }
 
   useEffect(() => {
     if (cargando || avisadoProgRef.current) return;
