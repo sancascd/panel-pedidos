@@ -665,6 +665,14 @@ export default function PaginaAdmin() {
                                               <span className="text-xs text-text-muted ml-2">
                                                 ({k.estado})
                                               </span>
+                                              {/* Al registrarlo habia otro con nombre parecido y el
+                                                  comercial dijo que era distinto. Puede serlo, o puede
+                                                  ser el mismo escrito de otra forma: aqui se decide. */}
+                                              {k.parecido_a ? (
+                                                <span className="block text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                                  Parecido a &laquo;{k.parecido_a}&raquo; — el comercial dijo que es otro. Revísalo.
+                                                </span>
+                                              ) : null}
                                             </div>
                                             <div className="flex gap-1 flex-shrink-0">
                                               {k.estado !== 'cerrado' ? (

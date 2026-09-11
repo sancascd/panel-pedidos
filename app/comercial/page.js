@@ -81,6 +81,11 @@ export default function PanelComercial() {
   const [poblacion, setPoblacion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [comprobacion, setComprobacion] = useState(null); // {estado, dias_restantes}
+  // Restaurantes ya registrados con un nombre parecido en la misma poblacion
+  // ("Lin" y "Lin Wok"). Antes solo chocaban los iguales, y dos comerciales
+  // podian acabar reservando el mismo sitio escrito de dos maneras.
+  const [parecidos, setParecidos] = useState([]);
+  const [esDistinto, setEsDistinto] = useState(false);
   const [comprobando, setComprobando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [aviso, setAviso] = useState({ texto: '', tipo: 'ok' });
@@ -125,16 +130,29 @@ export default function PanelComercial() {
   }
 
   async function comprobar() {
-    if (!nombre.trim()) return;
+    if (!nombre.trim() || !poblacion.trim()) return;
     setComprobando(true);
     setComprobacion(null);
+    setParecidos([]);
+    setEsDistinto(false);
     const { data, error } = await supabase.rpc('comprobar_restaurante', {
       p_nombre: nombre.trim(),
-      p_poblacion: poblacion.trim() || null,
+      p_poblacion: poblacion.trim(),
     });
+    if (error) { setComprobando(false); avisar('No se pudo comprobar: ' + error.message, 'error'); return; }
+    const resultado = Array.isArray(data) ? data[0] : data;
+
+    // Solo tiene sentido buscar parecidos si el nombre exacto esta libre: si
+    // ya lo tiene alguien, eso manda y no hay nada que preguntar.
+    if (resultado && resultado.estado === 'libre') {
+      const { data: par, error: errPar } = await supabase.rpc('restaurantes_parecidos', {
+        p_nombre: nombre.trim(),
+        p_poblacion: poblacion.trim(),
+      });
+      if (!errPar) setParecidos(par || []);
+    }
     setComprobando(false);
-    if (error) { avisar('No se pudo comprobar: ' + error.message, 'error'); return; }
-    setComprobacion(Array.isArray(data) ? data[0] : data);
+    setComprobacion(resultado);
   }
 
   async function registrar() {
@@ -142,13 +160,15 @@ export default function PanelComercial() {
     setGuardando(true);
     const { error } = await supabase.rpc('registrar_contacto', {
       p_nombre: nombre.trim(),
-      p_poblacion: poblacion.trim() || null,
+      p_poblacion: poblacion.trim(),
       p_telefono: telefono.trim() || null,
+      p_es_distinto: esDistinto,
     });
     setGuardando(false);
     if (error) { avisar(error.message, 'error'); return; }
     avisar('Registrado. Lo tienes reservado 30 días.');
     setNombre(''); setPoblacion(''); setTelefono(''); setComprobacion(null);
+    setParecidos([]); setEsDistinto(false);
     await Promise.all([cargarContactos(), cargarRanking()]);
   }
 
@@ -370,14 +390,17 @@ export default function PanelComercial() {
             <input
               value={poblacion}
               onChange={(e) => { setPoblacion(e.target.value); setComprobacion(null); }}
-              placeholder="Población (recomendado)"
+              placeholder="Población"
               className="input"
             />
           </div>
+          <p className="text-xs text-text-muted mt-2">
+            La población es obligatoria: si hay dos restaurantes que se llaman igual, es lo que los distingue.
+          </p>
 
           <button
             onClick={comprobar}
-            disabled={!nombre.trim() || comprobando}
+            disabled={!nombre.trim() || !poblacion.trim() || comprobando}
             className="btn-secondary w-full mt-3 disabled:opacity-50"
           >
             {comprobando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -386,11 +409,50 @@ export default function PanelComercial() {
 
           {comprobacion && (
             <div className="mt-4 animate-fade-in">
-              {comprobacion.estado === 'libre' && (
+              {comprobacion.estado === 'libre' && parecidos.length > 0 && !esDistinto && (
+                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
+                  <p className="font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                    Hay {parecidos.length === 1 ? 'un restaurante' : 'restaurantes'} con un nombre parecido en esa zona
+                  </p>
+                  <ul className="space-y-1 mb-3 text-text">
+                    {parecidos.map((p, i) => (
+                      <li key={i}>
+                        <strong>{p.nombre}</strong>
+                        {p.poblacion ? <span className="text-text-muted"> · {p.poblacion}</span> : null}
+                        <span className="text-text-muted">
+                          {' — '}
+                          {p.estado === 'cliente' ? 'ya es cliente'
+                            : p.estado === 'tuyo' ? 'lo tienes tú'
+                            : 'lo tiene otro compañero'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-text mb-3">¿Es el mismo restaurante que &laquo;{nombre.trim()}&raquo;?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        setComprobacion(null); setParecidos([]);
+                        avisar('Entonces ya está registrado, no hace falta que lo apuntes.');
+                      }}
+                      className="btn-secondary text-sm"
+                    >
+                      Sí, es el mismo
+                    </button>
+                    <button onClick={() => setEsDistinto(true)} className="btn-ghost text-sm">
+                      No, es otro distinto
+                    </button>
+                  </div>
+                </div>
+              )}
+              {comprobacion.estado === 'libre' && (parecidos.length === 0 || esDistinto) && (
                 <>
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/10 border border-accent/20 text-accent text-sm mb-3">
                     <Check className="w-4 h-4 flex-shrink-0" />
-                    <span><strong>Está libre.</strong> Puedes registrarlo.</span>
+                    <span>
+                      <strong>Está libre.</strong> Puedes registrarlo.
+                      {esDistinto && ' Quedará anotado que se parece a otro, por si hay que revisarlo.'}
+                    </span>
                   </div>
                   <input
                     value={telefono}
