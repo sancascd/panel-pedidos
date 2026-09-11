@@ -1269,7 +1269,22 @@ export default function PaginaPedidos() {
   }
 
   // Pedidos del dia (los cancelados no se muestran, pero siguen en la BD).
-  const pedidosDia = pedidos.filter(esDelDiaActual).filter(p => p.estado !== 'cancelado');
+  // Un encargo para OTRO dia no pinta nada en el tablero de hoy: esta en el
+  // bloque de programados, que es donde se consulta para organizarse, y entra
+  // en las columnas el dia que toca. Antes aparecia tambien aqui, y el turno
+  // se leia mal. (Se sigue imprimiendo al llegar, eso no cambia.)
+  // "Otro dia" es desde las 6:00 de manana: el dia de trabajo no acaba a las
+  // 00:00, porque hay restaurantes que cierran pasada la medianoche.
+  const finDiaTrabajo = inicioDiaTrabajo() + 24 * 60 * 60 * 1000;
+  const esDeOtroDia = (p) => {
+    if (!p.programado_para) return false;
+    const d = parsearFechaUTC(p.programado_para);
+    return !!d && d.getTime() >= finDiaTrabajo;
+  };
+  const pedidosDia = pedidos
+    .filter(esDelDiaActual)
+    .filter(p => p.estado !== 'cancelado')
+    .filter(p => !esDeOtroDia(p));
 
   // Programados que aun no toca servir. Van aparte del tablero: si se mezclaran
   // con lo de ahora, el turno se leeria mal. Pero el papel llega tarde para
