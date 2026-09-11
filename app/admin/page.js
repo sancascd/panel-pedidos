@@ -11,7 +11,8 @@ import { parsearFechaUTC } from '@/lib/fechas';
 import {
   Shield, Loader2, AlertCircle, CheckCircle2,
   Clock, Check, X, Store, Mail, Phone, MapPin, User,
-  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase, LogOut, ClipboardList
+  BarChart3, ShoppingBag, Euro, Users, Cpu, Ban, Activity, Gauge, ArrowUpCircle, LogIn, Briefcase, LogOut, ClipboardList,
+  CreditCard, Copy
 } from 'lucide-react';
 import {
   infoPlan, periodoActual, calcularConsumo, recomendacionUpgrade, ORDEN_PLANES
@@ -44,6 +45,8 @@ export default function PaginaAdmin() {
   const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
   const [statsGlobales, setStatsGlobales] = useState(null);
   const [planesData, setPlanesData] = useState(null);
+  const [enlaces, setEnlaces] = useState({});               // restaurante_id -> enlace de pago recién generado
+  const [generandoEnlace, setGenerandoEnlace] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
   const [editandoPlan, setEditandoPlan] = useState(null); // { id, nombre, plan, inicio }
   const [comerciales, setComerciales] = useState([]);
@@ -71,7 +74,7 @@ export default function PaginaAdmin() {
     // Los demos quedan fuera: no son clientes y no se les factura nada.
     const { data: rests } = await supabase
       .from('restaurantes')
-      .select('id, nombre, plan, plan_iniciado_en, estado, pedidos_incluidos')
+      .select('id, nombre, plan, plan_iniciado_en, estado, pedidos_incluidos, estado_cobro')
       .eq('estado', 'aprobado')
       .eq('es_demo', false);
 
@@ -115,7 +118,8 @@ export default function PaginaAdmin() {
       const reco = recomendacionUpgrade({ planId: r.plan, proyeccion: consumo.proyeccion });
       return { id: r.id, nombre: r.nombre, plan: r.plan,
                plan_iniciado_en: r.plan_iniciado_en,
-               pedidos_incluidos: r.pedidos_incluidos, consumo, reco };
+               pedidos_incluidos: r.pedidos_incluidos, estado_cobro: r.estado_cobro || 'sin_alta',
+               consumo, reco };
     }).sort((a, b) => b.consumo.porcentaje - a.consumo.porcentaje);
 
     // Nombres para las solicitudes
@@ -127,6 +131,25 @@ export default function PaginaAdmin() {
 
     setPlanesData(filas);
     setSolicitudes(solsConNombre);
+  }
+
+  // El enlace de pago de Stripe de un restaurante. Lo genera el bot (las claves
+  // de Stripe viven allí) y caduca a las 24 h: si no lo usa, se genera otro.
+  async function generarEnlace(f) {
+    setGenerandoEnlace(f.id);
+    try {
+      const r = await fetch('/api/bot-proxy/stripe/enlace', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurante_id: f.id }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) { avisar(d.error || 'No se pudo generar el enlace de pago.', 'error'); return; }
+      setEnlaces(prev => ({ ...prev, [f.id]: d.url }));
+      avisar('Enlace de pago listo para ' + f.nombre + '. Caduca en 24 horas.');
+      await cargarPlanes();
+    } finally {
+      setGenerandoEnlace(null);
+    }
   }
 
   async function aprobarUpgrade(sol) {
@@ -538,6 +561,9 @@ export default function PaginaAdmin() {
             filas={planesData}
             solicitudes={solicitudes}
             onGestionar={abrirEditorPlan}
+            onEnlace={generarEnlace}
+            enlaces={enlaces}
+            generandoEnlace={generandoEnlace}
             procesando={procesando}
             onAprobar={aprobarUpgrade}
             onRechazar={rechazarUpgrade}
@@ -1037,7 +1063,16 @@ export default function PaginaAdmin() {
 
 // ============== PANEL DE PLANES Y CONSUMO ==============
 
-function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar, onGestionar }) {
+// Cómo va el cobro de cada restaurante (lo pone el bot con los avisos de Stripe).
+const ESTADOS_COBRO = {
+  sin_alta:       { texto: 'Sin alta',        clase: 'bg-surface-2 text-text-muted border border-border' },
+  enlace_enviado: { texto: 'Enlace enviado',  clase: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20' },
+  activo:         { texto: 'Al día',          clase: 'bg-accent/10 text-accent border border-accent/20' },
+  impago:         { texto: 'Pago fallido',    clase: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' },
+  cancelado:      { texto: 'Baja',            clase: 'bg-surface-2 text-text-muted border border-border' },
+};
+
+function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar, onGestionar, onEnlace, enlaces = {}, generandoEnlace }) {
   if (!filas) {
     return (
       <div className="card p-12 text-center">
@@ -1098,6 +1133,7 @@ function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar, on
                     <th className="px-4 py-3 font-medium">Proyección</th>
                     <th className="px-4 py-3 font-medium">Overage</th>
                     <th className="px-4 py-3 font-medium">Desde</th>
+                    <th className="px-4 py-3 font-medium">Cobro</th>
                     <th className="px-4 py-3 font-medium"></th>
                   </tr>
                 </thead>
@@ -1133,11 +1169,45 @@ function PlanesPanel({ filas, solicitudes, procesando, onAprobar, onRechazar, on
                             : <span className="text-yellow-600 dark:text-yellow-400">Sin fijar</span>}
                         </td>
                         <td className="px-4 py-3">
+                          <span className={`badge whitespace-nowrap ${(ESTADOS_COBRO[f.estado_cobro] || ESTADOS_COBRO.sin_alta).clase}`}>
+                            {(ESTADOS_COBRO[f.estado_cobro] || ESTADOS_COBRO.sin_alta).texto}
+                          </span>
+                          {enlaces[f.id] && (
+                            <div className="mt-1.5 flex items-center gap-1">
+                              <input
+                                readOnly value={enlaces[f.id]}
+                                onFocus={e => e.target.select()}
+                                className="input text-xs w-40"
+                                title="Enlace de pago: mándaselo al restaurante"
+                              />
+                              <button
+                                onClick={() => navigator.clipboard && navigator.clipboard.writeText(enlaces[f.id])}
+                                className="btn-ghost p-1.5" title="Copiar el enlace"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2 justify-end">
                             {f.reco && f.reco.recomendar && (
                               <span className="badge bg-accent/10 text-accent border border-accent/20 whitespace-nowrap">
                                 <ArrowUpCircle className="w-3 h-3" /> Sugerir {infoPlan(f.reco.siguienteId).nombre}
                               </span>
+                            )}
+                            {!['activo', 'impago'].includes(f.estado_cobro) && (
+                              <button
+                                onClick={() => onEnlace(f)}
+                                disabled={generandoEnlace === f.id}
+                                className="btn-ghost text-xs whitespace-nowrap"
+                                title="Genera el enlace de pago de Stripe (caduca en 24 horas)"
+                              >
+                                {generandoEnlace === f.id
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <CreditCard className="w-3.5 h-3.5" />}
+                                Enlace de pago
+                              </button>
                             )}
                             <button
                               onClick={() => onGestionar(f)}

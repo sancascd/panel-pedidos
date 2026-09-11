@@ -21,7 +21,11 @@ const BOT_URL = process.env.BOT_URL || 'https://bot-pedidos-production-f2b2.up.r
 const PATHS_PERMITIDOS = new Set([
   'notificar',
   'notificar-estado',
-  'enviar-campana'
+  'enviar-campana',
+  // Cobro con Stripe: el enlace solo lo genera la administradora (el bot lo
+  // comprueba con X-Es-Superadmin); el portal, el propio restaurante.
+  'stripe/enlace',
+  'stripe/portal'
 ]);
 
 // Devuelve el contexto de autorización del usuario autenticado:

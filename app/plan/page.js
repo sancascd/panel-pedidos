@@ -6,8 +6,18 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Gauge, TrendingUp, Loader2, AlertCircle, CheckCircle2,
-  ArrowUpCircle, Check, Clock
+  ArrowUpCircle, Check, Clock, CreditCard
 } from 'lucide-react';
+
+// Lo que ve el restaurante de su pago. El estado lo pone el bot con los
+// avisos firmados de Stripe (restaurantes.estado_cobro).
+const TEXTO_COBRO = {
+  sin_alta: 'Todavía no tienes el pago dado de alta. Te enviaremos un enlace para hacerlo.',
+  enlace_enviado: 'Te hemos enviado el enlace para dar de alta el pago con tarjeta o domiciliación.',
+  activo: 'Tu pago está al día. Se cobra cada mes el mismo día en que empezaste.',
+  impago: 'No hemos podido cobrar el último pago. Revisa o cambia tu tarjeta.',
+  cancelado: 'El pago está dado de baja.',
+};
 import {
   PLANES, ORDEN_PLANES, infoPlan, planSiguiente,
   periodoActual, calcularConsumo, recomendacionUpgrade
@@ -23,6 +33,7 @@ export default function PaginaPlan() {
   const [periodo, setPeriodo] = useState(null);
   const [solicitudPendiente, setSolicitudPendiente] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [abriendoPortal, setAbriendoPortal] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
 
   useEffect(() => {
@@ -34,7 +45,7 @@ export default function PaginaPlan() {
 
       const { data: rest } = await supabase
         .from('restaurantes')
-        .select('id, nombre, plan, plan_iniciado_en, pedidos_incluidos')
+        .select('id, nombre, plan, plan_iniciado_en, pedidos_incluidos, estado_cobro, stripe_customer_id')
         .eq('id', restId)
         .maybeSingle();
       if (!rest) { setCargando(false); return; }
@@ -63,10 +74,34 @@ export default function PaginaPlan() {
         .maybeSingle();
       setSolicitudPendiente(sol || null);
 
+      // Vuelta desde la página de pago de Stripe.
+      const vuelta = new URLSearchParams(window.location.search).get('pago');
+      if (vuelta === 'ok') {
+        avisar('¡Listo! Tu pago ha quedado dado de alta. Puede tardar un minuto en aparecer aquí.');
+      } else if (vuelta === 'cancelado') {
+        avisar('No se ha completado el pago. Puedes volver a usar el enlace mientras no caduque.', 'error');
+      }
+
       setCargando(false);
     }
     init();
   }, []);
+
+  // El portal de Stripe: cambiar la tarjeta y ver las facturas. La sesión la
+  // crea el bot (las claves de Stripe viven allí, no en el panel).
+  async function abrirPortal() {
+    setAbriendoPortal(true);
+    try {
+      const r = await fetch('/api/bot-proxy/stripe/portal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) { avisar(d.error || 'No se pudo abrir la página de pago.', 'error'); return; }
+      window.location.href = d.url;
+    } finally {
+      setAbriendoPortal(false);
+    }
+  }
 
   function avisar(texto, tipo = 'success') {
     setMensaje({ texto, tipo });
@@ -245,6 +280,25 @@ export default function PaginaPlan() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* El pago */}
+        <div className="card p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-3 min-w-0">
+            <CreditCard className={`w-5 h-5 mt-0.5 flex-shrink-0 ${restaurante.estado_cobro === 'impago' ? 'text-red-500' : 'text-accent'}`} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text">Pago</p>
+              <p className={`text-sm ${restaurante.estado_cobro === 'impago' ? 'text-red-500' : 'text-text-muted'}`}>
+                {TEXTO_COBRO[restaurante.estado_cobro] || TEXTO_COBRO.sin_alta}
+              </p>
+            </div>
+          </div>
+          {restaurante.stripe_customer_id && ['activo', 'impago', 'cancelado'].includes(restaurante.estado_cobro) && (
+            <button onClick={abrirPortal} disabled={abriendoPortal} className="btn-secondary">
+              {abriendoPortal ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
+              Tarjeta y facturas
+            </button>
+          )}
         </div>
 
         {/* Recomendación de upgrade */}
