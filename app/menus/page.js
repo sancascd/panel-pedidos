@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
+import { mejorPlato, leerLinea, proponerPlatos } from '@/lib/enlazarCarta';
 import {
   ArrowLeft, Plus, Pencil, Trash2, Check, X, ClipboardList,
   Loader2, AlertCircle, ChevronDown, ChevronRight, Search
@@ -34,6 +35,7 @@ export default function PaginaMenus() {
   const [grupos, setGrupos] = useState({});      // menu_id -> [grupo]
   const [opciones, setOpciones] = useState({});  // grupo_id -> [opcion]
   const [platos, setPlatos] = useState({});      // menu_id -> [plato fijo]
+  const [propuestas, setPropuestas] = useState({}); // menu_id -> propuesta retocada a mano
   const [productos, setProductos] = useState([]);
   const [mensaje, setMensaje] = useState('');
 
@@ -213,14 +215,15 @@ export default function PaginaMenus() {
   // Un menú sin grupos no tiene nada que elegir, pero cocina tiene que saber
   // qué lleva y con qué número de plato: por eso cada plato se enlaza a la
   // carta. Lo que no está en la carta (bebida, postre) va sin número.
-  async function anadirPlato(menuId, producto) {
-    const nombre = producto ? producto.nombre : busqueda.trim();
+  // Se puede escribir "2 rollos de primavera": el 2 es la cantidad.
+  async function anadirPlato(menuId, producto, cantidad = 1) {
+    const nombre = producto ? producto.nombre : leerLinea(busqueda).texto;
     if (!nombre) return;
     const orden = (platos[menuId] || []).length + 1;
     const { error } = await supabase.from('menu_platos').insert({
       menu_id: menuId, restaurante_id: restauranteId,
       producto_id: producto ? producto.id : null, nombre,
-      cantidad: 1, orden,
+      cantidad: Math.min(99, Math.max(1, cantidad)), orden,
     });
     if (error) { avisar('Error: ' + error.message); return; }
     setBusqueda('');
@@ -243,6 +246,63 @@ export default function PaginaMenus() {
 
   const numeroDeProducto = (id) => (id && productos.find(p => p.id === id)?.numero) || '';
 
+  // ---------- enlazar solo con la carta ----------
+  // Lo que se propone para un menú cerrado a partir de su descripción, con los
+  // retoques que se hayan hecho a mano encima.
+  const propuestaDe = (m) => propuestas[m.id] || proponerPlatos(m.descripcion, productos);
+
+  function cambiarPropuesta(m, i, productoId) {
+    const prop = propuestaDe(m).slice();
+    prop[i] = { ...prop[i], producto: productos.find(p => p.id === productoId) || null, seguro: true };
+    setPropuestas(prev => ({ ...prev, [m.id]: prop }));
+  }
+
+  function filasDePropuesta(menuId, propuesta) {
+    const base = (platos[menuId] || []).length;
+    return propuesta.map((p, i) => ({
+      menu_id: menuId, restaurante_id: restauranteId,
+      producto_id: p.producto ? p.producto.id : null,
+      nombre: p.producto ? p.producto.nombre : p.texto,
+      cantidad: Math.min(99, Math.max(1, p.cantidad)),
+      orden: base + i + 1,
+    }));
+  }
+
+  async function guardarPropuesta(m) {
+    const { error } = await supabase.from('menu_platos').insert(filasDePropuesta(m.id, propuestaDe(m)));
+    if (error) { avisar('Error: ' + error.message); return; }
+    setPropuestas(prev => { const n = { ...prev }; delete n[m.id]; return n; });
+    await cargarTodo();
+  }
+
+  // El nombre de la opción NO se cambia: es el que ve el cliente, y puede ser
+  // el de su carta impresa ("Pan de gambas") aunque en la carta digital se
+  // llame de otra forma. Solo se le pone el número.
+  async function enlazarOpcion(o, producto) {
+    const { error } = await supabase.from('menu_opciones').update({ producto_id: producto.id }).eq('id', o.id);
+    if (error) { avisar('Error: ' + error.message); return; }
+    await cargarTodo();
+  }
+
+  // Todo lo que casa sin dudas, de una vez. Lo dudoso se queda propuesto para
+  // que lo decida una persona: un número equivocado es otro plato en cocina.
+  async function enlazarLosClaros() {
+    let n = 0;
+    for (const [id, s] of claros.opciones) {
+      const { error } = await supabase.from('menu_opciones').update({ producto_id: s.producto.id }).eq('id', id);
+      if (error) { avisar('Error: ' + error.message); return; }
+      n++;
+    }
+    for (const m of claros.menus) {
+      const filas = filasDePropuesta(m.id, propuestaDe(m));
+      const { error } = await supabase.from('menu_platos').insert(filas);
+      if (error) { avisar('Error: ' + error.message); return; }
+      n += filas.filter(f => f.producto_id).length;
+    }
+    await cargarTodo();
+    avisar('Enlazados ' + n + ' platos con la carta.');
+  }
+
   // Cómo se le va a enseñar el grupo al cliente por WhatsApp.
   function diagnosticoGrupo(g) {
     const ops = opciones[g.id] || [];
@@ -261,13 +321,44 @@ export default function PaginaMenus() {
     };
   }
 
-  const productosFiltrados = busqueda.trim() === ''
-    ? []
-    // También por número de carta, que es como piensa la cocina ("el 15").
-    : productos.filter(p => {
-        const q = busqueda.trim().toLowerCase();
-        return (p.nombre || '').toLowerCase().includes(q) || String(p.numero || '').toLowerCase() === q;
-      }).slice(0, 8);
+  // Primero el número exacto ("15", como piensa la cocina), luego lo que casa
+  // por palabras aunque esté en plural ("arroces fritos"), y luego lo que
+  // contiene el texto tal cual.
+  const productosFiltrados = (() => {
+    const { texto } = leerLinea(busqueda);
+    const q = texto.trim().toLowerCase();
+    if (!q) return [];
+    const porNumero = productos.filter(p => String(p.numero || '').toLowerCase() === q);
+    const porPalabras = mejorPlato(texto, productos)?.alternativas || [];
+    const porTexto = productos.filter(p => (p.nombre || '').toLowerCase().includes(q));
+    const vistos = new Set();
+    return [...porNumero, ...porPalabras, ...porTexto]
+      .filter(p => !vistos.has(p.id) && vistos.add(p.id))
+      .slice(0, 8);
+  })();
+
+  // Opciones sin número que tienen un plato de la carta que les casa.
+  const sugerencias = useMemo(() => {
+    const s = {};
+    Object.values(opciones).flat().forEach(o => {
+      if (o.producto_id) return;
+      const m = mejorPlato(o.nombre, productos);
+      if (m) s[o.id] = m;
+    });
+    return s;
+  }, [opciones, productos]);
+
+  // Lo que se puede enlazar de golpe: opciones seguras y menús cerrados sin
+  // platos cuya descripción casa entera sin dudas.
+  const claros = useMemo(() => ({
+    opciones: Object.entries(sugerencias).filter(([, s]) => s.seguro),
+    menus: menus.filter(m => {
+      if ((grupos[m.id] || []).length > 0 || (platos[m.id] || []).length > 0) return false;
+      const prop = proponerPlatos(m.descripcion, productos);
+      return prop.some(p => p.producto) && prop.every(p => !p.producto || p.seguro);
+    }),
+  }), [sugerencias, menus, grupos, platos, productos]);
+  const cuantosClaros = claros.opciones.length + claros.menus.length;
 
   if (cargando) {
     return (
@@ -309,6 +400,18 @@ export default function PaginaMenus() {
           </div>
         )}
 
+        {cuantosClaros > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 p-3 rounded-lg bg-accent/10 border border-accent/20 text-sm">
+            <p className="text-text flex-1 min-w-[12rem]">
+              {claros.opciones.length > 0 && <>{claros.opciones.length} {claros.opciones.length === 1 ? 'plato' : 'platos'} de menú sin número casan con la carta. </>}
+              {claros.menus.length > 0 && <>{claros.menus.length} {claros.menus.length === 1 ? 'menú cerrado' : 'menús cerrados'} se pueden montar solos a partir de su descripción.</>}
+            </p>
+            <button onClick={enlazarLosClaros} className="btn-primary text-xs">
+              <Check className="w-3.5 h-3.5" /> Enlazar con la carta
+            </button>
+          </div>
+        )}
+
         {menus.length === 0 && !editandoMenu && (
           <div className="card p-6 text-center">
             <ClipboardList className="w-8 h-8 text-text-muted mx-auto mb-3" />
@@ -336,7 +439,10 @@ export default function PaginaMenus() {
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs text-text-muted">Descripción (opcional)</label>
-                <input
+                {/* Área de texto y no una línea: la de un menú cerrado es una
+                    lista, y un input se comía los saltos al guardar. */}
+                <textarea
+                  rows={3}
                   className="input w-full" value={datosMenu.descripcion}
                   placeholder="Excepto festivos"
                   onChange={e => setDatosMenu({ ...datosMenu, descripcion: e.target.value })}
@@ -453,6 +559,40 @@ export default function PaginaMenus() {
                                 (sinNumero > 0 ? ' (' + sinNumero + ' sin número, no están en la carta).' : '.')}
                           </p>
 
+                          {pls.length === 0 && (m.descripcion || '').trim() !== '' && (() => {
+                            const prop = propuestaDe(m);
+                            return (
+                              <div className="mb-2 rounded-lg bg-surface-2 p-2">
+                                <p className="text-xs text-text-muted mb-1.5">
+                                  Propuesta sacada de la descripción. Revisa lo marcado y guarda.
+                                </p>
+                                <ul className="space-y-1">
+                                  {prop.map((p, i) => (
+                                    <li key={i} className="flex items-center gap-2 text-sm">
+                                      <span className="tabular-nums text-text-muted w-8 shrink-0">{p.cantidad}×</span>
+                                      <select
+                                        className="input text-xs flex-1 min-w-0"
+                                        value={p.producto ? p.producto.id : ''}
+                                        onChange={e => cambiarPropuesta(m, i, e.target.value)}
+                                      >
+                                        <option value="">{p.texto} (sin número)</option>
+                                        {p.alternativas.map(a => (
+                                          <option key={a.id} value={a.id}>{a.numero ? a.numero + '. ' : ''}{a.nombre}</option>
+                                        ))}
+                                      </select>
+                                      {p.producto && !p.seguro && (
+                                        <span className="badge bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">revisar</span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <button onClick={() => guardarPropuesta(m)} className="btn-primary text-xs mt-2">
+                                  <Check className="w-3.5 h-3.5" /> Guardar estos platos
+                                </button>
+                              </div>
+                            );
+                          })()}
+
                           <ul className="space-y-1 mb-2">
                             {pls.map(p => (
                               <li key={p.id + ':' + p.cantidad} className="flex items-center gap-2 text-sm">
@@ -484,20 +624,39 @@ export default function PaginaMenus() {
                               <div className="flex gap-2">
                                 <input
                                   className="input flex-1" autoFocus
-                                  placeholder="Buscar plato por nombre o número…"
+                                  placeholder="2 rollos de primavera, o el número…"
                                   value={busqueda}
                                   onChange={e => setBusqueda(e.target.value)}
+                                  onKeyDown={e => {
+                                    // Intro añade el plato si casa sin dudas.
+                                    if (e.key !== 'Enter') return;
+                                    const { cantidad, texto } = leerLinea(busqueda);
+                                    const porNumero = productos.find(p => String(p.numero || '').toLowerCase() === texto.trim().toLowerCase());
+                                    const mejor = porNumero ? { producto: porNumero, seguro: true } : mejorPlato(texto, productos);
+                                    if (mejor && mejor.seguro) anadirPlato(m.id, mejor.producto, cantidad);
+                                  }}
                                 />
                                 <button onClick={() => { setAnadiendoEn(null); setBusqueda(''); }} className="btn-ghost p-2">
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
+                              {(() => {
+                                const { cantidad, texto } = leerLinea(busqueda);
+                                const porNumero = productos.find(p => String(p.numero || '').toLowerCase() === texto.trim().toLowerCase());
+                                const mejor = porNumero ? { producto: porNumero, seguro: true } : mejorPlato(texto, productos);
+                                if (!mejor || !mejor.seguro) return null;
+                                return (
+                                  <p className="text-xs text-text-muted">
+                                    Intro para añadir {cantidad}× {mejor.producto.numero ? mejor.producto.numero + '. ' : ''}{mejor.producto.nombre}
+                                  </p>
+                                );
+                              })()}
                               {productosFiltrados.length > 0 && (
                                 <ul className="rounded-lg border border-border divide-y divide-border">
                                   {productosFiltrados.map(p => (
                                     <li key={p.id}>
                                       <button
-                                        onClick={() => anadirPlato(m.id, p)}
+                                        onClick={() => anadirPlato(m.id, p, leerLinea(busqueda).cantidad)}
                                         className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2 flex items-center gap-2"
                                       >
                                         {p.numero && <span className="text-xs text-text-muted tabular-nums">{p.numero}</span>}
@@ -509,11 +668,11 @@ export default function PaginaMenus() {
                               )}
                               {busqueda.trim() !== '' && (
                                 <button
-                                  onClick={() => anadirPlato(m.id, null)}
+                                  onClick={() => anadirPlato(m.id, null, leerLinea(busqueda).cantidad)}
                                   className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-border hover:border-accent/40 text-sm"
                                 >
                                   <span className="text-text">
-                                    Añadir <strong>&ldquo;{busqueda.trim()}&rdquo;</strong> sin número
+                                    Añadir <strong>&ldquo;{leerLinea(busqueda).texto}&rdquo;</strong> sin número
                                   </span>
                                   <span className="block text-xs text-text-muted mt-0.5">
                                     Para lo que no está en la carta: bebida, postre…
@@ -560,6 +719,21 @@ export default function PaginaMenus() {
                                   <span className="badge bg-surface-2 text-text-muted border border-border shrink-0" title="No está en la carta: solo existe dentro del menú">
                                     solo menú
                                   </span>
+                                )}
+                                {!o.producto_id && sugerencias[o.id] && (
+                                  <button
+                                    onClick={() => enlazarOpcion(o, sugerencias[o.id].producto)}
+                                    className={`badge border shrink-0 max-w-[16rem] truncate ${
+                                      sugerencias[o.id].seguro
+                                        ? 'bg-accent/10 text-accent border-accent/30'
+                                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                                    }`}
+                                    title="Ponerle el número de este plato de la carta"
+                                  >
+                                    {sugerencias[o.id].seguro ? 'Enlazar con el ' : '¿Es el '}
+                                    {sugerencias[o.id].producto.numero ? sugerencias[o.id].producto.numero + '. ' : ''}
+                                    {sugerencias[o.id].producto.nombre}{sugerencias[o.id].seguro ? '' : '?'}
+                                  </button>
                                 )}
                                 <input
                                   className="input w-20 ml-auto text-xs shrink-0"
