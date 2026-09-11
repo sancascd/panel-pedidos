@@ -15,7 +15,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
-  Briefcase, Presentation, FileText
+  Briefcase, Presentation, FileText, BookOpen
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -34,6 +34,10 @@ const LINKS_NAV = [
   // del panel. Lo ven la administradora y los comerciales, nadie mas.
   { href: '/material/comandi-como-funciona.pdf', icono: FileText,
     label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true },
+  // La guía completa para el comercial. Lleva consejos de venta que el
+  // restaurante no debe leer: es para ellos, no para enseñar ni mandar.
+  { href: '/material/guia-comercial.pdf', icono: BookOpen,
+    label: 'Material para el comercial', soloEquipo: true, nuevaPestana: true },
 ];
 
 // `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa

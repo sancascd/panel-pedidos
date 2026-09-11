@@ -15,7 +15,7 @@ import BotonTema from '@/components/BotonTema';
 import MenuNav from '@/components/MenuNav';
 import {
   MessageSquare, Search, Plus, Loader2, Check, X, LogOut,
-  Trophy, MapPin, Phone, AlertCircle, CheckCircle2, FileText,
+  Trophy, MapPin, Phone, AlertCircle, CheckCircle2, FileText, BookOpen,
 } from 'lucide-react';
 
 const ACCENT_HEX = '#10B981';
@@ -356,22 +356,40 @@ export default function PanelComercial() {
           </div>
         )}
 
-        {/* El dosier, a mano: es lo que se enseña en la visita, asi que no
-            deberia haber que ir a buscarlo al desplegable. */}
-        <a
-          href="/material/comandi-como-funciona.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="card p-4 flex items-center gap-3 hover:border-accent transition-colors"
-        >
-          <FileText className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT_HEX }} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-text">Material para el cliente</p>
-            <p className="text-xs text-text-muted">
-              El dosier de cómo funciona Comandi, para enseñar en la visita o mandarlo después.
-            </p>
-          </div>
-        </a>
+        {/* El material, a mano: es lo que se usa en la visita, asi que no
+            deberia haber que ir a buscarlo al desplegable. Dos PDF distintos:
+            el dosier se le enseña al restaurante; la guia es solo para el
+            comercial (lleva consejos de venta que el restaurante no debe leer). */}
+        <div className="grid sm:grid-cols-2 gap-3">
+          <a
+            href="/material/comandi-como-funciona.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card p-4 flex items-center gap-3 hover:border-accent transition-colors"
+          >
+            <FileText className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT_HEX }} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text">Material para el cliente</p>
+              <p className="text-xs text-text-muted">
+                El dosier de cómo funciona Comandi, para enseñar en la visita o mandarlo después.
+              </p>
+            </div>
+          </a>
+          <a
+            href="/material/guia-comercial.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card p-4 flex items-center gap-3 hover:border-accent transition-colors"
+          >
+            <BookOpen className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT_HEX }} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text">Material para el comercial</p>
+              <p className="text-xs text-text-muted">
+                La guía completa: el programa, la puesta en marcha y cómo se vende. Solo para ti.
+              </p>
+            </div>
+          </a>
+        </div>
 
         {/* Registrar */}
         <section className="card p-5">
