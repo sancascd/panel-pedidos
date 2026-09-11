@@ -38,7 +38,10 @@ as $function$
    where length(t) >= 3
      and t not in ('chino', 'china', 'chinos', 'chinas', 'wok', 'asiatico', 'asiatica',
                    'oriental', 'express', 'sushi', 'grill', 'food', 'garden', 'palace',
-                   'city', 'house', 'gran', 'nuevo', 'nueva', 'restaurant', 'rest');
+                   'city', 'house', 'gran', 'nuevo', 'nueva', 'restaurant', 'rest',
+                   -- "Comida para llevar Lin": sin esto, cualquier "para llevar"
+                   -- se pareceria a todos los demas de su ciudad.
+                   'para', 'llevar', 'take', 'away');
 $function$;
 
 
@@ -80,7 +83,18 @@ begin
      -- El igual exacto ya lo trata comprobar_restaurante(); aqui solo los
      -- que se parecen sin ser iguales.
      and c.nombre_norm <> v_nombre
-     and palabras_distintivas(c.nombre_restaurante) && v_palabras
+     -- Comparten una palabra que distingue, o casi: "Lin" y "Ling" son
+     -- probablemente el mismo sitio mal escrito. Se admite una letra de mas
+     -- al final; mas tolerancia empezaria a juntar restaurantes distintos.
+     and exists (
+       select 1
+         from unnest(palabras_distintivas(c.nombre_restaurante)) as a
+        cross join unnest(v_palabras) as b
+        where a = b
+           or (least(length(a), length(b)) >= 3
+               and abs(length(a) - length(b)) = 1
+               and (a like b || '%' or b like a || '%'))
+     )
      and (v_poblacion is null or c.poblacion_norm is null or c.poblacion_norm = v_poblacion)
    order by (c.estado = 'cerrado') desc, c.registrado_en desc
    limit 3;
