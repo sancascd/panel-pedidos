@@ -222,12 +222,16 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
   })();
 
   // ---------- TICKET DE COCINA ----------
+  // Cocina se sabe la carta por numero: con cantidad, numero y anotaciones le
+  // basta, y el ticket sale mucho mas corto (decision de Sandra, 2026-09-12).
+  // El nombre SOLO sale cuando el plato no tiene numero (bebidas, platos sin
+  // numerar, el propio menu): sin eso la linea quedaria en blanco.
   if (esCocina) {
     const totalArticulos = lineas.reduce((n, l) => n + Number(l.cantidad || 0), 0);
     return (
       <div className="ticket ticket-cocina">
         {avisoProgramado}
-        <p className="etiqueta">* * *  C O C I N A  * * *</p>
+        <p className="rotulo-cocina">TICKET DE COCINA</p>
         <h1>{numero}</h1>
         <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
         <div className="separador"></div>
@@ -240,14 +244,14 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
                 <tr>
                   <td className="col-cant">{l.cantidad}x</td>
                   {hayNumeros && <td className="col-num">{numeroDe(l)}</td>}
-                  <td className="col-prod">{l.nombre_producto}</td>
+                  <td className="col-prod">{numeroDe(l) ? '' : l.nombre_producto}</td>
                 </tr>
                 {platosDelMenu(l).map((p, i) => (
                   <tr key={'m' + i}>
-                    <td className="col-cant"></td>
+                    <td className="col-cant">&rarr;{Number(p.cantidad) > 1 ? ' ' + p.cantidad + 'x' : ''}</td>
                     {hayNumeros && <td className="col-num">{p.numero || ''}</td>}
                     <td className="col-prod">
-                      &rarr; {Number(p.cantidad) > 1 ? p.cantidad + 'x ' : ''}{p.nombre}{p.notas ? ' (' + p.notas + ')' : ''}
+                      {p.numero ? '' : p.nombre}{p.notas ? (p.numero ? '' : ' ') + '(' + p.notas + ')' : ''}
                     </td>
                   </tr>
                 ))}
@@ -1516,8 +1520,11 @@ export default function PaginaPedidos() {
           .ticket table .col-tot { width: 28%; text-align: right; }
           .ticket .nota { font-size: 14pt; font-style: italic; padding-left: 4mm; }
           .ticket .etiqueta { text-align: center; font-size: 15pt; letter-spacing: 1px; margin: 0 0 2mm 0; }
-          /* El de cocina se lee de lejos y de un vistazo: solo cantidad y plato */
+          /* El de cocina se lee de lejos y de un vistazo: cantidad y numero */
           .ticket-cocina { font-size: 19pt; }
+          /* Que no se confunda con el de la bolsa: rotulo grande entre rayas, sin fondo negro */
+          .ticket-cocina .rotulo-cocina { text-align: center; font-size: 20pt; letter-spacing: 0;
+            border-top: 3px solid #000; border-bottom: 3px solid #000; padding: 1mm 0; margin: 0 0 3mm 0; }
           .ticket-cocina h1 { font-size: 34pt; }
           .ticket-cocina table td { font-size: 22pt; padding: 2.5mm 0; }
           .ticket-cocina table .col-cant { width: 16%; }
