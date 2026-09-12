@@ -15,7 +15,7 @@ import {
   Printer, Pencil, X, Plus, Trash2, Phone, Calendar, History,
   ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2,
   MapPin, CreditCard, Banknote, Store, Home, Filter, Search, Receipt, Star,
-  Bell, BellOff, Download, Settings, Clock
+  Bell, BellOff, Download, Settings, Clock, Wallet
 } from 'lucide-react';
 
 // Llamadas al bot van por /api/bot-proxy/* (server-side).
@@ -385,6 +385,7 @@ export default function PaginaPedidos() {
   const [menuEspera, setMenuEspera] = useState(false);
   const [guardandoEspera, setGuardandoEspera] = useState(false);
   const [menuImpresion, setMenuImpresion] = useState(false);
+  const [menuCaja, setMenuCaja] = useState(false);
   const [ayudaKiosk, setAyudaKiosk] = useState(false);
   // Refs: los callbacks de realtime capturan el closure y se quedarian con
   // valores viejos si leyeran el state directamente.
@@ -1375,6 +1376,24 @@ export default function PaginaPedidos() {
     finalizados: pedidosDia.filter(p => columnaDe(p) === 'finalizados'),
   };
 
+  // Caja del dia: lo vendido en el dia de trabajo (desde las 6:00), sin los
+  // cancelados. Salen de los mismos pedidos que el tablero, asi que cuadra con
+  // lo que se ve. Va escondido detras de un boton a proposito: la pantalla la
+  // ve todo el que pasa por la cocina y el importe no tiene por que estar a la
+  // vista (peticion de Sandra, 2026-09-12).
+  const caja = (() => {
+    const suma = (lista) => lista.reduce((n, p) => n + (Number(p.total) || 0), 0);
+    return {
+      total: suma(pedidosDia),
+      pedidos: pedidosDia.length,
+      efectivo: suma(pedidosDia.filter(p => p.metodo_pago === 'efectivo')),
+      tarjeta: suma(pedidosDia.filter(p => p.metodo_pago === 'tarjeta')),
+      alRecoger: suma(pedidosDia.filter(p => p.metodo_pago !== 'efectivo' && p.metodo_pago !== 'tarjeta')),
+      sinTerminar: suma(activos),
+    };
+  })();
+  const euros = (n) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+
   function TarjetaPedido({ p }) {
     const est = infoEstado(p);
     const IconoEntrega = iconoEntrega(p);
@@ -1744,6 +1763,60 @@ export default function PaginaPedidos() {
                   Imprimir pendientes ({pendientesCount})
                 </button>
               )}
+
+              {/* Caja del dia: el importe NO se ve hasta pulsar */}
+              <div className="relative">
+                <button
+                  onClick={() => setMenuCaja(v => !v)}
+                  className="btn-ghost text-sm"
+                  title="Ver lo que se lleva vendido hoy"
+                >
+                  <Wallet className="w-4 h-4" />
+                  Caja de hoy
+                </button>
+
+                {menuCaja && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuCaja(false)} />
+                    <div className="absolute right-0 top-full mt-2 z-50 w-72 card p-4 shadow-lg animate-fade-in">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold text-text">Caja de hoy</p>
+                        <button onClick={() => setMenuCaja(false)} className="text-text-muted hover:text-text" title="Ocultar">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-xs text-text-muted mb-3">
+                        Desde las {HORA_INICIO_DIA}:00, sin contar los cancelados.
+                      </p>
+                      <p className="text-3xl font-bold text-text tabular-nums">{euros(caja.total)}</p>
+                      <p className="text-xs text-text-muted mb-3">
+                        {caja.pedidos} {caja.pedidos === 1 ? 'pedido' : 'pedidos'}
+                      </p>
+                      <dl className="text-sm divide-y divide-border border-t border-border">
+                        <div className="flex justify-between py-1.5">
+                          <dt className="flex items-center gap-2 text-text-muted"><Banknote className="w-4 h-4" />Efectivo</dt>
+                          <dd className="font-medium text-text tabular-nums">{euros(caja.efectivo)}</dd>
+                        </div>
+                        <div className="flex justify-between py-1.5">
+                          <dt className="flex items-center gap-2 text-text-muted"><CreditCard className="w-4 h-4" />Tarjeta</dt>
+                          <dd className="font-medium text-text tabular-nums">{euros(caja.tarjeta)}</dd>
+                        </div>
+                        {caja.alRecoger > 0 && (
+                          <div className="flex justify-between py-1.5">
+                            <dt className="flex items-center gap-2 text-text-muted"><Store className="w-4 h-4" />Paga al recoger</dt>
+                            <dd className="font-medium text-text tabular-nums">{euros(caja.alRecoger)}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      {caja.sinTerminar > 0 && (
+                        <p className="text-xs text-text-muted mt-3">
+                          De eso, <strong className="text-text">{euros(caja.sinTerminar)}</strong> son de pedidos que aún no se han terminado.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="relative">
                 <button
