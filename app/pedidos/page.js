@@ -29,6 +29,12 @@ const OPCIONES_ESPERA = [45, 60, 75, 90, 120];
 const HORAS_LIMITE_AVISO = 24;
 const HORA_INICIO_DIA = 6;
 
+// Impresion automatica: la pestana que imprime deja aqui su "latido". Si el
+// tablero se cierra un rato, al volver imprime lo llegado desde entonces, pero
+// solo si ha sido hace poco (si no, al encender el PC saldria toda la tarde).
+const CLAVE_LATIDO_IMPRESION = 'comandi-impresion-latido';
+const MAX_RECUPERAR_IMPRESION_MS = 90 * 60 * 1000;
+
 // Nota: el estado interno sigue siendo 'listo' (lo usa el bot para notificar),
 // pero en domicilio lo mostramos como "En preparación" y el primer botón dice
 // "Empezar preparación" para no confundir (en domicilio 'listo' = comida en
@@ -397,6 +403,10 @@ export default function PaginaPedidos() {
   // impreso_en al imprimir, pero la cola es asincrona: sin esto, el reloj de
   // los programados podia volver a encolar uno que ya estaba en camino.
   const encoladosRef = useRef(new Set());
+  // Solo UNA pestana de este ordenador imprime (la que tiene el "turno"). Si
+  // hubiera dos tableros abiertos, cada pedido saldria dos veces. Cuando la
+  // que imprime se cierra, la siguiente toma el relevo sola.
+  const [turnoImpresora, setTurnoImpresora] = useState(false);
 
   const [pestana, setPestana] = useState('hoy');
   // El restaurante puede pedir empezar cada dia limpio (ajuste
@@ -506,7 +516,44 @@ export default function PaginaPedidos() {
 
   function cambiarAjusteImpr(campo, valor) {
     setAjustesImpr(prev => ({ ...prev, [campo]: valor }));
+    // Con la impresion apagada no hay que recuperar nada al volver: sin esto,
+    // al encenderla saldrian los pedidos del rato en que estuvo apagada.
+    if (campo === 'auto' && !valor) {
+      try { localStorage.removeItem(CLAVE_LATIDO_IMPRESION); } catch (e) {}
+    }
   }
+
+  // El turno de impresora, con Web Locks: el navegador se lo da a una sola
+  // pestana y lo pasa a otra en cuanto esa se cierra. Sin soporte (navegadores
+  // viejos), cada pestana imprime como antes.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.locks || !navigator.locks.request) {
+      setTurnoImpresora(true);
+      return;
+    }
+    let soltar = null;
+    let desmontado = false;
+    navigator.locks.request('comandi-impresora', () => {
+      if (desmontado) return undefined;
+      setTurnoImpresora(true);
+      return new Promise(resolve => { soltar = resolve; });
+    }).catch(() => setTurnoImpresora(true));
+    return () => { desmontado = true; if (soltar) soltar(); };
+  }, []);
+
+  // Latido: la pestana que imprime apunta cada poco que sigue viva. Si el
+  // tablero se cierra un rato (se ha ido a Carta, se ha recargado...), al
+  // volver sabe desde cuando no escuchaba y saca lo que llego mientras.
+  useEffect(() => {
+    if (!turnoImpresora) return;
+    function latir() {
+      if (!ajustesImprRef.current.auto) return;
+      try { localStorage.setItem(CLAVE_LATIDO_IMPRESION, String(Date.now())); } catch (e) {}
+    }
+    const reloj = setInterval(latir, 20 * 1000);
+    window.addEventListener('pagehide', latir);
+    return () => { clearInterval(reloj); window.removeEventListener('pagehide', latir); latir(); };
+  }, [turnoImpresora]);
 
   function descartarAvisoPlan() {
     if (avisoPlan) {
@@ -624,11 +671,38 @@ export default function PaginaPedidos() {
   // habia al abrir (o los acumulados con el ajuste apagado) se marcan como
   // vistos: si no, al encender el PC saldria por la impresora toda la tarde.
   // Para esos esta el boton "Imprimir pendientes".
+  //
+  // Solo en la pestana con el turno de impresora: las demas no imprimen nada.
   useEffect(() => {
-    if (cargando) return;
+    if (cargando || !turnoImpresora) return;
+
+    const ahoraMs = Date.now();
+    const imprimible = (p) =>
+      !p.impreso_en &&
+      p.estado !== 'cancelado' &&
+      (esDelDiaActual(p) || esProgramadoVigente(p)) &&
+      // Un encargo cuyo turno aun no ha abierto NO sale al llegar: lo imprime
+      // el reloj de abajo cuando abra. Antes salian todos en cuanto llegaban,
+      // y uno pedido a mediodia para la noche se pasaba la tarde en el rail.
+      // Si su turno ya esta abierto, sale ya, como siempre.
+      !esperaASuTurno(p, ahoraMs);
 
     if (vistosImprRef.current === null) {
       vistosImprRef.current = new Set(pedidos.map(p => p.id));
+      // Recuperar lo que llego con el tablero cerrado HACE POCO (se fueron a
+      // Carta, recargaron...). Antes se daba por visto y no salia nunca. El
+      // limite evita sacar de golpe lo de la tarde al encender el ordenador.
+      if (!ajustesImprRef.current.auto) return;
+      let latido = 0;
+      try { latido = Number(localStorage.getItem(CLAVE_LATIDO_IMPRESION)) || 0; } catch (e) {}
+      if (!latido || ahoraMs - latido > MAX_RECUPERAR_IMPRESION_MS) return;
+      const perdidos = pedidos.filter(p => {
+        const creado = parsearFechaUTC(p.creado_en);
+        // Un minuto de margen: el latido es cada 20 s.
+        return creado && creado.getTime() >= latido - 60 * 1000 && imprimible(p);
+      });
+      perdidos.forEach(p => encoladosRef.current.add(p.id));
+      if (perdidos.length > 0) encolarImpresion(perdidos);
       return;
     }
 
@@ -637,22 +711,15 @@ export default function PaginaPedidos() {
       return;
     }
 
-    const ahoraMs = Date.now();
     const nuevos = pedidos.filter(p =>
       !vistosImprRef.current.has(p.id) &&
-      !p.impreso_en &&
-      p.estado !== 'cancelado' &&
-      (esDelDiaActual(p) || esProgramadoVigente(p)) &&
-      // Un encargo cuyo turno aun no ha abierto NO sale al llegar: lo imprime
-      // el reloj de abajo cuando abra. Antes salian todos en cuanto llegaban,
-      // y uno pedido a mediodia para la noche se pasaba la tarde en el rail.
-      // Si su turno ya esta abierto, sale ya, como siempre.
-      !esperaASuTurno(p, ahoraMs)
+      !encoladosRef.current.has(p.id) &&
+      imprimible(p)
     );
     pedidos.forEach(p => vistosImprRef.current.add(p.id));
     nuevos.forEach(p => encoladosRef.current.add(p.id));
     if (nuevos.length > 0) encolarImpresion(nuevos);
-  }, [pedidos, cargando, horarios]);
+  }, [pedidos, cargando, horarios, turnoImpresora]);
 
   // PROGRAMADOS: salen en papel al ABRIR SU TURNO. Uno pedido a mediodia para
   // las 21:30 imprime cuando abre la noche, que es cuando la cocina empieza a
@@ -660,7 +727,7 @@ export default function PaginaPedidos() {
   // cerrado cuando abrio el turno, sale en cuanto se abre.
   // Solo los que siguen en 'recibido': si alguien ya lo ha movido, ya lo ha visto.
   useEffect(() => {
-    if (cargando) return;
+    if (cargando || !turnoImpresora) return;
     function revisar() {
       if (!ajustesImprRef.current.auto) return;
       const ahoraMs = Date.now();
@@ -679,7 +746,7 @@ export default function PaginaPedidos() {
     revisar();
     const reloj = setInterval(revisar, 60 * 1000);
     return () => clearInterval(reloj);
-  }, [pedidos, cargando, horarios]);
+  }, [pedidos, cargando, horarios, turnoImpresora]);
 
   // ¿Es un encargo cuyo turno todavia no ha abierto? Sin horarios, o si la
   // hora cae fuera de los turnos, no espera: mejor que salga pronto que nunca.
@@ -1746,10 +1813,18 @@ export default function PaginaPedidos() {
           const pendientesCount = pendientesDeImprimir().length;
           return (
             <div className="mb-4 flex justify-end items-center gap-2 relative">
-              {ajustesImpr.auto && (
+              {ajustesImpr.auto && turnoImpresora && (
                 <span className="text-xs font-medium text-accent flex items-center gap-1.5 mr-auto">
                   <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                   Impresión automática activada
+                </span>
+              )}
+              {/* Hay otro tablero abierto en este ordenador y es el que imprime */}
+              {ajustesImpr.auto && !turnoImpresora && (
+                <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mr-auto"
+                      title="Solo imprime una pestaña para que no salga cada pedido dos veces">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  Imprime la otra pestaña del tablero
                 </span>
               )}
 

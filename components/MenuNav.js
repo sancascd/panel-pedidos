@@ -71,6 +71,20 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   const [montado, setMontado] = useState(false);
   useEffect(() => { setMontado(true); }, []);
 
+  // En el ordenador que imprime, el tablero NO puede cerrarse: es quien saca
+  // los tickets. Desde el tablero, el resto de pantallas se abren en otra
+  // pestaña y el tablero sigue imprimiendo detras. (Antes, ir a Carta en esa
+  // misma ventana dejaba de imprimir sin avisar.) El ajuste es por dispositivo.
+  const [imprimeAqui, setImprimeAqui] = useState(false);
+  useEffect(() => {
+    if (!abierto) return;
+    try {
+      const ajustes = JSON.parse(localStorage.getItem('comandi-impresion') || 'null');
+      setImprimeAqui(!!(ajustes && ajustes.auto === true));
+    } catch (e) { setImprimeAqui(false); }
+  }, [abierto]);
+  const protegerTablero = imprimeAqui && pathname === '/pedidos';
+
   // Si la página no nos dice si es admin, lo consultamos nosotros.
   useEffect(() => {
     if (esAdminProp !== undefined) {
@@ -255,13 +269,15 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                 <div className="my-1.5 border-t border-border" />
               </>
             )}
-            {linksVisibles.map(({ href, icono: Icono, label, nuevaPestana }) => (
+            {linksVisibles.map(({ href, icono: Icono, label, nuevaPestana }) => {
+              const otraPestana = nuevaPestana || (protegerTablero && href !== '/pedidos');
+              return (
               <a
                 key={href}
                 href={href}
                 role="menuitem"
-                target={nuevaPestana ? '_blank' : undefined}
-                rel={nuevaPestana ? 'noopener noreferrer' : undefined}
+                target={otraPestana ? '_blank' : undefined}
+                rel={otraPestana ? 'noopener noreferrer' : undefined}
                 onClick={() => setAbierto(false)}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   pathname === href
@@ -272,7 +288,8 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                 <Icono className="w-4 h-4 flex-shrink-0" />
                 {label}
               </a>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
