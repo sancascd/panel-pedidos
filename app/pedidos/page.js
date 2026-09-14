@@ -1449,9 +1449,12 @@ export default function PaginaPedidos() {
     return {
       total: suma(pedidosDia),
       pedidos: pedidosDia.length,
-      efectivo: suma(pedidosDia.filter(p => p.metodo_pago === 'efectivo')),
-      tarjeta: suma(pedidosDia.filter(p => p.metodo_pago === 'tarjeta')),
-      alRecoger: suma(pedidosDia.filter(p => p.metodo_pago !== 'efectivo' && p.metodo_pago !== 'tarjeta')),
+      // Desglose por forma de entrega (Sandra, 2026-09-14), igual que las
+      // columnas del tablero: todo lo que no es recogida es reparto.
+      recogida: suma(pedidosDia.filter(p => p.tipo_entrega === 'recogida')),
+      pedidosRecogida: pedidosDia.filter(p => p.tipo_entrega === 'recogida').length,
+      domicilio: suma(pedidosDia.filter(p => p.tipo_entrega !== 'recogida')),
+      pedidosDomicilio: pedidosDia.filter(p => p.tipo_entrega !== 'recogida').length,
       sinTerminar: suma(activos),
     };
   })();
@@ -1863,19 +1866,19 @@ export default function PaginaPedidos() {
                       </p>
                       <dl className="text-sm divide-y divide-border border-t border-border">
                         <div className="flex justify-between py-1.5">
-                          <dt className="flex items-center gap-2 text-text-muted"><Banknote className="w-4 h-4" />Efectivo</dt>
-                          <dd className="font-medium text-text tabular-nums">{euros(caja.efectivo)}</dd>
+                          <dt className="flex items-center gap-2 text-text-muted">
+                            <Store className="w-4 h-4" />Recogida
+                            <span className="text-xs tabular-nums">({caja.pedidosRecogida})</span>
+                          </dt>
+                          <dd className="font-medium text-text tabular-nums">{euros(caja.recogida)}</dd>
                         </div>
                         <div className="flex justify-between py-1.5">
-                          <dt className="flex items-center gap-2 text-text-muted"><CreditCard className="w-4 h-4" />Tarjeta</dt>
-                          <dd className="font-medium text-text tabular-nums">{euros(caja.tarjeta)}</dd>
+                          <dt className="flex items-center gap-2 text-text-muted">
+                            <Home className="w-4 h-4" />A domicilio
+                            <span className="text-xs tabular-nums">({caja.pedidosDomicilio})</span>
+                          </dt>
+                          <dd className="font-medium text-text tabular-nums">{euros(caja.domicilio)}</dd>
                         </div>
-                        {caja.alRecoger > 0 && (
-                          <div className="flex justify-between py-1.5">
-                            <dt className="flex items-center gap-2 text-text-muted"><Store className="w-4 h-4" />Paga al recoger</dt>
-                            <dd className="font-medium text-text tabular-nums">{euros(caja.alRecoger)}</dd>
-                          </div>
-                        )}
                       </dl>
                       {caja.sinTerminar > 0 && (
                         <p className="text-xs text-text-muted mt-3">
