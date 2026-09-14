@@ -163,7 +163,7 @@ export default function PanelComercial() {
     avisar('Registrado. Lo tienes reservado 30 días.');
     setNombre(''); setPoblacion(''); setTelefono(''); setComprobacion(null);
     setParecidos([]); setEsDistinto(false);
-    await Promise.all([cargarContactos(), cargarRanking()]);
+    await cargarContactos();
   }
 
   async function borrar(contacto) {
@@ -175,7 +175,7 @@ export default function PanelComercial() {
     const { error } = await supabase.rpc('borrar_contacto', { p_id: contacto.id });
     if (error) { avisar(error.message, 'error'); return; }
     avisar('Eliminado.');
-    await Promise.all([cargarContactos(), cargarRanking()]);
+    await cargarContactos();
   }
 
   async function cambiarEstado(contacto, estado) {
@@ -184,7 +184,7 @@ export default function PanelComercial() {
       p_estado: estado,
     });
     if (error) { avisar(error.message, 'error'); return; }
-    await Promise.all([cargarContactos(), cargarRanking()]);
+    await cargarContactos();
   }
 
   async function salir() {
