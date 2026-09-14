@@ -237,9 +237,8 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
     return (
       <div className="ticket ticket-cocina">
         {avisoProgramado}
-        <p className="rotulo-cocina">TICKET DE COCINA</p>
         <h1>{numero}</h1>
-        <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
+        <p style={{ textAlign: 'center', margin: '0 0 1mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
         <div className="separador"></div>
         <p className="grande">{esRecogida ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
         <div className="separador"></div>
@@ -273,7 +272,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
         <div className="separador"></div>
         {/* El nombre permite casar este ticket con el de la bolsa */}
         <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
-        <p><strong>Articulos:</strong> {totalArticulos}</p>
+        <p><strong>Artículos:</strong> {totalArticulos}</p>
         {recordatorioProgramado}
       </div>
     );
@@ -284,23 +283,20 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
     <div className="ticket">
       {avisoProgramado}
       <h1>PEDIDO {numero}</h1>
-      <p style={{ textAlign: 'center', margin: '0 0 3mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
-      {restaurante?.nombre && (
-        <p style={{ textAlign: 'center', margin: '0 0 3mm 0', fontSize: '18pt' }}>{restaurante.nombre}</p>
-      )}
+      <p style={{ textAlign: 'center', margin: '0 0 1mm 0' }}>{formatearFecha(pedido.creado_en)}</p>
       <div className="separador"></div>
       <p className="grande">{esRecogida ? 'RECOGIDA EN LOCAL' : 'A DOMICILIO'}</p>
       <div className="separador"></div>
       <p><strong>Cliente:</strong> {pedido.cliente_nombre || '-'}</p>
-      <p><strong>Telefono:</strong> {telefonoLimpio(pedido.cliente_telefono)}</p>
+      <p><strong>Teléfono:</strong> {telefonoLimpio(pedido.cliente_telefono)}</p>
       {!esRecogida && (
-        <p><strong>Direccion:</strong> {pedido.cliente_direccion || '-'}</p>
+        <p><strong>Dirección:</strong> {pedido.cliente_direccion || '-'}</p>
       )}
       <div className="separador"></div>
       <table>
         <thead>
           <tr>
-            <th className="col-cant">Cant</th>
+            <th className="col-cant">Ud.</th>
             <th className="col-prod">Producto</th>
             <th className="col-tot">Total</th>
           </tr>
@@ -339,7 +335,7 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
       <div className="separador"></div>
       <p><strong>Pago:</strong> {pagoTexto}</p>
       <div className="separador"></div>
-      <p style={{ textAlign: 'center', fontSize: '10pt' }}>Gracias!</p>
+      <p style={{ textAlign: 'center' }}>¡Gracias!</p>
       {recordatorioProgramado}
     </div>
   );
@@ -1591,34 +1587,32 @@ export default function PaginaPedidos() {
             overflow: visible !important; color: black !important;
           }
           .zona-imprimible * { color: black !important; }
-          .ticket { font-family: 'Courier New', monospace; font-size: 16pt; line-height: 1.35; font-weight: bold; }
-          .ticket h1 { font-size: 28pt; text-align: center; margin: 0 0 4mm 0; }
-          .ticket .separador { border-top: 2px dashed #000; margin: 3mm 0; }
-          /* Un programado tiene que cantar desde el otro lado de la cocina. */
-          .ticket .prog-aviso { text-align: center; font-size: 20pt; margin: 0 0 1mm 0; }
-          .ticket .prog-dia   { text-align: center; font-size: 24pt; margin: 0; }
-          .ticket .prog-hora  { text-align: center; font-size: 34pt; margin: 0 0 3mm 0; }
-          .ticket .grande { font-size: 20pt; font-weight: bold; }
+          /* Letra pequeña y en negrita (decision de Sandra, 2026-09-14, tras
+             instalarlo en Gran Muralla): ocupa mucho menos rollo y en la
+             termica se sigue leyendo bien. Lo que importa (numero de pedido,
+             entrega, numeros de plato) va solo un poco mas grande. */
+          .ticket { font-family: 'Courier New', monospace; font-size: 11pt; line-height: 1.3; font-weight: bold; }
+          .ticket p { margin: 0; }
+          .ticket h1 { font-size: 16pt; text-align: center; margin: 0 0 1mm 0; }
+          .ticket .separador { border-top: 1px dashed #000; margin: 2mm 0; }
+          /* Un programado se sigue viendo antes que nada, pero sin gritar */
+          .ticket .prog-aviso { text-align: center; font-size: 11pt; margin: 0; }
+          .ticket .prog-dia   { text-align: center; font-size: 13pt; margin: 0; }
+          .ticket .prog-hora  { text-align: center; font-size: 18pt; margin: 0 0 2mm 0; }
+          .ticket .grande { font-size: 12pt; font-weight: bold; }
           .ticket table { width: 100%; border-collapse: collapse; }
-          .ticket table th, .ticket table td { text-align: left; padding: 1.5mm 0; font-size: 17pt; vertical-align: top; }
-          .ticket table .col-cant { width: 14%; text-align: center; }
-          .ticket table .col-prod { width: 58%; }
-          .ticket table .col-tot { width: 28%; text-align: right; }
-          .ticket .nota { font-size: 14pt; font-style: italic; padding-left: 4mm; }
-          .ticket .etiqueta { text-align: center; font-size: 15pt; letter-spacing: 1px; margin: 0 0 2mm 0; }
-          /* El de cocina se lee de lejos y de un vistazo: cantidad y numero */
-          .ticket-cocina { font-size: 19pt; }
-          /* Que no se confunda con el de la bolsa: rotulo grande entre rayas, sin fondo negro */
-          .ticket-cocina .rotulo-cocina { text-align: center; font-size: 20pt; letter-spacing: 0;
-            border-top: 3px solid #000; border-bottom: 3px solid #000; padding: 1mm 0; margin: 0 0 3mm 0; }
-          .ticket-cocina h1 { font-size: 34pt; }
-          .ticket-cocina table td { font-size: 22pt; padding: 2.5mm 0; }
-          .ticket-cocina table .col-cant { width: 16%; }
-          /* El numero es lo primero que mira cocina: mas grande que el nombre */
-          .ticket-cocina table .col-num { width: 20%; font-size: 26pt; font-weight: bold; text-align: center; }
-          .ticket-cocina table .col-prod { width: 64%; }
-          .ticket-cocina .nota { font-size: 17pt; font-style: normal; }
-          .ticket .total { font-size: 22pt; font-weight: bold; text-align: right; margin-top: 2mm; }
+          .ticket table th, .ticket table td { text-align: left; padding: 0.7mm 0; font-size: 11pt; vertical-align: top; }
+          .ticket table .col-cant { width: 12%; text-align: left; }
+          .ticket table .col-prod { width: 62%; }
+          .ticket table .col-tot { width: 26%; text-align: right; }
+          .ticket .nota { font-size: 10pt; font-style: italic; padding-left: 3mm; }
+          /* El de cocina: cantidad y numero, un punto mas grandes que el resto */
+          .ticket-cocina table td { font-size: 12pt; padding: 0.8mm 0; }
+          .ticket-cocina table .col-cant { width: 14%; }
+          .ticket-cocina table .col-num { width: 18%; font-size: 14pt; font-weight: bold; text-align: left; }
+          .ticket-cocina table .col-prod { width: 68%; }
+          .ticket-cocina .nota { font-size: 11pt; font-style: normal; }
+          .ticket .total { font-size: 13pt; font-weight: bold; text-align: right; margin-top: 1mm; }
           /* Corte entre tickets cuando se imprimen varios en lote */
           .ticket + .ticket { page-break-before: always; break-before: page; }
         }
