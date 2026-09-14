@@ -7,7 +7,7 @@ import MenuNav from '@/components/MenuNav';
 import { COMANDO_KIOSK, PASOS_KIOSK, PRUEBA_KIOSK } from '@/lib/impresion';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, Printer, Copy
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, Printer, Copy, Check
 } from 'lucide-react';
 
 // Helpers para construir los mensajes completos del bot
