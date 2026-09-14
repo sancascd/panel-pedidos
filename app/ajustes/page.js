@@ -98,6 +98,7 @@ export default function PaginaAjustes() {
     telefono: '',
     direccion: '',
     pedido_minimo: '',
+    aviso_domicilio: '',
     email_contacto: '',
     carta_url: '',
     carta_tipo: 'comandi',
@@ -125,6 +126,7 @@ export default function PaginaAjustes() {
           telefono: rest.telefono || '',
           direccion: rest.direccion || '',
           pedido_minimo: rest.pedido_minimo == null ? '' : String(rest.pedido_minimo),
+          aviso_domicilio: rest.aviso_domicilio || '',
           email_contacto: rest.email_contacto || '',
           carta_url: rest.carta_url || '',
           // Si no hay preferencia guardada, inferir la efectiva actual.
@@ -166,6 +168,7 @@ export default function PaginaAjustes() {
         pedido_minimo: datos.pedido_minimo.trim() === ''
           ? null
           : Number(String(datos.pedido_minimo).replace(',', '.')),
+        aviso_domicilio: datos.aviso_domicilio.trim() || null,
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
         carta_tipo: datos.carta_tipo || null,
@@ -366,6 +369,21 @@ export default function PaginaAjustes() {
                 Si el pedido no llega, el bot lo avisa antes de pedir la dirección y ofrece
                 recogerlo en el local. Déjalo vacío si repartes sin mínimo. La recogida nunca
                 tiene mínimo.
+              </p>
+            </div>
+            <div>
+              <label className="label">Aviso para los repartos</label>
+              <textarea
+                value={datos.aviso_domicilio}
+                onChange={(e) => setDatos({ ...datos, aviso_domicilio: e.target.value })}
+                className="input"
+                rows="2"
+                maxLength={300}
+                placeholder="Ej: Sector Sur: pedido mínimo 15 €. No repartimos en La Colina ni en El Higuerón."
+              />
+              <p className="text-xs text-text-muted mt-1">
+                El bot lo enseña justo antes de pedir la dirección, solo en los pedidos a domicilio.
+                Úsalo para zonas donde no repartes o con otro mínimo. Déjalo vacío si no hace falta.
               </p>
             </div>
           </div>
