@@ -5,11 +5,36 @@ import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
 import { COMANDO_KIOSK, PASOS_KIOSK, PRUEBA_KIOSK } from '@/lib/impresion';
+import EditorHorarios from '@/components/EditorHorarios';
+import { cargarHorarios, guardarHorarios } from '@/lib/horarios';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
   Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, Printer, Copy, Check,
-  Clock, ChevronRight
+  Clock, ChevronDown, Store
 } from 'lucide-react';
+
+// Un apartado de Ajustes que se despliega al pulsar su cabecera.
+function Apartado({ id, icono: Icono, titulo, subtitulo, abierto, alternar, children }) {
+  return (
+    <div className="card overflow-hidden">
+      <button
+        onClick={() => alternar(id)}
+        aria-expanded={!!abierto}
+        className="w-full flex items-center gap-3 p-5 text-left hover:bg-surface-2/60 transition-colors"
+      >
+        <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+          <Icono className="w-4 h-4 text-accent" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-semibold text-text">{titulo}</h2>
+          {subtitulo && <p className="text-sm text-text-muted truncate">{subtitulo}</p>}
+        </div>
+        <ChevronDown className={`w-5 h-5 text-text-muted flex-shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+      </button>
+      {abierto && <div className="px-5 pb-5 pt-1 border-t border-border">{children}</div>}
+    </div>
+  );
+}
 
 // Helpers para construir los mensajes completos del bot
 function construirBienvenida(custom, nombreRest) {
@@ -89,8 +114,11 @@ export default function PaginaAjustes() {
     } catch (e) { /* que lo copie a mano */ }
   }
   const [subiendoLogo, setSubiendoLogo] = useState(false);
-  const [subiendoPdf, setSubiendoPdf] = useState(false);
   const [restaurante, setRestaurante] = useState(null);
+  const [horarios, setHorarios] = useState(null);
+  // Apartados abiertos. Todos cerrados al entrar, salvo ?abrir=<id>.
+  const [abiertos, setAbiertos] = useState({});
+  const alternar = (id) => setAbiertos(prev => ({ ...prev, [id]: !prev[id] }));
   const [mensaje, setMensaje] = useState({ texto: '', tipo: 'success' });
 
   const [datos, setDatos] = useState({
@@ -143,7 +171,11 @@ export default function PaginaAjustes() {
           mensaje_cerrado: rest.mensaje_cerrado || '',
           mensaje_despedida: rest.mensaje_despedida || '',
         });
+        try { setHorarios(await cargarHorarios(supabase, restId)); }
+        catch (e) { avisar('No se han podido cargar los horarios: ' + e.message, 'error'); }
       }
+      const abrir = new URLSearchParams(window.location.search).get('abrir');
+      if (abrir) setAbiertos({ [abrir]: true });
       setCargando(false);
     }
     init();
@@ -183,8 +215,8 @@ export default function PaginaAjustes() {
           ? 0
           : Math.round(Number(String(datos.cargo_bolsa).replace(',', '.')) * 100) / 100,
         email_contacto: datos.email_contacto.trim() || null,
-        carta_url: datos.carta_url.trim() || null,
-        carta_tipo: datos.carta_tipo || null,
+        // La carta que manda el bot (carta_tipo / carta_url / PDF) ya no se
+        // cambia desde aquí: todos con la carta web; si hace falta, a mano.
         acepta_efectivo: datos.acepta_efectivo,
         acepta_tarjeta: datos.acepta_tarjeta,
         resenas_activas: datos.resenas_activas,
@@ -193,8 +225,13 @@ export default function PaginaAjustes() {
         mensaje_despedida: datos.mensaje_despedida.trim() || null,
       })
       .eq('id', restaurante.id);
+    if (error) { setGuardando(false); avisar('Error al guardar: ' + error.message, 'error'); return; }
+    // Los horarios se guardan con el mismo botón.
+    if (horarios) {
+      try { await guardarHorarios(supabase, restaurante.id, horarios); }
+      catch (e) { setGuardando(false); avisar('Datos guardados, pero no los horarios: ' + e.message, 'error'); return; }
+    }
     setGuardando(false);
-    if (error) { avisar('Error al guardar: ' + error.message, 'error'); return; }
     avisar('Cambios guardados correctamente.');
   }
 
@@ -224,33 +261,6 @@ export default function PaginaAjustes() {
     await supabase.from('restaurantes').update({ logo_url: null }).eq('id', restaurante.id);
     setRestaurante({ ...restaurante, logo_url: null });
     avisar('Logo eliminado.');
-  }
-
-  async function subirPdf(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setSubiendoPdf(true);
-    const path = `${restaurante.id}/carta.pdf`;
-    const { error: errUp } = await supabase.storage
-      .from('cartas').upload(path, file, { upsert: true });
-    if (errUp) {
-      setSubiendoPdf(false);
-      avisar('Error subiendo PDF: ' + errUp.message, 'error');
-      return;
-    }
-    const { data: urlData } = supabase.storage.from('cartas').getPublicUrl(path);
-    const url = urlData.publicUrl + '?t=' + Date.now();
-    await supabase.from('restaurantes').update({ carta_pdf_url: url }).eq('id', restaurante.id);
-    setRestaurante({ ...restaurante, carta_pdf_url: url });
-    setSubiendoPdf(false);
-    avisar('PDF de la carta actualizado.');
-  }
-
-  async function borrarPdf() {
-    if (!confirm('¿Borrar el PDF de la carta?')) return;
-    await supabase.from('restaurantes').update({ carta_pdf_url: null }).eq('id', restaurante.id);
-    setRestaurante({ ...restaurante, carta_pdf_url: null });
-    avisar('PDF eliminado.');
   }
 
   if (cargando) {
@@ -296,7 +306,7 @@ export default function PaginaAjustes() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-3">
         {mensaje.texto && (
           <div className={`flex items-start gap-2 p-3 rounded-lg border text-sm animate-fade-in ${
             mensaje.tipo === 'error'
@@ -311,21 +321,14 @@ export default function PaginaAjustes() {
           </div>
         )}
 
-        {/* Horarios ya no está en el menú: se abre desde aquí (Sandra, 2026-09-15) */}
-        <a href="/horarios" className="card p-5 flex items-center gap-4 hover:border-accent/40 transition-colors">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-            <Clock className="w-5 h-5 text-accent" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-text">Horarios</h2>
-            <p className="text-sm text-text-muted">Los turnos de cada día y los días que cierras.</p>
-          </div>
-          <ChevronRight className="w-5 h-5 text-text-muted flex-shrink-0" />
-        </a>
+        {/* Cada apartado se despliega (Sandra, 2026-09-15). Orden: Datos (con
+            el logo) · Horarios · Métodos de pago · Mensajes del bot · Reseñas ·
+            Ajustes de impresión. «Carta para clientes» se quitó: todos con la
+            carta web. */}
 
-        {/* Datos básicos */}
-        <div className="card p-6">
-          <h2 className="text-base font-semibold text-text mb-4">Datos del restaurante</h2>
+        <Apartado id="datos" icono={Store} titulo="Datos del restaurante"
+          subtitulo="Nombre, contacto, logo, pedido mínimo, bolsa y aviso de repartos"
+          abierto={abiertos.datos} alternar={alternar}>
           <div className="space-y-4">
             <div>
               <label className="label">Nombre del restaurante *</label>
@@ -379,6 +382,46 @@ export default function PaginaAjustes() {
                 placeholder="Calle Mayor 5, Córdoba"
               />
             </div>
+
+            <div>
+              <label className="label">Logo</label>
+              <div className="flex items-center gap-4">
+                {restaurante.logo_url ? (
+                  <img
+                    src={restaurante.logo_url}
+                    alt="Logo"
+                    className="w-20 h-20 rounded-xl object-cover bg-surface-2 border border-border"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-xl bg-surface-2 border border-border flex items-center justify-center">
+                    <ImageIcon className="w-6 h-6 text-text-muted" />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="btn-secondary cursor-pointer">
+                    {subiendoLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        {restaurante.logo_url ? 'Cambiar logo' : 'Subir logo'}
+                      </>
+                    )}
+                    <input type="file" accept="image/*" onChange={subirLogo} className="hidden" />
+                  </label>
+                  {restaurante.logo_url && (
+                    <button onClick={borrarLogo} className="btn-ghost hover:text-red-500" title="Borrar logo">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-text-muted mt-1.5">Sale arriba a la izquierda en el panel. Se guarda al subirlo.</p>
+            </div>
+
             <div>
               <label className="label">Pedido mínimo a domicilio</label>
               <input
@@ -429,305 +472,22 @@ export default function PaginaAjustes() {
               </p>
             </div>
           </div>
-        </div>
+        </Apartado>
 
-        {/* Logo */}
-        <div className="card p-6">
-          <h2 className="text-base font-semibold text-text mb-4">Logo</h2>
-          <p className="text-sm text-text-muted mb-4">
-            Aparecerá arriba a la izquierda en el panel y en futuras comunicaciones.
+        <Apartado id="horarios" icono={Clock} titulo="Horarios"
+          subtitulo="Los turnos de cada día y los días que cierras"
+          abierto={abiertos.horarios} alternar={alternar}>
+          {horarios
+            ? <EditorHorarios horarios={horarios} onChange={setHorarios} />
+            : <p className="text-sm text-text-muted">No se han podido cargar los horarios. Recarga la página.</p>}
+        </Apartado>
+
+        <Apartado id="pagos" icono={Wallet} titulo="Métodos de pago"
+          subtitulo="Efectivo, tarjeta o los dos"
+          abierto={abiertos.pagos} alternar={alternar}>
+          <p className="text-sm text-text-muted mb-3">
+            El bot lo informa en el primer mensaje y solo ofrece las formas activas al finalizar el pedido a domicilio.
           </p>
-          <div className="flex items-center gap-4">
-            {restaurante.logo_url ? (
-              <img
-                src={restaurante.logo_url}
-                alt="Logo"
-                className="w-20 h-20 rounded-xl object-cover bg-surface-2 border border-border"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-xl bg-surface-2 border border-border flex items-center justify-center">
-                <ImageIcon className="w-6 h-6 text-text-muted" />
-              </div>
-            )}
-            <div className="flex gap-2">
-              <label className="btn-primary cursor-pointer">
-                {subiendoLogo ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Subiendo...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    {restaurante.logo_url ? 'Cambiar logo' : 'Subir logo'}
-                  </>
-                )}
-                <input type="file" accept="image/*" onChange={subirLogo} className="hidden" />
-              </label>
-              {restaurante.logo_url && (
-                <button onClick={borrarLogo} className="btn-ghost hover:text-red-500">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Carta */}
-        <div className="card p-6">
-          <h2 className="text-base font-semibold text-text mb-2">Carta para clientes</h2>
-          <p className="text-sm text-text-muted mb-4">
-            Elige qué carta manda el bot cuando un cliente pide verla.
-          </p>
-
-          <div className="space-y-2 mb-6">
-            {/* Opción: Carta Comandi */}
-            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'comandi' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
-              <input
-                type="radio"
-                name="carta_tipo"
-                className="mt-1 accent-accent"
-                checked={datos.carta_tipo === 'comandi'}
-                onChange={() => setDatos({ ...datos, carta_tipo: 'comandi' })}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-text">
-                  Carta Comandi <span className="text-xs text-accent">(recomendada)</span>
-                </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Página online con tu carta por categorías, siempre actualizada desde el panel.
-                </p>
-                {restaurante?.slug ? (
-                  <a
-                    href={`https://comandi.es/r/${restaurante.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline mt-1"
-                  >
-                    comandi.es/r/{restaurante.slug} <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : (
-                  <p className="text-xs text-text-muted italic mt-1">
-                    Comandi activará tu carta online al darte de alta.
-                  </p>
-                )}
-              </div>
-            </label>
-
-            {/* Opción: Mi enlace web */}
-            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'enlace' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
-              <input
-                type="radio"
-                name="carta_tipo"
-                className="mt-1 accent-accent"
-                checked={datos.carta_tipo === 'enlace'}
-                onChange={() => setDatos({ ...datos, carta_tipo: 'enlace' })}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-text">Mi enlace web</p>
-                <p className="text-xs text-text-muted mt-0.5">El bot manda la URL que pongas abajo.</p>
-              </div>
-            </label>
-
-            {/* Opción: Mi PDF */}
-            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${datos.carta_tipo === 'pdf' ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'}`}>
-              <input
-                type="radio"
-                name="carta_tipo"
-                className="mt-1 accent-accent"
-                checked={datos.carta_tipo === 'pdf'}
-                onChange={() => setDatos({ ...datos, carta_tipo: 'pdf' })}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-text">Mi PDF</p>
-                <p className="text-xs text-text-muted mt-0.5">El bot manda el PDF que subas abajo.</p>
-              </div>
-            </label>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="label">URL de la carta web (opcional)</label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  value={datos.carta_url}
-                  onChange={(e) => setDatos({ ...datos, carta_url: e.target.value })}
-                  className="input"
-                  placeholder="https://miweb.com/carta"
-                />
-                {datos.carta_url && (
-                  <a href={datos.carta_url} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="label">PDF de la carta (opcional)</label>
-              <div className="flex items-center gap-3">
-                {restaurante.carta_pdf_url ? (
-                  <a
-                    href={restaurante.carta_pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center gap-2 p-3 bg-surface-2 rounded-lg border border-border hover:border-accent/30 transition-colors"
-                  >
-                    <FileText className="w-5 h-5 text-accent" />
-                    <span className="text-sm text-text">PDF subido</span>
-                    <ExternalLink className="w-4 h-4 text-text-muted ml-auto" />
-                  </a>
-                ) : (
-                  <div className="flex-1 flex items-center gap-2 p-3 bg-surface-2 rounded-lg border border-border">
-                    <FileText className="w-5 h-5 text-text-muted" />
-                    <span className="text-sm text-text-muted">Sin PDF</span>
-                  </div>
-                )}
-
-                <label className="btn-secondary cursor-pointer">
-                  {subiendoPdf ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      <span className="hidden sm:inline">{restaurante.carta_pdf_url ? 'Cambiar' : 'Subir'}</span>
-                    </>
-                  )}
-                  <input type="file" accept="application/pdf" onChange={subirPdf} className="hidden" />
-                </label>
-                {restaurante.carta_pdf_url && (
-                  <button onClick={borrarPdf} className="btn-ghost hover:text-red-500">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mensajes del bot */}
-        <div className="card p-6">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="w-4 h-4 text-accent" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-text">Mensajes del bot</h2>
-              <p className="text-sm text-text-muted mt-1">
-                Personaliza los textos que enviará el bot a tus clientes. Si dejas un campo vacío,
-                se usará el mensaje por defecto de Comandi.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {/* Mensaje de bienvenida */}
-            <div>
-              <label className="label">Mensaje de bienvenida</label>
-              <textarea
-                value={datos.mensaje_bienvenida}
-                onChange={(e) => setDatos({ ...datos, mensaje_bienvenida: e.target.value })}
-                className="input"
-                rows="2"
-                placeholder="Por defecto: Hola, soy el asistente de [tu restaurante]."
-              />
-              <p className="text-xs text-text-muted mt-1.5">
-                Se muestra cuando el cliente saluda por primera vez, antes del menú de opciones.
-              </p>
-              <PreviewMensajeBot
-                nombreRestaurante={datos.nombre}
-                contenido={construirBienvenida(datos.mensaje_bienvenida, datos.nombre)}
-                esDefault={!datos.mensaje_bienvenida.trim()}
-              />
-            </div>
-
-            {/* Mensaje cerrado */}
-            <div>
-              <label className="label">Mensaje cuando estás cerrado</label>
-              <textarea
-                value={datos.mensaje_cerrado}
-                onChange={(e) => setDatos({ ...datos, mensaje_cerrado: e.target.value })}
-                className="input"
-                rows="2"
-                placeholder="Por defecto: Te esperamos pronto!"
-              />
-              <p className="text-xs text-text-muted mt-1.5">
-                Se añade al final del mensaje de horario cuando un cliente escribe fuera de horario.
-              </p>
-              <PreviewMensajeBot
-                nombreRestaurante={datos.nombre}
-                contenido={construirCerrado(datos.mensaje_cerrado)}
-                esDefault={!datos.mensaje_cerrado.trim()}
-              />
-            </div>
-
-            {/* Mensaje despedida */}
-            <div>
-              <label className="label">Mensaje de despedida</label>
-              <textarea
-                value={datos.mensaje_despedida}
-                onChange={(e) => setDatos({ ...datos, mensaje_despedida: e.target.value })}
-                className="input"
-                rows="2"
-                placeholder="Por defecto: Gracias por tu pedido!"
-              />
-              <p className="text-xs text-text-muted mt-1.5">
-                Se muestra al final del resumen tras confirmar el pedido.
-              </p>
-              <PreviewMensajeBot
-                nombreRestaurante={datos.nombre}
-                contenido={construirDespedida(datos.mensaje_despedida)}
-                esDefault={!datos.mensaje_despedida.trim()}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Reseñas automáticas */}
-        <div className="card p-6">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-              <Star className="w-4 h-4 text-accent" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-text">Reseñas automáticas</h2>
-              <p className="text-sm text-text-muted mt-1">
-                Cuando marques un pedido como entregado, el bot pedirá automáticamente al cliente
-                una puntuación del 1 al 5 por WhatsApp. Verás todas las reseñas en su sección propia del panel.
-              </p>
-            </div>
-          </div>
-          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
-            <input
-              type="checkbox"
-              checked={datos.resenas_activas}
-              onChange={(e) => setDatos({ ...datos, resenas_activas: e.target.checked })}
-              className="w-4 h-4 accent-accent"
-            />
-            <span className="text-sm text-text">
-              <strong className="font-medium">Activar reseñas automáticas</strong>
-              {' '}<span className="text-text-muted">(se piden 30 min después de entregar a domicilio, o al instante si es recogida)</span>
-            </span>
-          </label>
-        </div>
-
-        {/* Métodos de pago */}
-        <div className="card p-6">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-              <Wallet className="w-4 h-4 text-accent" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-text">Métodos de pago</h2>
-              <p className="text-sm text-text-muted mt-1">
-                Elige qué formas de pago aceptas. El bot lo informa en el primer mensaje y solo
-                ofrece las activas al finalizar el pedido a domicilio.
-              </p>
-            </div>
-          </div>
           <div className="space-y-2">
             <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
               <input
@@ -751,38 +511,112 @@ export default function PaginaAjustes() {
           {!datos.acepta_efectivo && !datos.acepta_tarjeta && (
             <p className="text-xs text-red-500 mt-3">Debes aceptar al menos un método de pago.</p>
           )}
-        </div>
+        </Apartado>
 
-        {/* Impresion de tickets. No se guarda nada: es el comando que hay que
-            copiar en el ordenador del local. Vive aqui para tenerlo a mano en
-            cualquier restaurante, sin buscarlo en ningun sitio. */}
-        <div className="card p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-              <Printer className="w-4 h-4 text-accent" />
+        <Apartado id="mensajes" icono={MessageSquare} titulo="Mensajes del bot"
+          subtitulo="Bienvenida, cerrado y despedida"
+          abierto={abiertos.mensajes} alternar={alternar}>
+          <p className="text-sm text-text-muted mb-4">
+            Personaliza los textos que enviará el bot a tus clientes. Si dejas un campo vacío,
+            se usará el mensaje por defecto de Comandi.
+          </p>
+          <div className="space-y-6">
+            <div>
+              <label className="label">Mensaje de bienvenida</label>
+              <textarea
+                value={datos.mensaje_bienvenida}
+                onChange={(e) => setDatos({ ...datos, mensaje_bienvenida: e.target.value })}
+                className="input"
+                rows="2"
+                placeholder="Por defecto: Hola, soy el asistente de [tu restaurante]."
+              />
+              <p className="text-xs text-text-muted mt-1.5">
+                Se muestra cuando el cliente saluda por primera vez, antes del menú de opciones.
+              </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirBienvenida(datos.mensaje_bienvenida, datos.nombre)}
+                esDefault={!datos.mensaje_bienvenida.trim()}
+              />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-text">Imprimir tickets sin pulsar nada</h2>
-              <p className="text-sm text-text-muted mt-1">
-                Chrome no imprime sin enseñar el cuadro de dialogo, salvo que se abra de una
-                forma concreta. Esto se hace <strong>una vez</strong>, en el ordenador del local.
+              <label className="label">Mensaje cuando estás cerrado</label>
+              <textarea
+                value={datos.mensaje_cerrado}
+                onChange={(e) => setDatos({ ...datos, mensaje_cerrado: e.target.value })}
+                className="input"
+                rows="2"
+                placeholder="Por defecto: Te esperamos pronto!"
+              />
+              <p className="text-xs text-text-muted mt-1.5">
+                Se añade al final del mensaje de horario cuando un cliente escribe fuera de horario.
               </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirCerrado(datos.mensaje_cerrado)}
+                esDefault={!datos.mensaje_cerrado.trim()}
+              />
+            </div>
+            <div>
+              <label className="label">Mensaje de despedida</label>
+              <textarea
+                value={datos.mensaje_despedida}
+                onChange={(e) => setDatos({ ...datos, mensaje_despedida: e.target.value })}
+                className="input"
+                rows="2"
+                placeholder="Por defecto: Gracias por tu pedido!"
+              />
+              <p className="text-xs text-text-muted mt-1.5">
+                Se muestra al final del resumen tras confirmar el pedido.
+              </p>
+              <PreviewMensajeBot
+                nombreRestaurante={datos.nombre}
+                contenido={construirDespedida(datos.mensaje_despedida)}
+                esDefault={!datos.mensaje_despedida.trim()}
+              />
             </div>
           </div>
+        </Apartado>
 
+        <Apartado id="resenas" icono={Star} titulo="Reseñas"
+          subtitulo={datos.resenas_activas ? 'Activadas' : 'Desactivadas'}
+          abierto={abiertos.resenas} alternar={alternar}>
+          <p className="text-sm text-text-muted mb-3">
+            Cuando marques un pedido como entregado, el bot pedirá al cliente una puntuación del 1 al 5
+            por WhatsApp. Con las reseñas activadas aparece «Reseñas» en el menú, donde las verás todas.
+          </p>
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-surface-2 border border-border hover:border-accent/30 transition-colors">
+            <input
+              type="checkbox"
+              checked={datos.resenas_activas}
+              onChange={(e) => setDatos({ ...datos, resenas_activas: e.target.checked })}
+              className="w-4 h-4 accent-accent"
+            />
+            <span className="text-sm text-text">
+              <strong className="font-medium">Activar reseñas automáticas</strong>
+              {' '}<span className="text-text-muted">(se piden 30 min después de entregar a domicilio, o al instante si es recogida)</span>
+            </span>
+          </label>
+        </Apartado>
+
+        {/* No se guarda nada: es el comando que hay que copiar en el ordenador
+            del local. Vive aquí para tenerlo a mano en cualquier restaurante. */}
+        <Apartado id="impresion" icono={Printer} titulo="Ajustes de impresión"
+          subtitulo="Imprimir los tickets sin pulsar nada"
+          abierto={abiertos.impresion} alternar={alternar}>
+          <p className="text-sm text-text-muted mb-4">
+            Chrome no imprime sin enseñar el cuadro de diálogo, salvo que se abra de una
+            forma concreta. Esto se hace <strong>una vez</strong>, en el ordenador del local.
+          </p>
           <div className="rounded-lg bg-surface-2 border border-border p-3">
             <code className="block text-xs font-mono text-text break-all leading-relaxed">
               {COMANDO_KIOSK}
             </code>
           </div>
-          <button
-            onClick={copiarComando}
-            className="btn-secondary text-sm mt-2"
-          >
+          <button onClick={copiarComando} className="btn-secondary text-sm mt-2">
             {copiado ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {copiado ? 'Copiado' : 'Copiar comando'}
           </button>
-
           <ol className="mt-4 space-y-3">
             {PASOS_KIOSK.map((paso, i) => (
               <li key={paso.titulo} className="flex gap-3">
@@ -796,16 +630,14 @@ export default function PaginaAjustes() {
               </li>
             ))}
           </ol>
-
           <p className="text-xs text-text-muted mt-4 pt-3 border-t border-border">
             {PRUEBA_KIOSK}
           </p>
-
           <p className="text-xs text-text-muted mt-3">
-            Si Chrome esta instalado en otra carpeta, cambia la ruta del principio.
+            Si Chrome está instalado en otra carpeta, cambia la ruta del principio.
             Suele ser <code className="font-mono">Program Files (x86)</code> en equipos antiguos.
           </p>
-        </div>
+        </Apartado>
 
         <div className="sticky bottom-4">
           <button onClick={guardar} disabled={guardando} className="btn-primary w-full shadow-lift">
