@@ -33,6 +33,7 @@ const CLIENTE_VACIO = {
   restaurante_id: '', razon_social: '', nif: '', direccion: '', cp: '', ciudad: 'Córdoba', provincia: 'Córdoba',
   concepto: CONCEPTO_DEFECTO, importe: '99', iva_incluido: true, iva_pct: '21',
   frecuencia: 'mensual', cada_dias: '30', fecha_inicio: '', fecha_fin: '', activo: true, notas: '', tramos: [],
+  pedidos_incluidos: '1000', precio_pedido_extra: '0.20',
 };
 
 export default function PaginaFacturacion() {
@@ -196,11 +197,18 @@ export default function PaginaFacturacion() {
       if (!(periodos > 0) || !(imp > 0)) { avisar('Cada tramo necesita un número de facturas y un importe mayores que cero.', 'error'); return; }
       tramos.push({ periodos, importe: imp });
     }
+    const incluidos = String(d.pedidos_incluidos ?? '').trim();
+    const precioExtra = String(d.precio_pedido_extra ?? '').trim().replace(',', '.');
+    if ((incluidos === '') !== (precioExtra === '') || (incluidos !== '' && (!(parseInt(incluidos, 10) >= 0) || !(Number(precioExtra) >= 0)))) {
+      avisar('Pedidos incluidos y precio por pedido de más: rellena los dos, o déjalos los dos vacíos si no se cobran.', 'error'); return;
+    }
     conOcupado('guardar-cliente', async () => {
       const { error } = await supabase.rpc('admin_guardar_cliente_facturacion', {
         p_id: editando.id || null,
         p: {
           ...d, nif: limpiarNif(d.nif), importe, tramos,
+          pedidos_incluidos: incluidos === '' ? '' : String(parseInt(incluidos, 10)),
+          precio_pedido_extra: precioExtra,
           iva_pct: Number(String(d.iva_pct).replace(',', '.')), cada_dias: parseInt(d.cada_dias, 10) || 30,
         },
       });
@@ -513,6 +521,8 @@ export default function PaginaFacturacion() {
                               onClick={() => setEditando({ id: c.id, datos: {
                                 ...CLIENTE_VACIO, ...Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v ?? ''])),
                                 importe: String(c.importe), iva_pct: String(c.iva_pct), cada_dias: String(c.cada_dias),
+                                pedidos_incluidos: c.pedidos_incluidos == null ? '' : String(c.pedidos_incluidos),
+                                precio_pedido_extra: c.precio_pedido_extra == null ? '' : String(Number(c.precio_pedido_extra)),
                                 tramos: (c.tramos || []).map(t => ({ periodos: String(t.periodos), importe: String(t.importe) })),
                               } })}>
                               <Pencil className="w-3.5 h-3.5" />Editar
@@ -523,7 +533,7 @@ export default function PaginaFacturacion() {
                                   {ocupado === 'emitir-' + c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}Emitir ahora
                                 </button>
                                 <button className="btn-ghost text-xs whitespace-nowrap"
-                                  onClick={() => setSuelta({ cliente: c, concepto: 'Pedidos por encima del plan', importe: '', iva_incluido: true, iva_pct: String(c.iva_pct) })}>
+                                  onClick={() => setSuelta({ cliente: c, concepto: '', importe: '', iva_incluido: true, iva_pct: String(c.iva_pct) })}>
                                   <Plus className="w-3.5 h-3.5" />Factura suelta
                                 </button>
                               </>
@@ -577,7 +587,7 @@ export default function PaginaFacturacion() {
       {/* ---------- Factura suelta ---------- */}
       {suelta && (
         <Ventana titulo={`Factura suelta · ${suelta.cliente.razon_social}`} cerrar={() => setSuelta(null)}>
-          <p className="text-sm text-text-muted">Para cobrar algo fuera de la mensualidad, como los pedidos por encima del plan. Lleva la misma numeración.</p>
+          <p className="text-sm text-text-muted">Para cobrar algo fuera de la factura del mes (los pedidos de más ya van solos en ella). Lleva la misma numeración.</p>
           <Campo label="Concepto" valor={suelta.concepto} cambiar={v => setSuelta({ ...suelta, concepto: v })} />
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Importe (€)" valor={suelta.importe} cambiar={v => setSuelta({ ...suelta, importe: v })} tipo="text" />
@@ -687,6 +697,26 @@ function FormularioCliente({ editando, setEditando, restaurantes, guardar, guard
             <input type="checkbox" checked={d.iva_incluido} onChange={e => cambiar('iva_incluido', e.target.checked)} />
             IVA incluido
           </label>
+        </div>
+
+        {/* Pedidos de más: van solos en la factura del mes siguiente */}
+        <div className="rounded-lg border border-border p-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-text">Pedidos de más</p>
+            <p className="text-xs text-text-muted">
+              Cada factura del mes lleva también, en otra línea, los pedidos por encima de los incluidos del mes anterior.
+              Déjalo vacío si a este cliente no se le cobran.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Campo label="Pedidos incluidos al mes" valor={d.pedidos_incluidos} cambiar={v => cambiar('pedidos_incluidos', v)} />
+            <Campo label={`Precio por pedido de más (€${d.iva_incluido ? ', IVA incluido' : ' + IVA'})`}
+              valor={d.precio_pedido_extra} cambiar={v => cambiar('precio_pedido_extra', v)}
+              ayuda="Básico 0,20 · Pro 0,12 · Premium 0,08" />
+            <Campo label="Contar pedidos desde (opcional)" tipo="date" valor={d.pedidos_desde}
+              cambiar={v => cambiar('pedidos_desde', v)}
+              ayuda="Solo si ya usaba Comandi antes de su primera factura: esa primera factura cobrará los pedidos de más desde este día." />
+          </div>
         </div>
 
         {/* Regla de precio propia del cliente */}

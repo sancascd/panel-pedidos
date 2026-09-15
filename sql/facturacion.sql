@@ -15,7 +15,12 @@
 --  - Cada restaurante solo LEE sus facturas. La administradora las ve todas
 --    por funciones que comprueban soy_superadmin().
 --
--- Aplicar en Supabase -> SQL editor. Se puede repetir.
+-- Aplicar en Supabase -> SQL editor.
+--
+-- ⚠️ YA APLICADO (2026-09-15). NO volver a ejecutarlo: las funciones de aquí
+-- se han rehecho después en facturacion_importar_r2026_0001.sql y
+-- facturacion_pedidos_extra.sql, y este script las devolvería a la versión
+-- vieja. Para una base de datos nueva: este, luego esos dos, en ese orden.
 
 create extension if not exists pgcrypto with schema extensions;
 

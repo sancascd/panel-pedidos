@@ -20,6 +20,10 @@
 --  8. Un restaurante no ve las facturas de otro (RLS) y no puede emitir.
 --  9. Importes: 99 / 149 / 249 € con IVA incluido cuadran al céntimo.
 -- 10. Precio de promoción en los primeros periodos.
+-- 11. Los pedidos de más del periodo anterior van en la misma factura.
+--
+-- Ejecutar después de facturacion.sql, facturacion_importar_r2026_0001.sql y
+-- facturacion_pedidos_extra.sql.
 --
 -- Dos emisiones A LA VEZ no se pueden lanzar desde un solo script. Lo cubre
 -- el diseño: el contador se bloquea con insert ... on conflict do update
@@ -69,8 +73,8 @@ begin
   update clientes_facturacion set activo = true where id in (v_cli_a, v_cli_b);
 
   -- 1. Idempotencia
-  f1 := emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0);
-  f2 := emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0);
+  f1 := emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0, null);
+  f2 := emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0, null);
   if f1.id <> f2.id then raise exception 'FALLA 1: emitir dos veces creó dos facturas'; end if;
 
   -- 2. Correlativa entre restaurantes (y 10. promoción: B paga 49 € los 3 primeros)
@@ -83,22 +87,22 @@ begin
   begin update clientes_facturacion set tramos = '[{"periodos":0,"importe":49}]' where id = v_cli_b;
   exception when others then v_ok := true; end;
   if not v_ok then raise exception 'FALLA 10: aceptó un tramo de 0 periodos'; end if;
-  f2 := emitir_factura(v_cli_b, '2031-12-01', '2031-12-31', 0);
+  f2 := emitir_factura(v_cli_b, '2031-12-01', '2031-12-31', 0, null);
   if f2.total <> 49 then raise exception 'FALLA 10: la promoción no se aplicó (total %)', f2.total; end if;
-  if (select total from emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0)) <> 99 then
+  if (select total from emitir_factura(v_cli_a, '2031-11-20', '2031-12-19', 0, null)) <> 99 then
     raise exception 'FALLA 10: sin promoción no es el importe normal';
   end if;
-  f3 := emitir_factura(v_cli_a, '2031-12-20', '2032-01-18', 1);
+  f3 := emitir_factura(v_cli_a, '2031-12-20', '2032-01-18', 1, null);
   if f1.numero <> '2031-0001' or f2.numero <> '2031-0002' or f3.numero <> '2031-0003' then
     raise exception 'FALLA 2: numeración % / % / %', f1.numero, f2.numero, f3.numero;
   end if;
 
   -- 4. Futuro y anterior al inicio
   v_ok := false;
-  begin perform emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2); exception when others then v_ok := true; end;
+  begin perform emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2, null); exception when others then v_ok := true; end;
   if not v_ok then raise exception 'FALLA 4: dejó facturar un periodo futuro'; end if;
   v_ok := false;
-  begin perform emitir_factura(v_cli_a, '2031-10-21', '2031-11-19', 0); exception when others then v_ok := true; end;
+  begin perform emitir_factura(v_cli_a, '2031-10-21', '2031-11-19', 0, null); exception when others then v_ok := true; end;
   if not v_ok then raise exception 'FALLA 4: dejó facturar antes de la primera factura'; end if;
 
   -- 5. Inmutable
@@ -128,10 +132,27 @@ begin
     raise exception 'FALLA 7: la cadena de hashes no enlaza';
   end if;
 
-  -- 3. Cambio de año
+  -- 3. Cambio de año (y 11. pedidos de más del periodo anterior en la misma factura)
+  -- A tiene 2 pedidos incluidos a 0,20 €. En su periodo anterior (20/12/2031 a
+  -- 18/01/2032) entran 5 pedidos; uno justo antes y otro justo después no cuentan.
+  update clientes_facturacion set pedidos_incluidos = 2, precio_pedido_extra = 0.20 where id = v_cli_a;
+  insert into pedidos (restaurante_id, cliente_telefono, cliente_nombre, total, estado, tipo_entrega, metodo_pago, creado_en)
+  select v_rest_a, '+34000000000', 'Prueba facturación', 10, 'recibido', 'recogida', 'pago_en_local', t
+    from unnest(array[
+      '2031-12-20 00:05 Europe/Madrid', '2031-12-25 13:00 Europe/Madrid', '2032-01-01 21:00 Europe/Madrid',
+      '2032-01-10 14:00 Europe/Madrid', '2032-01-18 23:55 Europe/Madrid',
+      '2031-12-19 23:55 Europe/Madrid', '2032-01-19 00:05 Europe/Madrid'
+    ]::timestamptz[]) as t;
+
   perform set_config('facturacion.hoy', '2032-01-19', true);
-  f1 := emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2);
+  f1 := emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2, '2031-12-20');
   if f1.numero <> '2032-0001' then raise exception 'FALLA 3: el año nuevo empieza en %', f1.numero; end if;
+  if f1.pedidos_periodo_anterior <> 5 or f1.pedidos_extra <> 3 then
+    raise exception 'FALLA 11: contó % pedidos y % de más (esperaba 5 y 3)', f1.pedidos_periodo_anterior, f1.pedidos_extra;
+  end if;
+  if f1.total <> 99.60 or jsonb_array_length(f1.lineas) <> 2 or f1.base + f1.cuota_iva <> f1.total then
+    raise exception 'FALLA 11: total % con % líneas', f1.total, jsonb_array_length(f1.lineas);
+  end if;
 
   -- 9. Importes con IVA incluido
   for imp in select * from (values (99::numeric), (149), (249)) as t(importe) loop
@@ -148,7 +169,7 @@ begin
   select count(*) into v_count from facturas where restaurante_id = v_rest_a;
   if v_count < 3 then reset role; raise exception 'FALLA 8: el restaurante A no ve las suyas (%)', v_count; end if;
   v_ok := false;
-  begin perform emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2); exception when others then v_ok := true; end;
+  begin perform emitir_factura(v_cli_a, '2032-01-19', '2032-02-17', 2, null); exception when others then v_ok := true; end;
   if not v_ok then reset role; raise exception 'FALLA 8: un restaurante pudo llamar a emitir_factura'; end if;
   v_ok := false;
   begin perform * from clientes_facturacion limit 1; exception when others then v_ok := true; end;
