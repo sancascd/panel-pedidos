@@ -68,7 +68,7 @@ create table if not exists public.clientes_facturacion (
   tramos          jsonb not null default '[]'::jsonb,
   -- 'dias': cada `cada_dias` desde fecha_inicio (30 -> 15/09, 15/10, 14/11...).
   -- 'mensual': el mismo día de cada mes (el 31 cae el 30 en abril, el 28/29 en febrero).
-  frecuencia      text not null default 'dias' check (frecuencia in ('dias', 'mensual')),
+  frecuencia      text not null default 'mensual' check (frecuencia in ('dias', 'mensual')),
   cada_dias       int not null default 30 check (cada_dias between 1 and 366),
   -- Día de la PRIMERA factura. Las siguientes se calculan desde aquí.
   fecha_inicio    date not null,
@@ -132,14 +132,17 @@ end $$;
 -- ---------- 3. Las facturas ----------
 create table if not exists public.facturas (
   id                      uuid primary key default gen_random_uuid(),
-  serie                   text not null check (serie in ('F', 'R')),
+  -- F ordinarias · R rectificativas · X importadas con numeración ajena (Stripe).
+  serie                   text not null constraint facturas_serie_valida check (serie in ('F', 'R', 'X')),
   anio                    int  not null,
   secuencia               int  not null,
   numero                  text not null unique,
   tipo                    text not null check (tipo in ('ordinaria', 'rectificativa')),
   -- periodica: la del proceso diario · manual: factura suelta (pedidos de
   -- más; las implementaciones NO se facturan aquí) · rectificativa.
-  origen                  text not null check (origen in ('periodica', 'manual', 'rectificativa')),
+  -- importada: hecha fuera de la web y subida tal cual (sql/facturacion_importar_r2026_0001.sql).
+  origen                  text not null constraint facturas_origen_valido
+                            check (origen in ('periodica', 'manual', 'rectificativa', 'importada')),
   rectifica_factura_id    uuid references public.facturas(id),
   motivo_rectificacion    text,
   cliente_facturacion_id  uuid not null references public.clientes_facturacion(id),
@@ -157,13 +160,18 @@ create table if not exists public.facturas (
   cuota_iva               numeric(10,2) not null,
   total                   numeric(10,2) not null,
   pdf_path                text,
+  -- Rectificada POR SUSTITUCIÓN: se ve, pero no suma en totales ni en el Excel.
+  sustituida              boolean not null default false,
   hash                    text not null,
   hash_anterior           text,
   creado_en               timestamptz not null default now(),
   unique (serie, anio, secuencia),
-  check ((tipo = 'rectificativa') = (rectifica_factura_id is not null)),
+  constraint facturas_rectificativa_con_original
+    check ((tipo = 'rectificativa') = (rectifica_factura_id is not null)
+           or (origen = 'importada' and tipo = 'rectificativa' and rectifica_factura_id is null)),
   check (tipo <> 'rectificativa' or coalesce(motivo_rectificacion, '') <> ''),
-  check (origen <> 'periodica' or (periodo_inicio is not null and periodo_fin is not null))
+  constraint facturas_periodica_con_periodo
+    check (origen <> 'periodica' or (periodo_inicio is not null and periodo_fin is not null))
 );
 
 -- Nunca dos facturas del mismo periodo para el mismo cliente.
@@ -326,10 +334,12 @@ $function$;
 create or replace function public.facturacion_receptor(c public.clientes_facturacion)
 returns jsonb
 language sql
-immutable
+stable
+set search_path = public
 as $function$
   select jsonb_build_object('razon_social', c.razon_social, 'nif', c.nif, 'direccion', c.direccion,
-                            'cp', c.cp, 'ciudad', c.ciudad, 'provincia', c.provincia);
+                            'cp', c.cp, 'ciudad', c.ciudad, 'provincia', c.provincia,
+                            'establecimiento', (select nombre from restaurantes where id = c.restaurante_id));
 $function$;
 
 
@@ -519,7 +529,7 @@ begin
       trim(p->>'concepto'), (p->>'importe')::numeric,
       coalesce(p->'tramos', '[]'::jsonb),
       coalesce((p->>'iva_incluido')::boolean, true), coalesce((p->>'iva_pct')::numeric, 21),
-      coalesce(p->>'frecuencia', 'dias'), coalesce((p->>'cada_dias')::int, 30),
+      coalesce(p->>'frecuencia', 'mensual'), coalesce((p->>'cada_dias')::int, 30),
       (p->>'fecha_inicio')::date, nullif(p->>'fecha_fin', '')::date,
       coalesce((p->>'activo')::boolean, true), nullif(trim(p->>'notas'), '')
     ) returning id into v_id;
@@ -537,7 +547,7 @@ begin
       tramos         = coalesce(p->'tramos', '[]'::jsonb),
       iva_incluido   = coalesce((p->>'iva_incluido')::boolean, true),
       iva_pct        = coalesce((p->>'iva_pct')::numeric, 21),
-      frecuencia     = coalesce(p->>'frecuencia', 'dias'),
+      frecuencia     = coalesce(p->>'frecuencia', 'mensual'),
       cada_dias      = coalesce((p->>'cada_dias')::int, 30),
       fecha_inicio   = (p->>'fecha_inicio')::date,
       fecha_fin      = nullif(p->>'fecha_fin', '')::date,

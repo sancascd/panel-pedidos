@@ -32,7 +32,7 @@ function hoyTexto() {
 const CLIENTE_VACIO = {
   restaurante_id: '', razon_social: '', nif: '', direccion: '', cp: '', ciudad: 'Córdoba', provincia: 'Córdoba',
   concepto: CONCEPTO_DEFECTO, importe: '99', iva_incluido: true, iva_pct: '21',
-  frecuencia: 'dias', cada_dias: '30', fecha_inicio: '', fecha_fin: '', activo: true, notas: '', tramos: [],
+  frecuencia: 'mensual', cada_dias: '30', fecha_inicio: '', fecha_fin: '', activo: true, notas: '', tramos: [],
 };
 
 export default function PaginaFacturacion() {
@@ -114,7 +114,9 @@ export default function PaginaFacturacion() {
     () => Object.fromEntries(restaurantes.map(r => [r.id, r.nombre])), [restaurantes]);
   const numeroPorId = useMemo(() => Object.fromEntries(facturas.map(f => [f.id, f.numero])), [facturas]);
   const rectificadas = useMemo(() => new Set(facturas.map(f => f.rectifica_factura_id).filter(Boolean)), [facturas]);
-  const totales = useMemo(() => facturas.reduce((t, f) => ({
+  // Las sustituidas (rectificadas por sustitución) no suman: su rectificativa
+  // ya lleva el mismo importe.
+  const totales = useMemo(() => facturas.filter(f => !f.sustituida).reduce((t, f) => ({
     base: t.base + Number(f.base), cuota: t.cuota + Number(f.cuota_iva), total: t.total + Number(f.total),
   }), { base: 0, cuota: 0, total: 0 }), [facturas]);
   const faltaEmisor = emisor && (!emisor.razon_social || !emisor.cif || !emisor.domicilio || !emisor.registro_mercantil);
@@ -349,9 +351,13 @@ export default function PaginaFacturacion() {
                         <td className="px-4 py-3 font-medium text-text whitespace-nowrap tabular-nums">
                           {f.numero}
                           {f.tipo === 'rectificativa' && (
-                            <p className="text-xs font-normal text-amber-600 dark:text-amber-400">Rectifica la {numeroPorId[f.rectifica_factura_id] || '…'}</p>
+                            <p className="text-xs font-normal text-amber-600 dark:text-amber-400">
+                              {f.rectifica_factura_id ? `Rectifica la ${numeroPorId[f.rectifica_factura_id] || '…'}` : 'Rectificativa'}
+                            </p>
                           )}
-                          {rectificadas.has(f.id) && <p className="text-xs font-normal text-text-muted">Rectificada</p>}
+                          {f.sustituida
+                            ? <p className="text-xs font-normal text-text-muted">Sustituida · no suma</p>
+                            : rectificadas.has(f.id) && <p className="text-xs font-normal text-text-muted">Rectificada</p>}
                         </td>
                         <td className="px-4 py-3 text-text-muted whitespace-nowrap tabular-nums">{fechaCorta(f.fecha_emision)}</td>
                         <td className="px-4 py-3 text-text">
@@ -360,7 +366,7 @@ export default function PaginaFacturacion() {
                         </td>
                         <td className="px-4 py-3 text-text-muted">
                           {f.concepto}
-                          <p className="text-xs">{f.origen === 'periodica' ? periodoTexto(f) : f.origen === 'manual' ? 'Factura suelta' : ''}</p>
+                          <p className="text-xs">{f.origen === 'periodica' ? periodoTexto(f) : f.origen === 'manual' ? 'Factura suelta' : f.origen === 'importada' ? 'Hecha fuera de la web (importada)' : ''}</p>
                         </td>
                         <td className="px-4 py-3 text-right text-text whitespace-nowrap tabular-nums">{euros(f.total)}</td>
                         <td className="px-4 py-3 whitespace-nowrap">

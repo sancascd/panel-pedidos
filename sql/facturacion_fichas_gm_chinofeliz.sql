@@ -26,7 +26,7 @@ begin
       fecha_inicio, activo, notas
     ) values (
       v_gm, 'RESTAURANTE JING WANG SL', 'B14394498', 'Plaza Colón, 29', '14001', 'Córdoba', 'Córdoba',
-      'Suscripción Comandi – asistente de pedidos por WhatsApp (plan Básico)', 99, true, 21, 'dias', 30,
+      'Suscripción Comandi – asistente de pedidos por WhatsApp (plan Básico)', 99, true, 21, 'mensual', 30,
       '2026-10-14', false,
       'Septiembre facturado por Stripe (8S7OYWRK-0001 + rectificativa R-2026-0001 a mano).'
     );
@@ -41,7 +41,7 @@ begin
       fecha_inicio, activo, notas
     ) values (
       v_cf, 'Mingxi Ke', 'X6740325Z', 'Calle Alcalá Zamora, 11', '14006', 'Córdoba', 'Córdoba',
-      'Suscripción Comandi – asistente de pedidos por WhatsApp (plan Básico)', 99, true, 21, 'dias', 30,
+      'Suscripción Comandi – asistente de pedidos por WhatsApp (plan Básico)', 99, true, 21, 'mensual', 30,
       '2026-09-15', false,
       'Fecha de primera factura PROVISIONAL: poner la de la firma del servicio antes de activar.'
     );

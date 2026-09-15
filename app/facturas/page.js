@@ -25,7 +25,7 @@ export default function PaginaFacturas() {
       if (!restId) { setCargando(false); return; }
       const { data, error: e } = await supabase
         .from('facturas')
-        .select('id, numero, tipo, fecha_emision, periodo_inicio, periodo_fin, concepto, total')
+        .select('id, numero, tipo, fecha_emision, periodo_inicio, periodo_fin, concepto, total, sustituida')
         .eq('restaurante_id', restId)
         .order('fecha_emision', { ascending: false })
         .order('numero', { ascending: false });
@@ -104,6 +104,9 @@ export default function PaginaFacturas() {
                         {f.numero}
                         {f.tipo === 'rectificativa' && (
                           <span className="ml-2 badge bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">Rectificativa</span>
+                        )}
+                        {f.sustituida && (
+                          <span className="ml-2 badge bg-surface-2 text-text-muted border border-border">Sustituida</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-text-muted whitespace-nowrap tabular-nums">{fechaCorta(f.fecha_emision)}</td>
