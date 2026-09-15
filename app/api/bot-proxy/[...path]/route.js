@@ -25,7 +25,16 @@ const PATHS_PERMITIDOS = new Set([
   // Cobro con Stripe: el enlace solo lo genera la administradora (el bot lo
   // comprueba con X-Es-Superadmin); el portal, el propio restaurante.
   'stripe/enlace',
-  'stripe/portal'
+  'stripe/portal',
+  // Facturación: descargar lo puede el restaurante dueño de la factura; lo
+  // demás, solo la administradora. Lo comprueba el bot en cada ruta.
+  'facturacion/descargar',
+  'facturacion/emitir-ahora',
+  'facturacion/manual',
+  'facturacion/rectificativa',
+  'facturacion/proximas',
+  'facturacion/ejecutar',
+  'facturacion/excel'
 ]);
 
 // Devuelve el contexto de autorización del usuario autenticado:

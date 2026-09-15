@@ -15,7 +15,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
-  Briefcase, Presentation, FileText, BookOpen, Trophy
+  Briefcase, Presentation, FileText, BookOpen, Trophy, Receipt
 } from 'lucide-react';
 
 const LINKS_NAV = [
@@ -27,8 +27,10 @@ const LINKS_NAV = [
   { href: '/analiticas', icono: BarChart3,       label: 'Analíticas' },
   { href: '/resenas',    icono: Star,            label: 'Reseñas' },
   { href: '/plan',       icono: Gauge,           label: 'Plan' },
+  { href: '/facturas',   icono: Receipt,         label: 'Facturas' },
   { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
   { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
+  { href: '/admin/facturacion', icono: Receipt,  label: 'Facturación', soloAdmin: true },
   { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
   // Solo cifras del equipo (ranking, ciudades, avance): nunca los
   // restaurantes de otro comercial. Lo ven los comerciales y la administradora.
