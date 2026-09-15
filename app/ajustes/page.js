@@ -99,6 +99,7 @@ export default function PaginaAjustes() {
     direccion: '',
     pedido_minimo: '',
     aviso_domicilio: '',
+    cargo_bolsa: '',
     email_contacto: '',
     carta_url: '',
     carta_tipo: 'comandi',
@@ -127,6 +128,7 @@ export default function PaginaAjustes() {
           direccion: rest.direccion || '',
           pedido_minimo: rest.pedido_minimo == null ? '' : String(rest.pedido_minimo),
           aviso_domicilio: rest.aviso_domicilio || '',
+          cargo_bolsa: Number(rest.cargo_bolsa) > 0 ? String(Number(rest.cargo_bolsa)) : '',
           email_contacto: rest.email_contacto || '',
           carta_url: rest.carta_url || '',
           // Si no hay preferencia guardada, inferir la efectiva actual.
@@ -155,6 +157,11 @@ export default function PaginaAjustes() {
       avisar('Debes aceptar al menos un método de pago.', 'error');
       return;
     }
+    const bolsa = String(datos.cargo_bolsa).trim().replace(',', '.');
+    if (bolsa !== '' && !(Number(bolsa) >= 0 && Number(bolsa) <= 5)) {
+      avisar('El cargo por bolsa tiene que ser un importe entre 0 y 5 €.', 'error');
+      return;
+    }
     setGuardando(true);
     const { error } = await supabase
       .from('restaurantes')
@@ -169,6 +176,10 @@ export default function PaginaAjustes() {
           ? null
           : Number(String(datos.pedido_minimo).replace(',', '.')),
         aviso_domicilio: datos.aviso_domicilio.trim() || null,
+        // Vacío = no se cobra bolsa (0).
+        cargo_bolsa: String(datos.cargo_bolsa).trim() === ''
+          ? 0
+          : Math.round(Number(String(datos.cargo_bolsa).replace(',', '.')) * 100) / 100,
         email_contacto: datos.email_contacto.trim() || null,
         carta_url: datos.carta_url.trim() || null,
         carta_tipo: datos.carta_tipo || null,
@@ -369,6 +380,23 @@ export default function PaginaAjustes() {
                 Si el pedido no llega, el bot lo avisa antes de pedir la dirección y ofrece
                 recogerlo en el local. Déjalo vacío si repartes sin mínimo. La recogida nunca
                 tiene mínimo.
+              </p>
+            </div>
+            <div>
+              <label className="label">Cargo por bolsa</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.01"
+                value={datos.cargo_bolsa}
+                onChange={(e) => setDatos({ ...datos, cargo_bolsa: e.target.value })}
+                className="input"
+                placeholder="Sin cargo"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                Se suma una vez a cada pedido y sale como línea «Bolsa» en el resumen, el panel y el ticket.
+                No cuenta para el pedido mínimo. Déjalo vacío si no cobras bolsa.
               </p>
             </div>
             <div>

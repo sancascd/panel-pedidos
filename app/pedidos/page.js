@@ -330,6 +330,9 @@ function TicketImprimible({ pedido, lineas, restaurante, formatearFecha, telefon
           ))}
         </tbody>
       </table>
+      {Number(pedido.cargo_bolsa) > 0 && (
+        <p>Bolsa: {Number(pedido.cargo_bolsa).toFixed(2)}&euro;</p>
+      )}
       <div className="separador"></div>
       <p className="total">TOTAL: {Number(pedido.total).toFixed(2)}&euro;</p>
       <div className="separador"></div>
@@ -1120,10 +1123,13 @@ export default function PaginaPedidos() {
     setProductoAAgregar('');
   }
 
+  // La bolsa que se cobró en el pedido se mantiene al editarlo: sin esto, al
+  // guardar se perdía del total.
   function totalEditado() {
-    return lineasEditadas
+    const platos = lineasEditadas
       .filter(l => l.cantidad > 0)
       .reduce((sum, l) => sum + (l.cantidad * l.precio_unitario), 0);
+    return Math.round((platos + Number(seleccionado?.cargo_bolsa || 0)) * 100) / 100;
   }
 
   function actualizarDatos(campo, valor) {
@@ -2484,6 +2490,12 @@ export default function PaginaPedidos() {
                     </div>
                   </div>
 
+                  {Number(seleccionado?.cargo_bolsa) > 0 && (
+                    <div className="flex justify-between text-sm text-text-muted mb-1">
+                      <span>Bolsa</span>
+                      <span className="tabular-nums">{Number(seleccionado.cargo_bolsa).toFixed(2)}€</span>
+                    </div>
+                  )}
                   <div className="border-t border-border pt-3 mb-4 flex justify-between items-baseline">
                     <span className="text-sm font-medium text-text-muted">Total</span>
                     <span className="text-2xl font-bold text-text tabular-nums">{totalEditado().toFixed(2)}€</span>
@@ -2668,6 +2680,12 @@ export default function PaginaPedidos() {
                           )}
                         </div>
                       ))}
+                      {Number(seleccionado.cargo_bolsa) > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="flex-1 text-text-muted">Bolsa</span>
+                          <span className="font-medium text-text tabular-nums">{Number(seleccionado.cargo_bolsa).toFixed(2)}€</span>
+                        </div>
+                      )}
                       <div className="flex justify-between items-baseline pt-3 border-t border-border">
                         <span className="text-sm font-medium text-text-muted">Total</span>
                         <span className="text-2xl font-bold text-text tabular-nums">{Number(seleccionado.total).toFixed(2)}€</span>
