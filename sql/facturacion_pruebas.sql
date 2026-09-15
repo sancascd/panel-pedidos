@@ -64,7 +64,6 @@ begin
 
   insert into clientes_facturacion (restaurante_id, razon_social, nif, direccion, importe, fecha_inicio, activo)
   values (v_rest_a, 'PRUEBA A SL', 'B00000001', 'Calle A 1', 99, '2031-11-20', false) returning id into v_cli_a;
-  update clientes_facturacion set activo = true where id = v_cli_a;
   insert into clientes_facturacion (restaurante_id, razon_social, nif, direccion, importe, fecha_inicio, activo)
   values (v_rest_b, 'PRUEBA B SL', 'B00000002', 'Calle B 2', 149, '2031-12-01', false) returning id into v_cli_b;
   -- Por si alguno de los dos ya tuviera ficha activa de verdad, las de prueba
