@@ -6,7 +6,7 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
 import {
   ArrowLeft, Receipt, Loader2, AlertCircle, CheckCircle2, Download, FileSpreadsheet,
-  CalendarClock, Users, Building2, Plus, Pencil, Undo2, Send, Play, X, Trash2
+  CalendarClock, Users, Building2, Plus, Pencil, Undo2, Send, Play, X, Trash2, RefreshCw
 } from 'lucide-react';
 import { euros, fechaCorta, periodoTexto, pedirAlBot, descargarPdf, guardarBase64 } from '@/lib/facturacion';
 import { errorNif, limpiarNif } from '@/lib/nif';
@@ -388,6 +388,16 @@ export default function PaginaFacturacion() {
                               onClick={() => conOcupado('pdf-' + f.id, () => descargarPdf(f.id))}>
                               {ocupado === 'pdf-' + f.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}PDF
                             </button>
+                            {f.origen !== 'importada' && (
+                              <button className="btn-ghost text-xs whitespace-nowrap"
+                                title="Vuelve a dibujar el PDF con el diseño actual. Los datos de la factura no cambian."
+                                onClick={() => conOcupado('rehacer-' + f.id, async () => {
+                                  await pedirAlBot('rehacer-pdf', { factura_id: f.id });
+                                  avisar(`PDF de la ${f.numero} rehecho con el diseño actual.`);
+                                })}>
+                                {ocupado === 'rehacer-' + f.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Rehacer PDF
+                              </button>
+                            )}
                             {f.tipo === 'ordinaria' && !rectificadas.has(f.id) && (
                               <button className="btn-ghost text-xs whitespace-nowrap" title="Crear una rectificativa que anula esta factura"
                                 onClick={() => setRectificando({ factura: f, motivo: '' })}>

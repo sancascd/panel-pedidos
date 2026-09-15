@@ -34,7 +34,8 @@ const PATHS_PERMITIDOS = new Set([
   'facturacion/rectificativa',
   'facturacion/proximas',
   'facturacion/ejecutar',
-  'facturacion/excel'
+  'facturacion/excel',
+  'facturacion/rehacer-pdf'
 ]);
 
 // Devuelve el contexto de autorización del usuario autenticado:
