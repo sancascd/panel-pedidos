@@ -19,33 +19,43 @@ import {
 } from 'lucide-react';
 import { SECCIONES_ADMIN, rutaSeccionAdmin } from '@/lib/menuAdmin';
 
+// Orden del menú del restaurante (Sandra, 2026-09-15):
+//   Tablero · Carta y menús ▾ · Clientes · Analíticas · Reseñas (si están activadas)
+//   ── Plan · Facturas · Ajustes (Horarios se abre desde Ajustes)
+// `zona`: entre zonas distintas se pinta una barra. `grupo`: se juntan en una
+// entrada que se despliega (GRUPOS).
 const LINKS_NAV = [
-  { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
-  { href: '/carta',      icono: UtensilsCrossed, label: 'Carta' },
-  { href: '/menus',      icono: ClipboardList,   label: 'Menús' },
-  { href: '/horarios',   icono: Clock,           label: 'Horarios' },
-  { href: '/clientes',   icono: Users,           label: 'Clientes' },
-  { href: '/analiticas', icono: BarChart3,       label: 'Analíticas' },
-  { href: '/resenas',    icono: Star,            label: 'Reseñas' },
-  { href: '/plan',       icono: Gauge,           label: 'Plan' },
-  { href: '/facturas',   icono: Receipt,         label: 'Facturas' },
-  { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
+  { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero',    zona: 1 },
+  { href: '/carta',      icono: UtensilsCrossed, label: 'Carta',      zona: 1, grupo: 'carta' },
+  { href: '/menus',      icono: ClipboardList,   label: 'Menús',      zona: 1, grupo: 'carta' },
+  { href: '/clientes',   icono: Users,           label: 'Clientes',   zona: 1 },
+  { href: '/analiticas', icono: BarChart3,       label: 'Analíticas', zona: 1 },
+  // Solo si el restaurante tiene las reseñas activadas (vienen apagadas).
+  { href: '/resenas',    icono: Star,            label: 'Reseñas',    zona: 1, soloResenas: true },
+  { href: '/plan',       icono: Gauge,           label: 'Plan',       zona: 2 },
+  { href: '/facturas',   icono: Receipt,         label: 'Facturas',   zona: 2 },
+  { href: '/ajustes',    icono: Settings,        label: 'Ajustes',    zona: 2 },
   // La administradora ya no tiene enlace «Admin»: sus secciones (Dashboard,
   // Restaurantes, Planes, Comerciales, Facturación) van arriba del desplegable
   // en todas sus páginas (lib/menuAdmin). Decisión de Sandra, 2026-09-15.
-  { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
+  { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true, zona: 3 },
   // Solo cifras del equipo (ranking, ciudades, avance): nunca los
   // restaurantes de otro comercial. Lo ven los comerciales y la administradora.
-  { href: '/equipo',     icono: Trophy,          label: 'Cómo va el equipo', labelAdmin: 'Ranking', soloEquipo: true },
+  { href: '/equipo',     icono: Trophy,          label: 'Cómo va el equipo', labelAdmin: 'Ranking', soloEquipo: true, zona: 3 },
   // Se abre en otra pestana: es un PDF para enseñar o mandar, no una pagina
   // del panel. Lo ven la administradora y los comerciales, nadie mas.
   { href: '/material/comandi-como-funciona.pdf', icono: FileText,
-    label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true, material: true },
+    label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true, grupoAdmin: 'materiales', zona: 3 },
   // La guía completa para el comercial. Lleva consejos de venta que el
   // restaurante no debe leer: es para ellos, no para enseñar ni mandar.
   { href: '/material/guia-comercial.pdf', icono: BookOpen,
-    label: 'Material para el comercial', soloEquipo: true, nuevaPestana: true, material: true },
+    label: 'Material para el comercial', soloEquipo: true, nuevaPestana: true, grupoAdmin: 'materiales', zona: 3 },
 ];
+
+const GRUPOS = {
+  carta:      { label: 'Carta y menús', icono: UtensilsCrossed },
+  materiales: { label: 'Materiales',    icono: FolderOpen },
+};
 
 // `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa
 // /admin). Asi la cabecera no acumula dos filas de navegacion.
@@ -70,6 +80,8 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   // El numero al que tiene que escribir el cliente que estas visitando. Es lo
   // primero que hace falta en una demostracion, asi que va en la propia barra.
   const [numeroDemo, setNumeroDemo] = useState('');
+  // Reseñas solo sale en el menú si el restaurante las tiene activadas.
+  const [resenasActivas, setResenasActivas] = useState(false);
   // La barra de 'estas dentro de un restaurante' se pinta FUERA de la cabecera
   // (ver mas abajo el porque); para eso hace falta saber que ya hay document.
   const [montado, setMontado] = useState(false);
@@ -121,8 +133,9 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
         setSinRestaurante(!data);
         if (!data) { setNombreRestaurante(''); setEsDemo(false); return; }
         const { data: rest } = await supabase
-          .from('restaurantes').select('nombre, es_demo, whatsapp_numero').eq('id', data).maybeSingle();
+          .from('restaurantes').select('nombre, es_demo, whatsapp_numero, resenas_activas').eq('id', data).maybeSingle();
         if (!activo) return;
+        setResenasActivas(rest?.resenas_activas === true);
         setNombreRestaurante(rest?.nombre || '');
         setEsDemo(rest?.es_demo === true);
         setNumeroDemo(rest?.es_demo ? (rest.whatsapp_numero || '') : '');
@@ -146,6 +159,7 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
     if (l.soloComercial && !esComercial) return false;
     if (l.soloEquipo && !puedeDemostrar) return false;
     if (soloLoSuyo && !l.soloAdmin && !l.soloComercial && !l.soloEquipo) return false;
+    if (l.soloResenas && !resenasActivas) return false;
     return true;
   });
 
@@ -156,9 +170,77 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
   const seccionesMenu = secciones && secciones.length
     ? secciones
     : (menuAdmin ? SECCIONES_ADMIN.map(s => ({ ...s, href: rutaSeccionAdmin(s.id) })) : null);
-  const materiales = menuAdmin ? linksVisibles.filter(l => l.material) : [];
-  const linksLista = menuAdmin ? linksVisibles.filter(l => !l.material) : linksVisibles;
-  const [materialesAbierto, setMaterialesAbierto] = useState(false);
+  // Grupo de cada enlace: `grupo` para todos; `grupoAdmin` solo en el menú de
+  // la administradora (los materiales de los comerciales siguen sueltos).
+  const grupoDe = (l) => l.grupo || (menuAdmin ? l.grupoAdmin : null);
+  // Un grupo empieza abierto si se está en una de sus páginas.
+  const [gruposAbiertos, setGruposAbiertos] = useState({});
+  const grupoAbierto = (g) => gruposAbiertos[g] ?? linksVisibles.some(l => grupoDe(l) === g && l.href === pathname);
+
+  // Los enlaces del desplegable: una barra al cambiar de zona y los grupos
+  // («Carta y menús», «Materiales») como una entrada que se despliega.
+  function pintarEnlaces() {
+    const piezas = [];
+    const gruposPintados = new Set();
+    let zonaAnterior = null;
+
+    const enlace = (l, dentro) => {
+      const otraPestana = l.nuevaPestana || (protegerTablero && l.href !== '/pedidos');
+      const Icono = l.icono;
+      return (
+        <a
+          key={l.href}
+          href={l.href}
+          role="menuitem"
+          target={otraPestana ? '_blank' : undefined}
+          rel={otraPestana ? 'noopener noreferrer' : undefined}
+          onClick={() => setAbierto(false)}
+          className={`flex items-center gap-2.5 ${dentro ? 'pl-9 pr-3 py-2' : 'px-3 py-2.5'} rounded-lg text-sm font-medium transition-colors ${
+            pathname === l.href
+              ? 'bg-accent/10 text-accent'
+              : 'text-text-muted hover:text-text hover:bg-surface-2'
+          }`}
+        >
+          <Icono className="w-4 h-4 flex-shrink-0" />
+          {(menuAdmin && l.labelAdmin) || l.label}
+        </a>
+      );
+    };
+
+    for (const l of linksVisibles) {
+      const g = grupoDe(l);
+      if (g && gruposPintados.has(g)) continue;
+      if (zonaAnterior !== null && l.zona !== zonaAnterior) {
+        piezas.push(<div key={'barra-' + l.href} className="my-1.5 border-t border-border" />);
+      }
+      zonaAnterior = l.zona;
+
+      if (!g) { piezas.push(enlace(l, false)); continue; }
+
+      gruposPintados.add(g);
+      const { label, icono: IconoGrupo } = GRUPOS[g];
+      const abiertoGrupo = grupoAbierto(g);
+      const hijos = linksVisibles.filter(x => grupoDe(x) === g);
+      const dentroDelGrupo = hijos.some(x => x.href === pathname);
+      piezas.push(
+        <button
+          key={'grupo-' + g}
+          onClick={() => setGruposAbiertos(prev => ({ ...prev, [g]: !abiertoGrupo }))}
+          role="menuitem"
+          aria-expanded={abiertoGrupo}
+          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            dentroDelGrupo && !abiertoGrupo ? 'bg-accent/10 text-accent' : 'text-text-muted hover:text-text hover:bg-surface-2'
+          }`}
+        >
+          <IconoGrupo className="w-4 h-4 flex-shrink-0" />
+          {label}
+          <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${abiertoGrupo ? 'rotate-180' : ''}`} />
+        </button>
+      );
+      if (abiertoGrupo) hijos.forEach(h => piezas.push(enlace(h, true)));
+    }
+    return piezas;
+  }
 
   async function salirDelPanel() {
     const supabase = crearClienteSupabase();
@@ -288,56 +370,7 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                 <div className="my-1.5 border-t border-border" />
               </>
             )}
-            {linksLista.map(({ href, icono: Icono, label, labelAdmin, nuevaPestana }) => {
-              const otraPestana = nuevaPestana || (protegerTablero && href !== '/pedidos');
-              return (
-              <a
-                key={href}
-                href={href}
-                role="menuitem"
-                target={otraPestana ? '_blank' : undefined}
-                rel={otraPestana ? 'noopener noreferrer' : undefined}
-                onClick={() => setAbierto(false)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === href
-                    ? 'bg-accent/10 text-accent'
-                    : 'text-text-muted hover:text-text hover:bg-surface-2'
-                }`}
-              >
-                <Icono className="w-4 h-4 flex-shrink-0" />
-                {(menuAdmin && labelAdmin) || label}
-              </a>
-              );
-            })}
-            {/* Los dos PDF juntos bajo «Materiales» (administradora) */}
-            {materiales.length > 0 && (
-              <>
-                <button
-                  onClick={() => setMaterialesAbierto(v => !v)}
-                  role="menuitem"
-                  aria-expanded={materialesAbierto}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
-                >
-                  <FolderOpen className="w-4 h-4 flex-shrink-0" />
-                  Materiales
-                  <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${materialesAbierto ? 'rotate-180' : ''}`} />
-                </button>
-                {materialesAbierto && materiales.map(({ href, icono: Icono, label }) => (
-                  <a
-                    key={href}
-                    href={href}
-                    role="menuitem"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setAbierto(false)}
-                    className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
-                  >
-                    <Icono className="w-4 h-4 flex-shrink-0" />
-                    {label}
-                  </a>
-                ))}
-              </>
-            )}
+            {pintarEnlaces()}
           </div>
         </>
       )}

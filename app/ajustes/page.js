@@ -7,7 +7,8 @@ import MenuNav from '@/components/MenuNav';
 import { COMANDO_KIOSK, PASOS_KIOSK, PRUEBA_KIOSK } from '@/lib/impresion';
 import {
   ArrowLeft, Settings, Loader2, AlertCircle, CheckCircle2,
-  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, Printer, Copy, Check
+  Upload, Trash2, FileText, Image as ImageIcon, ExternalLink, Star, MessageSquare, Wallet, Printer, Copy, Check,
+  Clock, ChevronRight
 } from 'lucide-react';
 
 // Helpers para construir los mensajes completos del bot
@@ -105,7 +106,7 @@ export default function PaginaAjustes() {
     carta_tipo: 'comandi',
     acepta_efectivo: true,
     acepta_tarjeta: true,
-    resenas_activas: true,
+    resenas_activas: false,
     mensaje_bienvenida: '',
     mensaje_cerrado: '',
     mensaje_despedida: '',
@@ -136,7 +137,8 @@ export default function PaginaAjustes() {
             || (rest.slug ? 'comandi' : (rest.carta_url ? 'enlace' : (rest.carta_pdf_url ? 'pdf' : 'comandi'))),
           acepta_efectivo: rest.acepta_efectivo !== false,
           acepta_tarjeta: rest.acepta_tarjeta !== false,
-          resenas_activas: rest.resenas_activas !== false,
+          // El bot solo pide reseñas si es true: vacío = apagadas (vienen así por defecto).
+          resenas_activas: rest.resenas_activas === true,
           mensaje_bienvenida: rest.mensaje_bienvenida || '',
           mensaje_cerrado: rest.mensaje_cerrado || '',
           mensaje_despedida: rest.mensaje_despedida || '',
@@ -308,6 +310,18 @@ export default function PaginaAjustes() {
             <span>{mensaje.texto}</span>
           </div>
         )}
+
+        {/* Horarios ya no está en el menú: se abre desde aquí (Sandra, 2026-09-15) */}
+        <a href="/horarios" className="card p-5 flex items-center gap-4 hover:border-accent/40 transition-colors">
+          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-5 h-5 text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-semibold text-text">Horarios</h2>
+            <p className="text-sm text-text-muted">Los turnos de cada día y los días que cierras.</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-text-muted flex-shrink-0" />
+        </a>
 
         {/* Datos básicos */}
         <div className="card p-6">

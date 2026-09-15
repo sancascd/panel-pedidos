@@ -110,9 +110,10 @@ export default function PaginaHorarios() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/pedidos" className="btn-ghost">
+            {/* Horarios se abre desde Ajustes: se vuelve allí */}
+            <a href="/ajustes" className="btn-ghost">
               <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Volver</span>
+              <span className="hidden sm:inline">Ajustes</span>
             </a>
             <div className="h-6 w-px bg-border mx-1" />
             <MenuNav />
