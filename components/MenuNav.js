@@ -15,8 +15,9 @@ import { crearClienteSupabase } from '@/lib/supabase';
 import {
   Menu, X, LayoutDashboard, UtensilsCrossed, Clock,
   Users, BarChart3, Star, Gauge, Settings, Shield, LogOut, ClipboardList,
-  Briefcase, Presentation, FileText, BookOpen, Trophy, Receipt
+  Briefcase, Presentation, FileText, BookOpen, Trophy, Receipt, FolderOpen, ChevronDown
 } from 'lucide-react';
+import { SECCIONES_ADMIN, rutaSeccionAdmin } from '@/lib/menuAdmin';
 
 const LINKS_NAV = [
   { href: '/pedidos',    icono: LayoutDashboard, label: 'Tablero' },
@@ -29,20 +30,21 @@ const LINKS_NAV = [
   { href: '/plan',       icono: Gauge,           label: 'Plan' },
   { href: '/facturas',   icono: Receipt,         label: 'Facturas' },
   { href: '/ajustes',    icono: Settings,        label: 'Ajustes' },
-  { href: '/admin',      icono: Shield,          label: 'Admin', soloAdmin: true },
-  { href: '/admin/facturacion', icono: Receipt,  label: 'Facturación', soloAdmin: true },
+  // La administradora ya no tiene enlace «Admin»: sus secciones (Dashboard,
+  // Restaurantes, Planes, Comerciales, Facturación) van arriba del desplegable
+  // en todas sus páginas (lib/menuAdmin). Decisión de Sandra, 2026-09-15.
   { href: '/comercial',  icono: Briefcase,       label: 'Mis contactos', soloComercial: true },
   // Solo cifras del equipo (ranking, ciudades, avance): nunca los
   // restaurantes de otro comercial. Lo ven los comerciales y la administradora.
-  { href: '/equipo',     icono: Trophy,          label: 'Cómo va el equipo', soloEquipo: true },
+  { href: '/equipo',     icono: Trophy,          label: 'Cómo va el equipo', labelAdmin: 'Ranking', soloEquipo: true },
   // Se abre en otra pestana: es un PDF para enseñar o mandar, no una pagina
   // del panel. Lo ven la administradora y los comerciales, nadie mas.
   { href: '/material/comandi-como-funciona.pdf', icono: FileText,
-    label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true },
+    label: 'Material para el cliente', soloEquipo: true, nuevaPestana: true, material: true },
   // La guía completa para el comercial. Lleva consejos de venta que el
   // restaurante no debe leer: es para ellos, no para enseñar ni mandar.
   { href: '/material/guia-comercial.pdf', icono: BookOpen,
-    label: 'Material para el comercial', soloEquipo: true, nuevaPestana: true },
+    label: 'Material para el comercial', soloEquipo: true, nuevaPestana: true, material: true },
 ];
 
 // `secciones` deja meter en el desplegable las pestanas de una pagina (lo usa
@@ -147,6 +149,17 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
     return true;
   });
 
+  // Desplegable de la administradora (fuera de un restaurante), igual en todas
+  // sus páginas: sus secciones arriba · Demostración · Ranking y Materiales.
+  // Si la página ya trae sus `secciones` (/admin, /admin/facturacion), mandan esas.
+  const menuAdmin = esAdmin && soloLoSuyo;
+  const seccionesMenu = secciones && secciones.length
+    ? secciones
+    : (menuAdmin ? SECCIONES_ADMIN.map(s => ({ ...s, href: rutaSeccionAdmin(s.id) })) : null);
+  const materiales = menuAdmin ? linksVisibles.filter(l => l.material) : [];
+  const linksLista = menuAdmin ? linksVisibles.filter(l => !l.material) : linksVisibles;
+  const [materialesAbierto, setMaterialesAbierto] = useState(false);
+
   async function salirDelPanel() {
     const supabase = crearClienteSupabase();
     // salir_del_restaurante() exige superadmin; salir_de_la_demo() no, porque
@@ -220,12 +233,16 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
             aria-hidden
           />
           <div className="absolute right-0 mt-2 w-56 z-50 card shadow-lift p-1.5 animate-fade-in" role="menu">
-            {secciones && secciones.length > 0 && (
+            {seccionesMenu && seccionesMenu.length > 0 && (
               <>
-                {secciones.map(({ id, label, icono: Icono, contador }) => (
+                {seccionesMenu.map(({ id, label, icono: Icono, contador, href }) => (
                   <button
                     key={id}
-                    onClick={() => { setAbierto(false); onSeccion(id); }}
+                    onClick={() => {
+                      setAbierto(false);
+                      if (href) { window.location.href = href; return; }
+                      onSeccion(id);
+                    }}
                     role="menuitem"
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       seccionActiva === id
@@ -266,12 +283,12 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
                 >
                   <Presentation className="w-4 h-4 flex-shrink-0" />
-                  Demostracion
+                  Demostración
                 </button>
                 <div className="my-1.5 border-t border-border" />
               </>
             )}
-            {linksVisibles.map(({ href, icono: Icono, label, nuevaPestana }) => {
+            {linksLista.map(({ href, icono: Icono, label, labelAdmin, nuevaPestana }) => {
               const otraPestana = nuevaPestana || (protegerTablero && href !== '/pedidos');
               return (
               <a
@@ -288,10 +305,39 @@ export default function MenuNav({ esAdmin: esAdminProp, secciones, seccionActiva
                 }`}
               >
                 <Icono className="w-4 h-4 flex-shrink-0" />
-                {label}
+                {(menuAdmin && labelAdmin) || label}
               </a>
               );
             })}
+            {/* Los dos PDF juntos bajo «Materiales» (administradora) */}
+            {materiales.length > 0 && (
+              <>
+                <button
+                  onClick={() => setMaterialesAbierto(v => !v)}
+                  role="menuitem"
+                  aria-expanded={materialesAbierto}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+                >
+                  <FolderOpen className="w-4 h-4 flex-shrink-0" />
+                  Materiales
+                  <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${materialesAbierto ? 'rotate-180' : ''}`} />
+                </button>
+                {materialesAbierto && materiales.map(({ href, icono: Icono, label }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    role="menuitem"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setAbierto(false)}
+                    className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+                  >
+                    <Icono className="w-4 h-4 flex-shrink-0" />
+                    {label}
+                  </a>
+                ))}
+              </>
+            )}
           </div>
         </>
       )}

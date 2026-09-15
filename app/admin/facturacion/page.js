@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { euros, fechaCorta, periodoTexto, pedirAlBot, descargarPdf, guardarBase64 } from '@/lib/facturacion';
 import { errorNif, limpiarNif } from '@/lib/nif';
+import { SECCIONES_ADMIN, rutaSeccionAdmin } from '@/lib/menuAdmin';
 
 // Facturación de Comandi, solo para la administradora. Leer va por funciones
 // de la base de datos que comprueban soy_superadmin(); emitir, descargar y
@@ -257,7 +258,10 @@ export default function PaginaFacturacion() {
               <span className="hidden sm:inline">Admin</span>
             </a>
             <div className="h-6 w-px bg-border mx-1" />
-            <MenuNav esAdmin secciones={SECCIONES} seccionActiva={seccion} onSeccion={setSeccion} />
+            {/* El desplegable es el mismo que en /admin; las pestañas de
+                facturación van en la propia página. */}
+            <MenuNav esAdmin secciones={SECCIONES_ADMIN} seccionActiva="facturacion"
+              onSeccion={(id) => { if (id !== 'facturacion') router.push(rutaSeccionAdmin(id)); }} />
           </div>
         </div>
       </header>

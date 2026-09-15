@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearClienteSupabase } from '@/lib/supabase';
 import MenuNav from '@/components/MenuNav';
+import { SECCIONES_ADMIN, rutaSeccionAdmin } from '@/lib/menuAdmin';
 import PuestaEnMarcha from '@/components/PuestaEnMarcha';
 import { avance } from '@/lib/puestaEnMarcha';
 import BotonTema from '@/components/BotonTema';
@@ -21,15 +22,11 @@ import {
 const DIAS_INACTIVIDAD = 7;
 
 // Las secciones viven en el desplegable, no en una barra de pestanas: con seis
-// pestanas la cabecera era todo ruido. "Rechazados" desaparece como seccion y
-// pasa a ser un filtro dentro de Restaurantes, que es donde se busca.
-const SECCIONES = [
-  { id: 'dashboard',    label: 'Dashboard',    icono: BarChart3 },
-  { id: 'planes',       label: 'Planes',       icono: Gauge },
-  { id: 'pendientes',   label: 'Pendientes',   icono: Clock },
-  { id: 'restaurantes', label: 'Restaurantes', icono: Store },
-  { id: 'comerciales',  label: 'Comerciales',  icono: Briefcase },
-];
+// pestanas la cabecera era todo ruido. Orden de Sandra (2026-09-15). Pendientes
+// y Rechazados no son secciones: son pestañas dentro de Restaurantes.
+// Facturación es otra página, pero va en el mismo desplegable (lib/menuAdmin).
+const SECCIONES = SECCIONES_ADMIN;
+const FILTROS_RESTAURANTES = ['activos', 'pendientes', 'rechazados'];
 
 export default function PaginaAdmin() {
   const router = useRouter();
@@ -52,7 +49,20 @@ export default function PaginaAdmin() {
   const [comerciales, setComerciales] = useState([]);
   const [comercialAbierto, setComercialAbierto] = useState(null);
   const [contactosDe, setContactosDe] = useState({}); // { comercial_id: [contactos] }
-  const [verRechazados, setVerRechazados] = useState(false);
+  const [filtroRest, setFiltroRest] = useState('activos');   // activos | pendientes | rechazados
+
+  // Se puede llegar a una sección desde otra página: /admin?seccion=planes
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get('seccion');
+    if (s && SECCIONES.some(x => x.id === s)) setPestana(s);
+    if (s === 'pendientes') { setPestana('restaurantes'); setFiltroRest('pendientes'); }
+  }, []);
+
+  function irASeccion(id) {
+    if (id === 'facturacion') { router.push(rutaSeccionAdmin(id)); return; }
+    setPestana(id);
+  }
 
   useEffect(() => {
     async function init() {
@@ -475,11 +485,10 @@ export default function PaginaAdmin() {
   const rechazados = restaurantes.filter(r => r.estado === 'rechazado');
 
   function listaActual() {
-    if (pestana === 'pendientes') return pendientes;
-    // Los rechazados no son una seccion propia: apenas se consultan. Viven
-    // como un filtro dentro de Restaurantes.
-    if (pestana === 'restaurantes') return verRechazados ? rechazados : aprobados;
-    return [];
+    if (pestana !== 'restaurantes') return [];
+    if (filtroRest === 'pendientes') return pendientes;
+    if (filtroRest === 'rechazados') return rechazados;
+    return aprobados;
   }
 
   function badgeEstado(estado) {
@@ -518,14 +527,14 @@ export default function PaginaAdmin() {
             <MenuNav
             secciones={SECCIONES.map(sec => ({
               ...sec,
+              // Restaurantes cuenta los pendientes: es lo que pide atención.
               contador: sec.id === 'planes' ? (solicitudes.length || undefined)
-                      : sec.id === 'pendientes' ? (pendientes.length || undefined)
-                      : sec.id === 'restaurantes' ? aprobados.length
+                      : sec.id === 'restaurantes' ? (pendientes.length || undefined)
                       : sec.id === 'comerciales' ? (comerciales.filter(c => !c.activo).length || undefined)
                       : undefined,
             }))}
             seccionActiva={pestana}
-            onSeccion={setPestana}
+            onSeccion={irASeccion}
           />
             <button
               onClick={cerrarSesion}
@@ -768,39 +777,40 @@ export default function PaginaAdmin() {
         {pestana === 'restaurantes' && (
           <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm text-text-muted">
-              {verRechazados
-                ? rechazados.length + (rechazados.length === 1 ? ' restaurante rechazado' : ' restaurantes rechazados')
-                : aprobados.length + (aprobados.length === 1 ? ' restaurante activo' : ' restaurantes activos')}
+              {filtroRest === 'pendientes'
+                ? pendientes.length + (pendientes.length === 1 ? ' restaurante pendiente' : ' restaurantes pendientes')
+                : filtroRest === 'rechazados'
+                  ? rechazados.length + (rechazados.length === 1 ? ' restaurante rechazado' : ' restaurantes rechazados')
+                  : aprobados.length + (aprobados.length === 1 ? ' restaurante activo' : ' restaurantes activos')}
             </p>
             <div className="flex gap-1 p-1 rounded-lg bg-surface-2">
-              <button
-                onClick={() => setVerRechazados(false)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  !verRechazados ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'
-                }`}
-              >
-                Activos
-              </button>
-              <button
-                onClick={() => setVerRechazados(true)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  verRechazados ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'
-                }`}
-              >
-                Rechazados{rechazados.length ? ' (' + rechazados.length + ')' : ''}
-              </button>
+              {FILTROS_RESTAURANTES.map(f => {
+                const n = f === 'pendientes' ? pendientes.length : f === 'rechazados' ? rechazados.length : null;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFiltroRest(f)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      filtroRest === f ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'
+                    }`}
+                  >
+                    {f === 'activos' ? 'Activos' : f === 'pendientes' ? 'Pendientes' : 'Rechazados'}
+                    {n ? ' (' + n + ')' : ''}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {(pestana === 'pendientes' || pestana === 'restaurantes') && (
+        {pestana === 'restaurantes' && (
           listaActual().length === 0 ? (
             <div className="card p-12 text-center">
               <Store className="w-10 h-10 text-text-muted mx-auto mb-3 opacity-50" />
               <p className="text-text-muted">
-                {pestana === 'pendientes'
+                {filtroRest === 'pendientes'
                   ? 'No hay solicitudes pendientes.'
-                  : verRechazados ? 'No has rechazado ninguno.' : 'Todavía no hay restaurantes activos.'}
+                  : filtroRest === 'rechazados' ? 'No has rechazado ninguno.' : 'Todavía no hay restaurantes activos.'}
               </p>
             </div>
           ) : (
